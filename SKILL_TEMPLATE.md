@@ -147,6 +147,8 @@ After {Sync}, counter is 1 and state is 🗒️. Do NOT carry forward the previo
 | `{ArtD}` | Restore artifacts to sidebar | Tier 3 |
 | [Add custom commands as needed] | | |
 
+**Save Location:** Claude routes saves by default (bonfires → MASTER+Memory, code → files). You can specify: "Save that to MASTER" or "Put that in memory." If memory is full, say "overflow to MASTER."
+
 ### Critical Rules
 
 | Rule | Meaning |
