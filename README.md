@@ -29,6 +29,7 @@ Two buttons. That's it.
 2. Fill in `MASTER_TEMPLATE.md` with your current state
 3. Paste SKILL content at session start
 4. Work naturally. Call `{Sync}` every ~10 messages.
+5. Watch the counter: 🗒️ normal → 🟡 past limit → 🟠 dangerous → 🔴 critical
 
 **See `SETUP_GUIDE.md` for full instructions and tier options.**
 

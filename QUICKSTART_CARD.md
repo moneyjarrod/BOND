@@ -21,23 +21,25 @@
 
 ---
 
-## COUNTER: 🗒️ N/X
+## COUNTER STATES
 
-- N = messages since sync
-- X = your threshold (5/10/15)
-- At X/X → call {Sync}
+| State | Display | Action |
+|-------|---------|--------|
+| Normal | `🗒️ N/LIMIT` | Keep working |
+| Past Limit | `🟡 N/LIMIT` | Consider sync |
+| Dangerous | `🟠 N/LIMIT` | Sync soon (15+) |
+| Critical | `🔴 N/LIMIT` | Sync NOW (20+) |
+
+Yellow = past YOUR limit. Orange/Red = universal.
 
 ---
 
 ## LAYERS (Top = Override)
-
-```
 Code/Examples  ← SOURCE OF TRUTH
-     ↑
-   MASTER      ← Current state
-     ↑
-   SKILL       ← Always true
-```
+↑
+MASTER      ← Current state
+↑
+SKILL       ← Always true
 
 ---
 
@@ -72,21 +74,15 @@ Code/Examples  ← SOURCE OF TRUTH
 ---
 
 ## FILES
-
-```
 Project/
 ├── SKILL.md    ← Identity
 ├── MASTER.md   ← State
 └── artifacts/  ← HTML sources (T3)
-```
 
 ---
 
 ## BONFIRE FLOW 🔥
-
-```
 Work → Proof → Propose {Save} → Agree → Write
-```
 
 ---
 

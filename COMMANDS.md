@@ -1,101 +1,66 @@
-# COMMANDS REFERENCE
-## BOND: The Bonfire Protocol
+# BOND Commands Reference
 
-*Bidirectional Ongoing Navigation & Drift-prevention*
+## Core Commands
 
----
-
-## Core Commands (The Two Buttons)
-
-### {Sync} - Button A
-
-**Purpose:** Read files, ground in truth, reset counter
-
-**When to use:**
-- Start of every session
-- Every ~10 messages (or when counter hits X/X)
-- After Claude seems confused or off-track
-- When switching tasks within a project
-
-**What Claude does:**
-1. Reads SKILL.md (identity layer)
-2. Reads MASTER.md (state layer)
-3. Optionally reads source-of-truth files if task requires
-4. Resets sticky counter to 1/X
-5. Confirms sync complete
-
-**Tier availability:**
-- Tier 1: Manual (paste files or key sections)
-- Tier 2+: Automated (Claude reads from filesystem)
+| Command | When | What It Does |
+|---------|------|--------------|
+| `{Sync}` | Every ~10 messages | Claude reads your files, re-grounds in truth |
+| `{Save}` | After proven work | Both agree → Claude writes to proper files |
 
 ---
 
-### {Save} - Button B
+## Sync Counter System
 
-**Purpose:** Write proven work to files
+Claude tracks messages since last `{Sync}` with a visual counter at the end of each response.
 
-**When to use:**
-- Bonfire achieved (with proof)
-- Session ending with progress to preserve
-- Important decision made
+### Counter States
 
-**The Protocol (Bidirectional Agreement):**
-1. One party proposes save (human or Claude)
-2. Other party confirms or raises concerns
-3. Both agree → Claude writes
-4. Never write without agreement
+| State | Symbol | Meaning |
+|-------|--------|---------|
+| **Normal** | `🗒️ N/LIMIT` | Under your limit |
+| **Past Limit** | `🟡 N/LIMIT` | Over your limit but < 15 |
+| **Dangerous** | `🟠 N/LIMIT` | 15+ messages without sync |
+| **Critical** | `🔴 N/LIMIT` | 20+ messages without sync |
 
-**Tier availability:**
-- Tier 1: Manual (you update files yourself)
-- Tier 2+: Automated (Claude writes to filesystem)
+### How It Works
+
+- Counter shows `N/LIMIT` where N = messages since sync, LIMIT = your configured limit
+- Counter **continues past limit** (11/10, 12/10...) rather than resetting
+- **Yellow threshold** varies by user's limit (personal warning)
+- **Orange threshold** (15) is universal (dangerous for any user)
+- **Red threshold** (20) is universal (critical for any user)
+
+### Example
+
+If your limit is 10:
+🗒️ 5/10   ← Normal, 5 messages in
+🗒️ 10/10  ← At limit
+🟡 12/10  ← Past YOUR limit, sync recommended
+🟠 15/10  ← Dangerous - context degradation likely
+🔴 22/10  ← Critical - sync immediately
+
+If someone else's limit is 5:
+🗒️ 3/5    ← Normal
+🟡 7/5    ← Past THEIR limit
+🟠 15/5   ← Same dangerous threshold
+🔴 20/5   ← Same critical threshold
+
+### Setting Your Limit
+
+In your SKILL.md or memory, specify:
+{Sync} limit: 10
 
 ---
 
 ## Supporting Commands
 
-| Command | Purpose | Tier |
-|---------|---------|------|
-| `{Restore}` | Full reload of all files | 2+ |
-| `{ArtD}` | Restore artifacts to sidebar | 3 |
-| `{Tick}` | Quick status check (no file read) | All |
-| `{Relational}` | Architecture alignment check | 2+ |
-| `{Drift?}` | Self-check for drift | All |
+| Command | Purpose |
+|---------|---------|
+| `{Tick}` | Quick session snapshot (no file writes) |
+| `{Chunk}` | Handoff compression for context limits |
+| `{Relational}` | Architecture alignment check |
+| `{ArtD}` | Restore artifacts to sidebar |
 
 ---
 
-## The Sticky Counter
-
-**Format:** `🗒️ N/X`
-
-- N = messages since last {Sync}
-- X = your threshold (default 10)
-- At X/X → {Sync} recommended
-- Resets to 1/X after {Sync}
-
----
-
-## BOND Rules
-
-| Rule | Meaning |
-|------|---------|
-| **Identify=Execute** | Notice it → Do it NOW |
-| **Both Agree** | {Save} needs confirmation from both |
-| **Code > Prose** | Trust working examples over descriptions |
-| **Proof Required** | Bonfires need evidence |
-
----
-
-## Custom Commands
-
-Add domain-specific commands in your SKILL.md:
-
-| Example | Domain | Action |
-|---------|--------|--------|
-| `{Voice}` | Writing | Review style guide |
-| `{Test}` | Dev | Run test suite |
-| `{Research}` | Academic | Search sources |
-
----
-
-🔥 **BOND: The Bonfire Protocol**
-*Keep the fire burning across sessions.*
+🔥 BOND: The Bonfire Protocol
