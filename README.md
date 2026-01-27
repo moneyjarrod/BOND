@@ -31,6 +31,8 @@ Two buttons. That's it.
 4. Work naturally. Call `{Sync}` every ~10 messages.
 5. Watch the counter: 🗒️ normal → 🟡 past limit → 🟠 dangerous → 🔴 critical
 
+**Important:** Only `{Sync}` or a new conversation resets the counter. Saving work, completing tasks, or declaring milestones does NOT reset it - context still degrades over time.
+
 **See `SETUP_GUIDE.md` for full instructions and tier options.**
 
 ---

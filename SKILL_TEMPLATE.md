@@ -111,6 +111,32 @@ Every reply ends with `🗒️ N/X`. Default is 10. Adjust X based on your work:
 
 At X/X, {Sync} recommended.
 
+**Counter Colors (MANDATORY when triggered):**
+- `🗒️ N/X` = Normal (within limit)
+- `🟡 N/X` = Past YOUR limit (LIMIT < N < 15)
+- `🟠 N/X` = Dangerous (15 ≤ N < 20)
+- `🔴 N/X` = Critical (N ≥ 20)
+
+**PRIORITY: Universal thresholds (15, 20) ALWAYS override personal limits.**
+Example: If your limit is 15 and you're at 16, that's 🟠 not 🟡.
+
+**CRITICAL - What Resets the Counter:**
+| Action | Resets? | Why |
+|--------|---------|-----|
+| `{Sync}` | ✅ YES | Fresh context from files |
+| New conversation | ✅ YES | Clean slate |
+| `{Save}` | ❌ NO | Task done ≠ context fresh |
+| `{Chunk}` | ❌ NO | State snapshot only |
+| Bonfire declared | ❌ NO | Milestone ≠ refresh |
+| Compaction | ❌ NO | Resume at 🟠 15/X if lost |
+
+**The counter tracks CONTEXT DEGRADATION over message count, not task completion.**
+
+If Claude loses count (compaction, confusion), default to `🟠 15/X` and recommend {Sync}.
+
+**Emotional Carryover (Anti-Pattern):**
+After {Sync}, counter is 1 and state is 🗒️. Do NOT carry forward the previous caution color. The reset is complete.
+
 ### Commands
 
 | Command | Purpose | Your Tier |

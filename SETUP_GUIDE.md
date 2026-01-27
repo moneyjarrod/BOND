@@ -208,6 +208,22 @@ No milestone without proof. This keeps your progress log honest.
 
 **CRITICAL:** The counter appears on EVERY response - including file generation, code blocks, quick answers, everything. No exceptions. If a response lacks a counter, that's a protocol violation.
 
+### What Resets the Counter
+
+| Action | Resets Counter? | Why |
+|--------|----------------|-----|
+| `{Sync}` | ✅ YES | Fresh context from files |
+| New conversation | ✅ YES | Clean slate |
+| `{Save}` | ❌ NO | Task done ≠ context fresh |
+| `{Chunk}` | ❌ NO | State snapshot only |
+| Bonfire declared | ❌ NO | Milestone ≠ refresh |
+| Task completion | ❌ NO | Context still degrading |
+| Compaction | ❌ NO | Resume at 🟠 15/LIMIT if lost |
+
+**The counter tracks CONTEXT DEGRADATION over message count, not task completion.**
+
+If Claude loses count (compaction, confusion), default to `🟠 15/LIMIT` and recommend {Sync}.
+
 ### Counter States
 
 | Messages | Display | Meaning |
@@ -251,17 +267,6 @@ If someone else's limit is 5:
 ```
 
 **Why this works:** You control your personal warning (yellow), but everyone shares the same danger zones (orange/red) because context degradation affects all users similarly at those counts.
-
-### After Compaction
-
-**CRITICAL:** Context compaction = instant context loss = immediate {Sync} required.
-
-When Claude's context gets compacted:
-- All previous conversation detail is summarized/lost
-- Counter state is lost
-- Treat it like starting a fresh session
-
-**Rule:** Compaction = instant 🔴. Always {Sync} immediately after compaction.
 
 ---
 

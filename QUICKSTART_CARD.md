@@ -34,6 +34,19 @@
 
 Yellow = past YOUR limit. Orange/Red = universal.
 
+### CRITICAL: What Resets the Counter
+
+| Action | Resets Counter? |
+|--------|----------------|
+| `{Sync}` | ✅ YES - resets to 1/LIMIT |
+| New conversation | ✅ YES - fresh start |
+| `{Save}` | ❌ NO - task done ≠ context fresh |
+| `{Chunk}` | ❌ NO - state snapshot, not refresh |
+| Compaction | ❌ NO - resume at 🟠 15/LIMIT if lost |
+| Task completion | ❌ NO - context still degrading |
+
+**The counter tracks CONTEXT DEGRADATION, not task progress.**
+
 ---
 
 ## LAYERS (Top = Override)
@@ -56,7 +69,6 @@ Code/Examples  ← SOURCE OF TRUTH
 | Both Agree | {Save} needs confirmation |
 | Code > Prose | Trust working examples |
 | Proof Required | Bonfires need evidence |
-| Counter Always | Every response has counter |
 
 ---
 
@@ -65,12 +77,6 @@ Code/Examples  ← SOURCE OF TRUTH
 1. **Quick:** State a mantra
 2. **Medium:** `{Sync}`
 3. **Full:** Paste SKILL + "Reset to core"
-
----
-
-## COMPACTION
-
-**Compaction = instant 🔴. Always {Sync} immediately after.**
 
 ---
 
