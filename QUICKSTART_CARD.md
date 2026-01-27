@@ -19,6 +19,8 @@
 **Tier 2:** `[PROJECT] work. {Sync}`
 **Tier 3:** `[PROJECT] work. {Sync} then {ArtD}`
 
+**After compaction:** Always `{Sync}` immediately (compaction = instant 🔴)
+
 ---
 
 ## COUNTER STATES

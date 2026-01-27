@@ -52,6 +52,24 @@ In your SKILL.md or memory, specify:
 
 ---
 
+## After Compaction
+
+If you see a message like "[conversation was compacted]" or "This conversation was summarized", call `{Sync}` immediately.
+
+**Why:** Compaction compresses the conversation to free up context space. Claude loses detail about:
+- Recent decisions and agreements
+- Nuanced context from earlier messages
+- The "feel" of the conversation flow
+
+**What to do:**
+1. Notice the compaction message
+2. Say `{Sync}` (or `{Sync} post-compaction`)
+3. Claude re-reads files and re-grounds
+4. Continue working
+
+**Rule:** Compaction = instant 🔴. Always sync immediately after.
+---
+
 ## Supporting Commands
 
 | Command | Purpose |

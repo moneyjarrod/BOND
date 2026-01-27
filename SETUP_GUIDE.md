@@ -232,6 +232,14 @@ If someone else's limit is 5:
 
 **Why this works:** You control your personal warning (yellow), but everyone shares the same danger zones (orange/red) because context degradation affects all users similarly at those counts.
 
+### After Compaction
+
+Compaction is when Claude compresses the conversation to free up context space. You'll see a message like "[conversation was compacted]" or "This conversation was summarized."
+
+**Compaction = instant context loss.** Always call `{Sync}` immediately after compaction, regardless of your counter position.
+
+Think of compaction as a forced context reset - Claude retains a summary but loses the detailed texture of your conversation. The counter doesn't matter at that point; you need fresh grounding from your files.
+
 ---
 
 ## DRIFT DETECTION (The "D" in BOND)
