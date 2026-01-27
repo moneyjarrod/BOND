@@ -64,9 +64,12 @@ That's it. Everything else supports these two actions.
 5. Manually update your local files based on session outcomes
 
 **First message pattern:**
+```
 [Paste SKILL.md content or key sections]
+
 Continuing [PROJECT] work. Last session we [brief summary].
 Let's pick up with [current task].
+```
 
 **Limitations:**
 - No file read/write automation
@@ -103,7 +106,9 @@ Let's pick up with [current task].
 ```
 
 **First message pattern:**
+```
 [PROJECT] work. {Sync}
+```
 
 **What Claude does on {Sync}:**
 1. Reads SKILL.md (identity/truth)
@@ -125,11 +130,15 @@ Let's pick up with [current task].
 5. Create `ARTIFACT_REGISTRY.md` listing your artifacts
 
 **Skill creation:**
+```
 Open new chat, say:
 "Create a new skill called [yourskill] with this content: [paste SKILL_TEMPLATE]"
+```
 
 **First message pattern:**
+```
 [PROJECT] work. {Sync} then {ArtD}
+```
 
 **Additional benefits:**
 - SKILL is ALWAYS in Claude's context (no paste needed)
@@ -143,13 +152,16 @@ Open new chat, say:
 ### 1. Layered Truth
 
 Not all information is equal. Organize in layers:
+
+```
 SKILL (Layer 0) - Identity, axioms, mantras
-↓ always true
+    ↓ always true
 MASTER (Layer 1) - Current state, progress, decisions
-↓ true right now
+    ↓ true right now
 [YOUR TRUTH SOURCE] (Layer 2) - Working examples, code, evidence
-↓ source of truth
+    ↓ source of truth
 [SECONDARY] (Layer 3) - Additional reference, comparison
+```
 
 **Rule: Higher layers override lower when in conflict.**
 
@@ -192,7 +204,9 @@ No milestone without proof. This keeps your progress log honest.
 
 ## THE STICKY COUNTER
 
-Every Claude reply ends with a counter showing messages since last `{Sync}`.
+**Every Claude reply ends with a counter** showing messages since last `{Sync}`.
+
+**CRITICAL:** The counter appears on EVERY response - including file generation, code blocks, quick answers, everything. No exceptions. If a response lacks a counter, that's a protocol violation.
 
 ### Counter States
 
@@ -208,7 +222,9 @@ Every Claude reply ends with a counter showing messages since last `{Sync}`.
 ### Setting Your Limit
 
 In your SKILL.md or memory:
+```
 {Sync} limit: 10
+```
 
 **Recommended starting points:**
 - Fast iteration, simple tasks: 5
@@ -218,27 +234,34 @@ In your SKILL.md or memory:
 ### Example
 
 If your limit is 10:
+```
 🗒️ 5/10   ← Normal
-🗒️ 10/10  ← At limit
+🗒️ 10/10  ← At limit  
 🟡 12/10  ← Past YOUR limit (yellow)
 🟠 15/10  ← Dangerous (orange)
 🔴 22/10  ← Critical (red)
+```
 
 If someone else's limit is 5:
+```
 🗒️ 3/5   ← Normal
-🟡 7/5   ← Past THEIR limit (yellow)
+🟡 7/5   ← Past THEIR limit (yellow) 
 🟠 15/5  ← Same dangerous threshold
 🔴 20/5  ← Same critical threshold
+```
 
 **Why this works:** You control your personal warning (yellow), but everyone shares the same danger zones (orange/red) because context degradation affects all users similarly at those counts.
 
 ### After Compaction
 
-Compaction is when Claude compresses the conversation to free up context space. You'll see a message like "[conversation was compacted]" or "This conversation was summarized."
+**CRITICAL:** Context compaction = instant context loss = immediate {Sync} required.
 
-**Compaction = instant context loss.** Always call `{Sync}` immediately after compaction, regardless of your counter position.
+When Claude's context gets compacted:
+- All previous conversation detail is summarized/lost
+- Counter state is lost
+- Treat it like starting a fresh session
 
-Think of compaction as a forced context reset - Claude retains a summary but loses the detailed texture of your conversation. The counter doesn't matter at that point; you need fresh grounding from your files.
+**Rule:** Compaction = instant 🔴. Always {Sync} immediately after compaction.
 
 ---
 
@@ -292,11 +315,16 @@ Command: Use `{Save}` with explicit memory update, or tell Claude "Update memory
 ## FILE STRUCTURE
 
 ### Minimum (Tier 1-2)
+
+```
 YourProject/
 ├── SKILL.md          ← Identity, always-true
 └── MASTER.md         ← State, current-true
+```
 
 ### Full (Tier 3)
+
+```
 YourProject/
 ├── SKILL.md          ← Copy of skill (or just in /mnt/skills/)
 ├── MASTER.md         ← State tracking
@@ -304,6 +332,7 @@ YourProject/
 │   └── dashboard.html
 ├── ARTIFACT_REGISTRY.md  ← Lists artifacts for {ArtD}
 └── [your other folders]
+```
 
 ---
 

@@ -19,11 +19,11 @@
 **Tier 2:** `[PROJECT] work. {Sync}`
 **Tier 3:** `[PROJECT] work. {Sync} then {ArtD}`
 
-**After compaction:** Always `{Sync}` immediately (compaction = instant 🔴)
-
 ---
 
 ## COUNTER STATES
+
+**Counter on EVERY response. No exceptions.**
 
 | State | Display | Action |
 |-------|---------|--------|
@@ -37,11 +37,14 @@ Yellow = past YOUR limit. Orange/Red = universal.
 ---
 
 ## LAYERS (Top = Override)
+
+```
 Code/Examples  ← SOURCE OF TRUTH
-↑
-MASTER      ← Current state
-↑
-SKILL       ← Always true
+     ↑
+   MASTER      ← Current state
+     ↑
+   SKILL       ← Always true
+```
 
 ---
 
@@ -53,6 +56,7 @@ SKILL       ← Always true
 | Both Agree | {Save} needs confirmation |
 | Code > Prose | Trust working examples |
 | Proof Required | Bonfires need evidence |
+| Counter Always | Every response has counter |
 
 ---
 
@@ -61,6 +65,12 @@ SKILL       ← Always true
 1. **Quick:** State a mantra
 2. **Medium:** `{Sync}`
 3. **Full:** Paste SKILL + "Reset to core"
+
+---
+
+## COMPACTION
+
+**Compaction = instant 🔴. Always {Sync} immediately after.**
 
 ---
 
@@ -76,15 +86,21 @@ SKILL       ← Always true
 ---
 
 ## FILES
+
+```
 Project/
 ├── SKILL.md    ← Identity
 ├── MASTER.md   ← State
 └── artifacts/  ← HTML sources (T3)
+```
 
 ---
 
 ## BONFIRE FLOW 🔥
+
+```
 Work → Proof → Propose {Save} → Agree → Write
+```
 
 ---
 
