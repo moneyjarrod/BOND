@@ -47,6 +47,7 @@ Two buttons. That's it.
 | `COMMANDS.md` | Command reference |
 | `QUICKSTART_CARD.md` | One-page cheatsheet |
 | `ARTIFACT_REGISTRY_TEMPLATE.md` | For Tier 3 artifact persistence |
+| `TIERED_MEMORY.md` | **Advanced:** 80% token reduction for complex projects |
 | `DIAGRAM.md` | Visual system flow |
 | `examples/` | Filled examples for different domains |
 
