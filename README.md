@@ -48,6 +48,8 @@ Two buttons. That's it.
 | `QUICKSTART_CARD.md` | One-page cheatsheet |
 | `ARTIFACT_REGISTRY_TEMPLATE.md` | For Tier 3 artifact persistence |
 | `TIERED_MEMORY.md` | **Advanced:** 80% token reduction for complex projects |
+| `THREE_TIER_ARCHIVAL.md` | **Advanced:** Auto-graduation for growing projects |
+| `PORTAL_SYSTEM.md` | **Advanced:** Context switching between work streams |
 | `DIAGRAM.md` | Visual system flow |
 | `examples/` | Filled examples for different domains |
 
