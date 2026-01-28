@@ -65,6 +65,7 @@ Code/Examples  ← SOURCE OF TRUTH
 
 | Rule | Meaning |
 |------|---------|
+| Bug→Fix Link | Document WHAT bug each solution fixed |
 | Identify=Execute | Notice it → Do it |
 | Both Agree | {Save} needs confirmation |
 | Code > Prose | Trust working examples |

@@ -97,7 +97,7 @@ Let's pick up with [current task].
       "command": "npx",
       "args": [
         "-y",
-        "@anthropic-ai/mcp-filesystem",
+        "@modelcontextprotocol/server-filesystem",
         "/path/to/your/project"
       ]
     }
@@ -199,6 +199,30 @@ Milestones need evidence:
 - Explicit confirmation ("Yes, I verified X works")
 
 No milestone without proof. This keeps your progress log honest.
+
+### 6. Bug→Fix Link Rule
+
+When documenting milestones, bonfires, or solutions, ALWAYS include:
+
+| Element | Required | Purpose |
+|---------|----------|---------|
+| **Symptom** | ✅ Yes | What user/Claude observed (searchable keywords) |
+| **Cause** | Optional | Root cause if known |
+| **Fix** | ✅ Yes | What solved the problem |
+| **Link** | ✅ Yes | Explicit connection: "This fixed X" |
+
+**Why this matters:** Claude instances need to recall WHAT PROBLEM a solution solves, not just that the solution exists. Without the link, Claude knows "we have X" but not "X fixes Y".
+
+**Format for bonfires:**
+```
+| # | Name | Insight | Fixed |
+| 52 | Segment Terrain | Store ops, re-derive | WEDGE (accum+res) |
+```
+
+**Searchable symptom keywords:**
+- Visual: wedge, cone, slope, orphan, bleed, spread
+- Behavior: accumulates, global, bleeds, spreads
+- Math: overshoot, interpolation, weighted average
 
 ---
 
