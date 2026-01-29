@@ -58,6 +58,45 @@
               │ overrides
               ▼
            SKILL                 ← ALWAYS TRUE
+              │
+              │ can query
+              ▼
+           QAIS                  ← RESONANCE FIELD (optional)
+```
+
+---
+
+## QAIS Resonance Flow (Advanced)
+
+```
+        QUERY: "What is Alice's role?"
+                    │
+                    ▼
+         ┌─────────────────────┐
+         │   QAIS FIELD        │
+         │   (qais_field.npz)  │
+         │                     │
+         │  Stored bindings:   │
+         │  Alice|role|dev     │
+         │  Bob|role|design    │
+         │  ...                │
+         └─────────────────────┘
+                    │
+                    ▼
+         qais_resonate("Alice", "role",
+           ["developer", "designer", "writer"])
+                    │
+                    ▼
+         ┌─────────────────────┐
+         │  RANKED RESULTS:    │
+         │  developer  +1.0 ✅ │
+         │  designer   +0.02   │
+         │  writer     -0.01   │
+         └─────────────────────┘
+                    │
+                    ▼
+         Confidence: HIGH
+         (48x signal-to-noise)
 ```
 
 ---

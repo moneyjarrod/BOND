@@ -92,6 +92,20 @@ Code/Examples  ← SOURCE OF TRUTH
 
 ---
 
+## QAIS (Advanced)
+
+True resonance memory. Requires Python + numpy.
+
+| Tool | Purpose |
+|------|---------|
+| `qais_resonate` | Query with candidates → ranked scores |
+| `qais_exists` | Check if entity in field |
+| `qais_store` | Add identity-role-fact |
+
+See `QAIS_SYSTEM.md` for setup.
+
+---
+
 ## FILES
 
 ```
