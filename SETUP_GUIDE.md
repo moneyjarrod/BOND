@@ -252,12 +252,14 @@ If Claude loses count (compaction, confusion), default to `🟠 15/LIMIT` and re
 
 | Messages | Display | Meaning |
 |----------|---------|----------|
-| 1 to LIMIT | `🗒️ N/LIMIT` | Normal - working within your limit |
-| LIMIT+1 to 14 | `🟡 N/LIMIT` | Past YOUR limit - consider syncing |
-| 15 to 19 | `🟠 N/LIMIT` | Dangerous - context degradation likely |
-| 20+ | `🔴 N/LIMIT` | Critical - sync immediately |
+| 1 to LIMIT | `🗒️ N/LIMIT` | Normal - working within your limit (includes AT limit) |
+| LIMIT+1 to 14 | `🟡 N/LIMIT` | PAST your limit - consider syncing (yellow means PAST, not AT) |
+| 15 to 19 | `🟠 N/LIMIT` | Dangerous - context degradation likely (15 is AT orange, not 14) |
+| 20+ | `🔴 N/LIMIT` | Critical - sync immediately (20 is AT red, not 19) |
 
-**Key insight:** Yellow threshold is personalized (your limit), but orange (15) and red (20) are universal danger zones that apply to everyone regardless of their limit.
+**Key insight:** Yellow threshold is personalized (your limit), but orange (15) and red (20) are universal danger zones that apply to everyone regardless of their limit. If your personal limit is 14 or higher, you may skip yellow entirely and go straight to orange.
+
+**Universal thresholds are ABSOLUTE:** No matter what your personal limit is, 15+ is always orange and 20+ is always red.
 
 ### Setting Your Limit
 
@@ -276,18 +278,28 @@ In your SKILL.md or memory:
 If your limit is 10:
 ```
 🗒️ 5/10   ← Normal
-🗒️ 10/10  ← At limit  
-🟡 12/10  ← Past YOUR limit (yellow)
-🟠 15/10  ← Dangerous (orange)
-🔴 22/10  ← Critical (red)
+🗒️ 10/10  ← AT limit (still normal! yellow means PAST, not AT)
+🟡 11/10  ← PAST your limit (yellow starts HERE)
+🟡 14/10  ← Still yellow (last yellow before orange)
+🟠 15/10  ← Dangerous (orange starts AT 15, not 14)
+🟠 19/10  ← Still orange (last orange before red)
+🔴 20/10  ← Critical (red starts AT 20, not 19)
 ```
 
-If someone else's limit is 5:
+If your limit is 14 (skips yellow):
 ```
-🗒️ 3/5   ← Normal
-🟡 7/5   ← Past THEIR limit (yellow) 
-🟠 15/5  ← Same dangerous threshold
-🔴 20/5  ← Same critical threshold
+🗒️ 14/14  ← AT limit (still normal)
+🟠 15/14  ← Jumps straight to orange (no room for yellow)
+🔴 20/14  ← Critical
+```
+
+If your limit is 5:
+```
+🗒️ 5/5   ← AT limit (still normal)
+🟡 6/5   ← Yellow starts here
+🟡 14/5  ← Still yellow
+🟠 15/5  ← Orange (universal)
+🔴 20/5  ← Critical (universal)
 ```
 
 **Why this works:** You control your personal warning (yellow), but everyone shares the same danger zones (orange/red) because context degradation affects all users similarly at those counts.

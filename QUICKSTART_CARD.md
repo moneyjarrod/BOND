@@ -27,12 +27,14 @@
 
 | State | Display | Action |
 |-------|---------|--------|
-| Normal | `🗒️ N/LIMIT` | Keep working |
-| Past Limit | `🟡 N/LIMIT` | Consider sync |
-| Dangerous | `🟠 N/LIMIT` | Sync soon (15+) |
-| Critical | `🔴 N/LIMIT` | Sync NOW (20+) |
+| Normal | `🗒️ N/LIMIT` | Keep working (includes AT limit) |
+| Past Limit | `🟡 N/LIMIT` | Consider sync (PAST, not AT) |
+| Dangerous | `🟠 N/LIMIT` | Sync soon (AT 15, not 14) |
+| Critical | `🔴 N/LIMIT` | Sync NOW (AT 20, not 19) |
 
-Yellow = past YOUR limit. Orange/Red = universal.
+**Yellow means PAST, not AT.** 10/10 = still normal. 11/10 = yellow.
+
+Yellow = past YOUR limit. Orange (15+) / Red (20+) = universal absolutes.
 
 ### CRITICAL: What Resets the Counter
 
