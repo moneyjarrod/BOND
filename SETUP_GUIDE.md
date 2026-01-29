@@ -316,6 +316,91 @@ Drift = Claude straying from your established principles.
 
 ---
 
+## QAIS: RESONANCE MEMORY (Advanced)
+
+QAIS (Quantum Approximate Identity Substrate) provides true vector-based resonance instead of text pattern matching. Claude queries a persistent field and gets confidence-scored results.
+
+### What QAIS Does
+
+| Without QAIS | With QAIS |
+|--------------|-----------|
+| Search text for keywords | Query vector field |
+| Hope for matches | Get ranked confidence scores |
+| ~350 tokens for seeds | ~50 tokens per query |
+| Pattern matching | True resonance (48x SNR) |
+
+### Setup
+
+**Requirements:**
+- Claude Desktop with MCP support (Tier 2+)
+- Python 3.8+
+- numpy (`pip install numpy`)
+
+**Step 1:** Copy `qais_mcp_server.py` to your project folder.
+
+**Step 2:** Add to your `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Projects"]
+    },
+    "qais": {
+      "command": "python",
+      "args": ["-u", "C:\\Path\\To\\Your\\qais_mcp_server.py"]
+    }
+  }
+}
+```
+
+**Step 3:** Restart Claude Desktop.
+
+**Step 4:** Seed your field:
+
+```
+Store in QAIS:
+- "MyProject", "type", "web application"
+- "Alice", "role", "lead developer"
+- "CoreConcept", "def", "the main principle"
+```
+
+### Tools Available
+
+| Tool | Purpose |
+|------|---------|
+| `qais_resonate` | Query with candidates, get ranked scores |
+| `qais_exists` | Check if entity is in field |
+| `qais_store` | Add new identity-role-fact |
+| `qais_stats` | Field statistics |
+
+### Example
+
+After storing "Alice, role, lead developer":
+
+```
+qais_resonate("Alice", "role", ["lead developer", "designer", "writer"])
+```
+
+Returns:
+```json
+[
+  {"fact": "lead developer", "score": 1.0, "confidence": "HIGH"},
+  {"fact": "designer", "score": 0.02, "confidence": "NOISE"}
+]
+```
+
+### Integration
+
+Use QAIS alongside SKILL seeds:
+- **SKILL seeds:** Always in context (pattern matching)
+- **QAIS field:** Queried on demand (true resonance)
+
+See `QAIS_SYSTEM.md` for full documentation.
+
+---
+
 ## MEMORY MANAGEMENT
 
 Claude's built-in memory has limits (~30 items). Use it strategically.
@@ -453,6 +538,9 @@ Keep the fire burning across sessions. 🔥
 | `COMMANDS.md` | Detailed command reference |
 | `QUICKSTART_CARD.md` | One-page cheatsheet |
 | `ARTIFACT_REGISTRY_TEMPLATE.md` | Tier 3 artifact persistence |
+| `QAIS_SYSTEM.md` | Advanced: True resonance memory |
+| `qais_mcp_server.py` | Advanced: QAIS MCP server |
+| `QAIS_SEEDS_TEMPLATE.md` | Advanced: Seed format reference |
 | `DIAGRAM.md` | Visual system flows |
 | `examples/` | Domain-specific examples |
 

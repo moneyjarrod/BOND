@@ -50,6 +50,9 @@ Two buttons. That's it.
 | `TIERED_MEMORY.md` | **Advanced:** 80% token reduction for complex projects |
 | `THREE_TIER_ARCHIVAL.md` | **Advanced:** Auto-graduation for growing projects |
 | `PORTAL_SYSTEM.md` | **Advanced:** Context switching between work streams |
+| `QAIS_SYSTEM.md` | **Advanced:** True resonance memory (48x SNR) |
+| `qais_mcp_server.py` | **Advanced:** QAIS MCP server for Claude Desktop |
+| `QAIS_SEEDS_TEMPLATE.md` | **Advanced:** Seed format reference |
 | `DIAGRAM.md` | Visual system flow |
 | `examples/` | Filled examples for different domains |
 
@@ -77,7 +80,7 @@ Two buttons. That's it.
 
 ## Origin
 
-Built across 50+ sessions developing a game engine. We kept losing context. Memory helped but wasn't enough. Files helped but needed structure.
+Built across 56 sessions developing a game engine. We kept losing context. Memory helped but wasn't enough. Files helped but needed structure.
 
 The insight: **The relationship matters.** Claude isn't just a tool—it's a collaborator. Collaborators need shared truth, clear communication, and mutual agreement.
 
