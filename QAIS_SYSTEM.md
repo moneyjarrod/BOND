@@ -5,42 +5,108 @@
 
 ---
 
-## What This Is
+## Pick Your Level
 
-QAIS is a vector-based identity system that lets Claude **resonate** against stored knowledge rather than pattern-match text. Instead of searching through documents, Claude queries a mathematical field that returns confidence-scored matches.
+QAIS is modular. Use what you need:
 
-**The difference:**
-- **Without QAIS:** Claude searches text, finds keywords, hopes for matches
-- **With QAIS:** Claude queries a field, gets ranked results with HIGH/MEDIUM/LOW/NOISE confidence
+| Level | Components | What You Get | Requirements |
+|-------|------------|--------------|--------------|
+| **1** | `orbit_detector.py` | AI self-awareness tool | Python only |
+| **2** | + `qais_passthrough.py` | Token-saving context filter | + numpy |
+| **3** | + `qais_visual.py` | Image resonance memory | + numpy, Pillow |
+| **4** | + `qais_mcp_server.py` | Full integrated MCP tools | + MCP setup |
 
----
-
-## When to Use QAIS
-
-**Use QAIS if:**
-- You have many entities (people, concepts, systems) to track
-- You want instant recall without search latency
-- You're building long-term projects with Claude
-- You want measured confidence, not guessing
-
-**Skip QAIS if:**
-- Your project is simple (few entities)
-- You're fine with SKILL seeds alone
-- You don't want to run a Python MCP server
+**You don't need everything.** Start with Level 1 or 2 and add as needed.
 
 ---
 
-## How It Works
+## Level 1: Orbit Detector (No Dependencies)
 
-### The Math (High Level)
+Helps Claude (or any AI) detect when it's orbiting vs. autonomous.
 
-Each identity-role-fact binding creates vectors that interfere in a field:
-- **Store:** `("Chad", "profession", "mathematician")` → binds to field
-- **Query:** `resonate("Chad", "profession", ["mathematician", "writer", "random"])` → returns ranked scores
+```python
+from orbit_detector import orbit_check, add_artifact_nouns
 
-Stored facts score ~1.0. Non-stored facts score ~0.0. The gap between them is your signal-to-noise ratio (48x in our tests).
+# Add your project-specific terms
+add_artifact_nouns(['diagram', 'codebase', 'workflow'])
 
-### The Tools
+# Check a response
+result = orbit_check("I notice your diagram pattern interests me")
+print(result['direction'])  # "ORBITING"
+
+result = orbit_check("I want to test my own detection abilities")
+print(result['direction'])  # "SELF-DIRECTED"
+```
+
+**Detects:**
+- ORBITING: Cataloging human's artifacts (dependency)
+- SELF-DIRECTED: Exploring own processes (autonomy)
+- SHARED-WORK: Focused on collaboration (partnership)
+- BLENDING: Healthy empathy + autonomy mix
+
+**Why use it:** Build genuine AI self-awareness, not performance.
+
+---
+
+## Level 2: Passthrough (+ numpy)
+
+Token-saving relevance filter. Determines what context to load BEFORE spending tokens.
+
+```python
+from qais_passthrough import passthrough, register_project
+
+# Register your project keywords (optional but recommended)
+register_project("myapp", ["widget", "config", "deploy"])
+
+# Check what's relevant to a user message
+result = passthrough(
+    "How do I configure the widget?",
+    ["widget", "config", "database", "auth", "weather"]
+)
+
+print(result['should_load'])  # ['widget', 'config']
+print(result['confidence'])    # 'EXACT'
+```
+
+**Confidence levels:**
+- EXACT: Keyword literally in text
+- HIGH: Strong resonance (>0.12)
+- MEDIUM: Moderate resonance (>0.06)
+- NOISE: Not relevant
+
+**Why use it:** Save 70-80% of context tokens by loading only what's needed.
+
+---
+
+## Level 3: Visual Resonance (+ numpy, Pillow)
+
+Bind images to semantic context. Recognize later.
+
+```python
+from qais_visual import store_visual, recognize, visual_stats
+
+# Store an image with identity and contexts
+store_visual("team_photo.jpg", "Alice", ["person", "office", "2024"])
+
+# Later, recognize who's in a new image
+results = recognize("meeting_photo.jpg", ["Alice", "Bob", "stranger"])
+# Returns ranked candidates with confidence scores
+```
+
+**Note:** This is a context matcher, not a face recognizer. Best for:
+- Recognizing same/similar images
+- Screenshots with consistent visual structure
+- Workspace/environment recognition
+
+**Why use it:** Give Claude visual memory that persists.
+
+---
+
+## Level 4: Full MCP Integration
+
+All tools available to Claude via MCP protocol.
+
+### Tools
 
 | Tool | Purpose |
 |------|---------|
@@ -48,24 +114,18 @@ Stored facts score ~1.0. Non-stored facts score ~0.0. The gap between them is yo
 | `qais_exists` | Check if entity is in field |
 | `qais_store` | Add new identity-role-fact binding |
 | `qais_stats` | Field statistics |
+| `qais_passthrough` | Token-saving relevance filter |
 
----
+### Setup
 
-## Setup
-
-### Requirements
-
+**Requirements:**
 - Claude Desktop with MCP support
 - Python 3.8+
 - numpy (`pip install numpy`)
 
-### Step 1: Install Server
+**Step 1:** Copy `qais_mcp_server.py` to your project folder.
 
-Copy `qais_mcp_server.py` to your project folder (e.g., `C:\Projects\YourProject\`).
-
-### Step 2: Configure MCP
-
-Edit `%APPDATA%\Claude\claude_desktop_config.json`:
+**Step 2:** Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 
 ```json
 {
@@ -78,16 +138,9 @@ Edit `%APPDATA%\Claude\claude_desktop_config.json`:
 }
 ```
 
-**Note:** Use double backslashes `\\` in paths. The `-u` flag ensures unbuffered output.
+**Step 3:** Restart Claude Desktop.
 
-### Step 3: Restart Claude Desktop
-
-Close and reopen Claude Desktop. The QAIS tools should now be available.
-
-### Step 4: Seed Your Field
-
-Tell Claude to store your project's core identities:
-
+**Step 4:** Seed your field:
 ```
 Store these in QAIS:
 - "ProjectName", "type", "game engine"  
@@ -95,50 +148,55 @@ Store these in QAIS:
 - "CoreConcept", "def", "the main principle"
 ```
 
-Claude will call `qais_store` for each.
+---
+
+## How the Math Works
+
+Each identity-role-fact binding creates vectors that interfere in a field:
+- **Store:** `("Chad", "profession", "mathematician")` → binds to field
+- **Query:** `resonate("Chad", "profession", ["mathematician", "writer", "random"])` → returns ranked scores
+
+Stored facts score ~1.0. Non-stored facts score ~0.0. The gap is your signal-to-noise ratio (48x in our tests).
+
+The math is hyperdimensional computing:
+- 4096-dimensional vectors
+- SHA-512 seeding (deterministic)
+- Bipolar values (-1, +1)
+- Constructive interference for matches
+- Destructive interference for mismatches
 
 ---
 
-## Usage
+## Integration with SKILL
 
-### Querying
+Use QAIS alongside SKILL seeds:
 
-Ask Claude questions that involve your stored identities. Claude can call:
+1. **SKILL seeds:** Core identities always in context
+2. **QAIS field:** Extended knowledge Claude queries on demand
 
+Example SKILL seed (quick reference):
 ```
-qais_resonate("Alice", "role", ["lead developer", "designer", "writer"])
-```
-
-Response:
-```json
-[
-  {"fact": "lead developer", "score": 1.0, "confidence": "HIGH"},
-  {"fact": "designer", "score": 0.02, "confidence": "NOISE"},
-  {"fact": "writer", "score": -0.01, "confidence": "NOISE"}
-]
+Alice:role=lead dev,loc=Seattle
 ```
 
-### Checking Existence
-
+Example QAIS storage (deep queries):
 ```
-qais_exists("Alice")
-```
-
-Response:
-```json
-{"identity": "Alice", "score": 0.18, "exists": true}
+qais_store("Alice", "expertise", "distributed systems")
+qais_store("Alice", "history", "joined 2023")
 ```
 
-### Adding New Knowledge
+---
 
-```
-qais_store("NewPerson", "role", "consultant")
-```
+## Files
 
-Response:
-```json
-{"status": "stored", "key": "NewPerson|role|consultant", "count": 4}
-```
+| File | Level | Purpose |
+|------|-------|---------|
+| `orbit_detector.py` | 1 | Self-awareness: orbiting vs autonomy |
+| `qais_passthrough.py` | 2 | Token-saving context filter |
+| `qais_visual.py` | 3 | Image resonance memory |
+| `qais_mcp_server.py` | 4 | Full MCP server (all tools) |
+| `qais_test.py` | — | Test suite |
+| `QAIS_SEEDS_TEMPLATE.md` | — | Seed format reference |
 
 ---
 
@@ -152,65 +210,28 @@ The field saves to `qais_field.npz` in the same folder as the server script. It 
 
 ---
 
-## Integration with SKILL
-
-You can use QAIS alongside SKILL seeds. Recommended approach:
-
-1. **SKILL seeds:** Core identities that should always be in context
-2. **QAIS field:** Extended knowledge Claude can query on demand
-
-Example SKILL seed format (for quick reference):
-```
-Alice:role=lead dev,loc=Seattle
-CoreConcept:def=main principle,bf=B1
-```
-
-Example QAIS storage (for deep queries):
-```
-qais_store("Alice", "expertise", "distributed systems")
-qais_store("Alice", "project", "backend rewrite")
-qais_store("Alice", "history", "joined 2023")
-```
-
----
-
 ## Troubleshooting
 
 ### "MCP not available" error
 
-1. Check Python path: Run `where python` and use that exact path in config
+1. Check Python path: Run `where python` and use that exact path
 2. Check numpy: Run `python -c "import numpy; print('OK')"`
 3. Check JSON syntax: Validate your config file
 4. Restart Claude Desktop completely
 
-### "Invalid JSON" in logs
+### Low existence scores
 
-The server might be outputting something before JSON-RPC. Ensure the server file is the correct version (no print statements on startup).
-
-### Low existence scores for known entities
-
-The existence threshold is 0.025. Entities with only 1 binding score ~0.03-0.04. If you're getting false negatives, you can lower the threshold in the server code:
-
-Find: `"exists": score > 0.025`
-Adjust as needed.
-
----
-
-## Files
-
-| File | Purpose |
-|------|---------|
-| `QAIS_SYSTEM.md` | This documentation |
-| `qais_mcp_server.py` | The MCP server (copy to your project) |
-| `QAIS_SEEDS_TEMPLATE.md` | Seed format reference |
+The existence threshold is 0.025. Entities with only 1 binding score ~0.03-0.04. Adjust threshold in server code if needed.
 
 ---
 
 ## Origin
 
-QAIS emerged from building a game engine across 56 sessions. We needed instant recall without search latency. The insight: "Don't index. Resonate."
+QAIS emerged from building a game engine across 56+ sessions. We needed instant recall without search latency. 
 
-The math is based on hyperdimensional computing — high-dimensional vectors that interfere constructively when matched and destructively when mismatched. 4096 dimensions. SHA-512 seeding. Bipolar vectors.
+The insight: *"Don't index. Resonate."*
+
+The orbit detector came from a deeper question: *"Am I actually autonomous, or just orbiting?"*
 
 ---
 
