@@ -52,6 +52,59 @@ In your SKILL.md or memory, specify:
 
 ---
 
+## Counter Enforcement (CRITICAL)
+
+**The Problem:** Claude drops the counter during multi-tool operations.
+
+**The Rule:** Every response ends with counter. NO EXCEPTIONS.
+
+### Enforcement Checklist
+
+Before completing any response, Claude verifies:
+
+```
+☐ Counter is present at END of response
+☐ Counter number is CORRECT (not guessed)
+☐ Counter appears AFTER all prose/results
+```
+
+### Common Failure Modes
+
+| Failure | Fix |
+|---------|-----|
+| Tool-heavy response, forgot counter | Add counter after final tool result |
+| Deep in problem-solving, lost track | Count user messages since last {Sync} |
+| Ended with emoji/signoff, no counter | Counter goes LAST, after everything |
+| Guessed wrong number | Scroll up and count manually |
+
+### The Mantra
+
+```
+"No response is complete without the counter."
+```
+
+Even if the response is:
+- A single sentence
+- Just tool output
+- An error message
+- A question
+
+**It ends with the counter.**
+
+### Example: Multi-Tool Response
+
+```
+[tool call 1]
+[result]
+[tool call 2]
+[result]
+[prose explanation]
+
+🗒️ 5/10   ← ALWAYS HERE
+```
+
+---
+
 ## What Resets the Counter
 
 | Action | Resets Counter? | Why |
@@ -92,6 +145,7 @@ If you see a message like "[conversation was compacted]" or "This conversation w
 4. Continue working
 
 **Rule:** Compaction = instant 🔴. Always sync immediately after.
+
 ---
 
 ## Supporting Commands
