@@ -370,7 +370,81 @@ YourProject/
 | `{Save}` | ❌ No | ✅ Yes | ❌ No | 2+ |
 | `{Tick}` | ❌ No | ❌ No | ❌ No | All |
 | `{Chunk}` | ❌ No | ❌ No | ❌ No | All |
+| `{Crystal}` | ❌ No | ✅ QAIS | ❌ No | QAIS |
 | `{ArtD}` | ✅ Registry | ✅ Copies | ❌ No | 3 |
+
+---
+
+## {Crystal} Protocol
+
+**Trigger:** User says `{Crystal}`
+
+**Purpose:** Persistent crystallization. Like {Chunk} but stores to QAIS field. "Chunk hopes. Crystal ensures."
+
+**Action:**
+1. Generate crystallization summary (same as {Chunk})
+2. Call `crystal` MCP tool with the chunk text
+3. Tool extracts key concepts from text
+4. Tool touches heatmap with extracted concepts
+5. Tool generates momentum seed from completed/state/next
+6. Tool stores to QAIS:
+   - `Session[N]|momentum` — flow state
+   - `Session[N]|context` — what was worked on
+   - `Session[N]|insight` — key insight (if found)
+   - `Session[N]|tags` — top concepts
+7. Return summary of what was persisted
+8. Do NOT reset counter
+
+**Dependencies:**
+- QAIS MCP server (v3.2+)
+- `crystal` tool available
+
+**Output:**
+```
+## {Crystal} — Session [N] Crystallization
+
+### Completed
+- [item]
+- [item]
+
+### Key Insight
+[insight]
+
+### Current State
+[state]
+
+### Next
+[next task]
+
+---
+
+**Persisted to QAIS:**
+- Session[N]|momentum ✅
+- Session[N]|context ✅
+- Session[N]|tags ✅
+
+**Heatmap touched:** [N] concepts
+
+🗒️ N/10   ← NOT reset
+```
+
+**When to use:**
+- End of session (want state to survive)
+- Before expected compaction
+- When insights are worth preserving
+- Major milestone completed
+
+**Comparison:**
+
+| | {Chunk} | {Crystal} |
+|---|---------|-----------|
+| Tier | All | QAIS |
+| Output | Text | Text + QAIS seeds |
+| Persists | Conversation only | QAIS field |
+| Survives compaction | Maybe | Yes (field persists) |
+| Survives session end | No | Yes |
+
+**Key insight:** Chunk hopes compaction is kind. Crystal ensures persistence.
 
 ---
 

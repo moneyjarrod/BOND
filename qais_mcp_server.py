@@ -1,5 +1,5 @@
 """
-QAIS MCP Server v3.1 (Passthrough v5 + Session Heat Map)
+QAIS MCP Server v3.2 (Crystal + Passthrough v5 + Session Heat Map)
 Quantum Approximate Identity Substrate
 True resonance memory for Claude.
 
@@ -7,6 +7,11 @@ True resonance memory for Claude.
 
 Part of the BOND Protocol
 https://github.com/moneyjarrod/BOND
+
+v3.2 CHANGES:
+  - Added {Crystal} command: persistent crystallization
+  - Extracts concepts, generates momentum, stores to QAIS
+  - "Chunk hopes. Crystal ensures."
 
 v3.1 CHANGES:
   - Added Session Heat Map for tracking concept activity
@@ -23,6 +28,7 @@ import os
 import re
 import time
 from collections import defaultdict
+from datetime import datetime
 
 try:
     import numpy as np
@@ -144,6 +150,176 @@ HEATMAP = SessionHeatMap()
 
 
 # =============================================================================
+# CRYSTAL: PERSISTENT CRYSTALLIZATION
+# =============================================================================
+
+# High-value terms that indicate important concepts
+SIGNAL_WORDS = {
+    'breakthrough', 'insight', 'fixed', 'solved', 'proven', 'works',
+    'principle', 'architecture', 'pattern', 'protocol', 'rule',
+    'bonfire', 'milestone', 'complete', 'done', 'verified', 'created',
+    'implemented', 'integrated', 'unified', 'merged'
+}
+
+def extract_concepts(text, max_concepts=10):
+    """Extract key concepts from text with importance scoring."""
+    words = re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', text)
+    
+    freq = {}
+    for word in words:
+        w = word.lower()
+        if len(w) > 2 and w not in STOPWORDS:
+            freq[w] = freq.get(w, 0) + 1
+    
+    scored = []
+    for word, count in freq.items():
+        score = count
+        if word in SIGNAL_WORDS:
+            score += 5
+        # Boost if appears capitalized in original
+        if word.upper() in text or word.capitalize() in text:
+            score += 2
+        scored.append((word, score))
+    
+    scored.sort(key=lambda x: -x[1])
+    return [c[0] for c in scored[:max_concepts]]
+
+
+def extract_sections(text):
+    """Extract labeled sections from crystallization text."""
+    sections = {}
+    
+    # Pattern: ### Header
+    header_matches = re.findall(r'###\s*(\w+[\w\s]*)\n(.*?)(?=###|\Z)', text, re.DOTALL | re.IGNORECASE)
+    for header, content in header_matches:
+        sections[header.lower().strip()] = content.strip()[:500]
+    
+    # Pattern: **Header:**
+    bold_matches = re.findall(r'\*\*(\w+[\w\s]*):\*\*\s*(.*?)(?=\*\*|\n\n|\Z)', text, re.DOTALL)
+    for header, content in bold_matches:
+        sections[header.lower().strip()] = content.strip()[:500]
+    
+    return sections
+
+
+def parse_bullet_items(text):
+    """Extract items from bullet points."""
+    items = re.findall(r'[-*]\s*(.+?)(?:\n|$)', text)
+    return [item.strip() for item in items if item.strip()]
+
+
+class Crystal:
+    """
+    Processes crystallization and executes QAIS storage.
+    "Chunk hopes. Crystal ensures."
+    """
+    
+    def __init__(self, field, heatmap):
+        self.field = field
+        self.heatmap = heatmap
+    
+    def crystallize(self, chunk_text, session_num, project="BOND", context=None):
+        """
+        Process crystallization text and persist to QAIS.
+        
+        Returns summary of what was stored.
+        """
+        timestamp = datetime.now().isoformat()
+        
+        result = {
+            "session": session_num,
+            "project": project,
+            "timestamp": timestamp,
+            "concepts": [],
+            "momentum": None,
+            "stored": [],
+            "heatmap_touched": 0
+        }
+        
+        # 1. Extract concepts
+        concepts = extract_concepts(chunk_text)
+        result["concepts"] = concepts
+        
+        # 2. Touch heatmap with concepts
+        if concepts:
+            touch_result = self.heatmap.touch(concepts, f"Session {session_num} crystal")
+            result["heatmap_touched"] = touch_result["touched"]
+        
+        # 3. Extract sections for momentum
+        sections = extract_sections(chunk_text)
+        
+        # Build completed list
+        completed = []
+        for key in ['completed', 'done', 'finished']:
+            if key in sections:
+                completed = parse_bullet_items(sections[key])
+                break
+        
+        # Get state
+        state = "in progress"
+        for key in ['state', 'current', 'status']:
+            if key in sections:
+                state = sections[key][:100]
+                break
+        
+        # Get next
+        next_task = "continue"
+        for key in ['next', 'open', 'todo']:
+            if key in sections:
+                next_text = sections[key]
+                items = parse_bullet_items(next_text)
+                next_task = items[0] if items else next_text[:100]
+                break
+        
+        # 4. Generate momentum seed
+        completed_str = ", ".join(completed[:3]) if completed else "work"
+        momentum = f"S{session_num} {completed_str}, {state[:50]}, next: {next_task[:50]}"
+        result["momentum"] = momentum
+        
+        # 5. Store to QAIS
+        session_id = f"Session{session_num}"
+        
+        # Store momentum
+        store_result = self.field.store(session_id, "momentum", momentum)
+        if store_result["status"] == "stored":
+            result["stored"].append(f"{session_id}|momentum")
+        
+        # Store context if provided
+        if context:
+            store_result = self.field.store(session_id, "context", context[:200])
+            if store_result["status"] == "stored":
+                result["stored"].append(f"{session_id}|context")
+        
+        # Store insight if found
+        for key in ['insight', 'key insight', 'key']:
+            if key in sections:
+                insight = sections[key][:200]
+                store_result = self.field.store(session_id, "insight", insight)
+                if store_result["status"] == "stored":
+                    result["stored"].append(f"{session_id}|insight")
+                break
+        
+        # Store top concepts as session tags
+        if concepts:
+            tags = ", ".join(concepts[:5])
+            store_result = self.field.store(session_id, "tags", tags)
+            if store_result["status"] == "stored":
+                result["stored"].append(f"{session_id}|tags")
+        
+        return result
+
+
+# Global crystal instance (initialized with field)
+CRYSTAL = None
+
+def get_crystal():
+    global CRYSTAL
+    if CRYSTAL is None:
+        CRYSTAL = Crystal(get_field(), HEATMAP)
+    return CRYSTAL
+
+
+# =============================================================================
 # ENHANCED TEXT PROCESSING (v5)
 # =============================================================================
 
@@ -163,7 +339,8 @@ STOPWORDS = {
     'think', 'make', 'take', 'see', 'come', 'look', 'use', 'find', 'give',
     'got', 'get', 'put', 'said', 'say', 'like', 'also', 'well', 'back',
     'being', 'been', 'much', 'way', 'even', 'new', 'want', 'first', 'any',
-    'happens', 'does', 'mean', 'work', 'works', 'things', 'thing'
+    'happens', 'does', 'mean', 'work', 'works', 'things', 'thing', 'session',
+    'chunk', 'crystallization'
 }
 
 SYNONYMS = {
@@ -520,6 +697,20 @@ TOOLS = [
         "name": "heatmap_clear",
         "description": "Reset heat map for new session.",
         "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "crystal",
+        "description": "Persistent crystallization. Extracts concepts, generates momentum, stores to QAIS. 'Chunk hopes. Crystal ensures.'",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "chunk_text": {"type": "string", "description": "The crystallization text (same format as {Chunk} output)"},
+                "session_num": {"type": "integer", "description": "Current session number"},
+                "project": {"type": "string", "description": "Project name (default: BOND)"},
+                "context": {"type": "string", "description": "Optional context description (e.g., 'QAIS v3.2 work')"}
+            },
+            "required": ["chunk_text", "session_num"]
+        }
     }
 ]
 
@@ -536,7 +727,7 @@ def handle_request(request):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "qais-server", "version": "3.1.0"}
+                "serverInfo": {"name": "qais-server", "version": "3.2.0"}
             }
         }
     
@@ -567,6 +758,14 @@ def handle_request(request):
                 result = HEATMAP.for_chunk()
             elif tool_name == "heatmap_clear":
                 result = HEATMAP.clear()
+            elif tool_name == "crystal":
+                crystal = get_crystal()
+                result = crystal.crystallize(
+                    args["chunk_text"],
+                    args["session_num"],
+                    args.get("project", "BOND"),
+                    args.get("context")
+                )
             else:
                 return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32601, "message": f"Unknown tool: {tool_name}"}}
             
