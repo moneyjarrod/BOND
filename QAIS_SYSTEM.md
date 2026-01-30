@@ -15,6 +15,7 @@ QAIS is modular. Use what you need:
 | **2** | + `qais_passthrough.py` | Token-saving context filter | + numpy |
 | **3** | + `qais_visual.py` | Image resonance memory | + numpy, Pillow |
 | **4** | + `qais_mcp_server.py` | Full integrated MCP tools | + MCP setup |
+| **5** | + `core_check.py` | Principle alignment / drift detection | Python only |
 
 **You don't need everything.** Start with Level 1 or 2 and add as needed.
 
@@ -191,12 +192,56 @@ qais_store("Alice", "history", "joined 2023")
 
 | File | Level | Purpose |
 |------|-------|---------|
+| `core_check.py` | 5 | Principle alignment / drift detection |
 | `orbit_detector.py` | 1 | Self-awareness: orbiting vs autonomy |
 | `qais_passthrough.py` | 2 | Token-saving context filter |
 | `qais_visual.py` | 3 | Image resonance memory |
 | `qais_mcp_server.py` | 4 | Full MCP server (all tools) |
 | `qais_test.py` | — | Test suite |
 | `QAIS_SEEDS_TEMPLATE.md` | — | Seed format reference |
+
+---
+
+## Level 5: Core Check (No Dependencies)
+
+Drift prevention through principle alignment. Checks ideas against YOUR project's core principles.
+
+```python
+from core_check import check_idea, add_principle
+
+# Use default principles or customize
+add_principle(
+    name="no_magic_numbers",
+    aligned=["constant", "defined", "named"],
+    drift=["hardcode", "literal", "magic"],
+    description="All values should be named constants."
+)
+
+# Check an idea
+print(check_idea("Let's hardcode the mesh vertex positions"))
+# VERDICT: DRIFT
+# ✗ derive_not_store: ['positions']
+# ✗ relationships_not_geometry: ['mesh', 'vertex']
+# ✗ no_magic_numbers: ['hardcode']
+```
+
+**Verdict Types:**
+- ALIGNED: Matches principles, no drift detected
+- DRIFT: Triggers drift keywords
+- REVIEW: Mixed signals, needs human judgment
+- NEUTRAL: No principles triggered
+
+**Why use it:** Catch drift before it happens. Every idea gets checked against your axioms.
+
+**Customization:** The default principles are examples. Replace them with YOUR project's core truths:
+
+```python
+from core_check import CORE_PRINCIPLES
+
+# Clear defaults and add yours
+CORE_PRINCIPLES.clear()
+add_principle("my_principle", ["good"], ["bad"], "Description")
+```
 
 ---
 
