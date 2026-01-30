@@ -49,33 +49,43 @@ print(result['direction'])  # "SELF-DIRECTED"
 
 ---
 
-## Level 2: Passthrough (+ numpy)
+## Level 2: Passthrough v5 (+ numpy)
 
-Token-saving relevance filter. Determines what context to load BEFORE spending tokens.
+Token-saving relevance filter with **fact resonance**. Matches against stored KNOWLEDGE, not just context names.
+
+**v5 Enhancements:**
+- **Fact Resonance:** "50 meter boundary" → finds FPRS via fact "50m boundary of existence"
+- **Number+Unit Normalization:** "50m" ↔ "50 meter" now match
+- **Synonym Expansion:** "derive" finds "compute", "calculate"
+- **Bigram Bundling:** Captures phrases like "boundary_existence"
 
 ```python
-from qais_passthrough import passthrough, register_project
+from qais_passthrough import passthrough
 
-# Register your project keywords (optional but recommended)
-register_project("myapp", ["widget", "config", "deploy"])
-
-# Check what's relevant to a user message
+# Resonates against stored facts in QAIS field
 result = passthrough(
-    "How do I configure the widget?",
-    ["widget", "config", "database", "auth", "weather"]
+    "What happens at the 50 meter boundary?",
+    ["FPRS", "ASDF", "mining", "QAIS"]
 )
 
-print(result['should_load'])  # ['widget', 'config']
-print(result['confidence'])    # 'EXACT'
+print(result['should_load'])  # ['FPRS'] - found via stored fact!
+print(result['confidence'])    # 'HIGH'
+print(result['evidence'])      # Shows which facts matched
 ```
 
 **Confidence levels:**
-- EXACT: Keyword literally in text
-- HIGH: Strong resonance (>0.12)
-- MEDIUM: Moderate resonance (>0.06)
-- NOISE: Not relevant
+- EXACT: Keyword literally in text (or synonym)
+- HIGH: Strong fact resonance (>0.30)
+- MEDIUM: Moderate resonance (>0.15)
+- LOW: Weak resonance (>0.08)
 
-**Why use it:** Save 70-80% of context tokens by loading only what's needed.
+**How it works:**
+1. Your text → enhanced keyword extraction → HD vector
+2. Resonates against ALL stored facts in QAIS field
+3. Traces matching facts back to parent identities
+4. Returns contexts worth loading with evidence
+
+**Why use it:** Save 70-80% of context tokens AND get semantic matching.
 
 ---
 

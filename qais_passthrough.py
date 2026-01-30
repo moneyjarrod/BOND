@@ -1,43 +1,45 @@
 """
-QAIS Passthrough Processor v3
-"Resonate first, load later."
+QAIS Passthrough v4
+"Resonate against knowledge, not names."
 
 Token-saving relevance filter using hyperdimensional computing.
 Determines WHAT context to load BEFORE committing tokens to retrieval.
 
-Modular domain system:
-- CODE_KEYWORDS: Programming concepts (always active)
-- DOC_KEYWORDS: Documentation/prose  
-- USER domains: Project-specific terms (register your own)
+v4 CHANGES:
+  - Now resonates against STORED FACTS, not just context names
+  - "50 meter boundary" -> finds FPRS via stored fact "50m boundary of existence"
+  - Requires qais_field.npz to be present for fact resonance
+  - Falls back to keyword matching if no field found
 
 Part of BOND Protocol | github.com/moneyjarrod/BOND
-Created: Session 63 | J-Dub & Claude | 2026-01-30
+Session 64 | J-Dub & Claude | 2026-01-30
 
 Usage:
-    from qais_passthrough import passthrough, register_project
+    from qais_passthrough import passthrough, PassthroughV4
     
-    # Register your project's keywords
-    register_project("myproject", ["widget", "gadget", "flux"])
+    # Quick usage (auto-loads field)
+    result = passthrough(
+        "What happens at the 50 meter boundary?",
+        ["FPRS", "ASDF", "mining"]
+    )
+    print(result["should_load"])  # ["FPRS"] - found via fact resonance!
     
-    # Query incoming text
-    result = passthrough(user_message, ["widget", "gadget", "other"])
-    
-    # Only load what matches
-    if result["should_load"]:
-        for context in result["should_load"]:
-            load_context(context)  # Your retrieval function
+    # Or with explicit field path
+    proc = PassthroughV4("path/to/qais_field.npz")
+    result = proc.passthrough(text, candidates)
 """
 
 import numpy as np
 import hashlib
 import re
-from typing import List, Dict, Tuple, Optional, Set
+import os
+from typing import List, Dict, Set, Tuple, Optional
 from dataclasses import dataclass
 
 N = 4096  # Hyperdimensional vector size
 
 # =============================================================================
-# STOPWORDS (filtered out of keyword extraction)
+# STOPWORDS
 # =============================================================================
 
 STOPWORDS = {
@@ -59,161 +61,20 @@ STOPWORDS = {
 }
 
 # =============================================================================
-# BUILT-IN DOMAIN KEYWORD SETS
-# =============================================================================
-
-# Always active for code detection
-CODE_KEYWORDS = {
-    # Structure
-    'function', 'class', 'method', 'module', 'package', 'library',
-    'variable', 'constant', 'parameter', 'argument', 'return', 'import',
-    'export', 'interface', 'type', 'enum', 'struct', 'trait', 'impl',
-    # Flow control
-    'loop', 'condition', 'branch', 'recursion', 'iteration', 'switch',
-    'async', 'await', 'callback', 'promise', 'thread', 'concurrent',
-    'yield', 'generator', 'iterator', 'break', 'continue',
-    # Operations
-    'parse', 'serialize', 'validate', 'transform', 'convert', 'compile',
-    'fetch', 'request', 'response', 'query', 'filter', 'map', 'reduce',
-    'sort', 'search', 'match', 'replace', 'split', 'join', 'merge',
-    # State & debugging
-    'error', 'exception', 'debug', 'test', 'fix', 'bug', 'issue',
-    'config', 'settings', 'environment', 'initialize', 'setup', 'init',
-    'log', 'trace', 'warn', 'assert', 'expect', 'mock', 'stub',
-    # Data structures
-    'array', 'list', 'dict', 'dictionary', 'map', 'set', 'queue', 'stack',
-    'tree', 'graph', 'node', 'edge', 'hash', 'table', 'buffer', 'cache',
-    'string', 'integer', 'float', 'boolean', 'null', 'none', 'undefined',
-    # Patterns
-    'api', 'endpoint', 'route', 'handler', 'middleware', 'controller',
-    'model', 'view', 'service', 'repository', 'factory', 'singleton',
-    'observer', 'listener', 'event', 'dispatch', 'emit', 'subscribe',
-    # Memory & performance
-    'memory', 'allocate', 'free', 'garbage', 'reference', 'pointer',
-    'optimize', 'performance', 'benchmark', 'profile', 'complexity',
-    # Version control
-    'commit', 'branch', 'merge', 'rebase', 'pull', 'push', 'clone',
-    'diff', 'patch', 'conflict', 'resolve', 'stash', 'checkout'
-}
-
-# For documentation/prose content
-DOC_KEYWORDS = {
-    'section', 'chapter', 'heading', 'paragraph', 'summary', 'overview',
-    'introduction', 'conclusion', 'appendix', 'reference', 'index',
-    'version', 'changelog', 'release', 'update', 'deprecated', 'legacy',
-    'breaking', 'migration', 'upgrade', 'compatibility',
-    'install', 'setup', 'configure', 'usage', 'example', 'tutorial',
-    'guide', 'quickstart', 'getting', 'started', 'requirements',
-    'workflow', 'pipeline', 'process', 'step', 'phase', 'stage',
-    'input', 'output', 'result', 'outcome', 'goal', 'objective'
-}
-
-# BOND protocol keywords (for BOND users)
-BOND_KEYWORDS = {
-    'skill', 'drift', 'anchor', 'tokens', 'bonfire', 'qais', 'bond',
-    'resonance', 'field', 'optimization', 'layer', 'sync', 'save',
-    'portal', 'buffer', 'archive', 'ops', 'master', 'relational',
-    'passthrough', 'visual', 'identity', 'binding', 'seed', 'vector',
-    'counter', 'session', 'context', 'restore', 'compact'
-}
-
-
-# =============================================================================
-# DOMAIN REGISTRY
-# =============================================================================
-
-@dataclass
-class Domain:
-    """A domain is a named set of weighted keywords."""
-    name: str
-    keywords: Set[str]
-    weight: float = 3.0
-    active: bool = True
-
-
-class DomainRegistry:
-    """
-    Manages domain keyword sets.
-    Users can add project-specific domains.
-    """
-    
-    def __init__(self):
-        self.domains: Dict[str, Domain] = {}
-        # Register built-in domains
-        self.register("code", CODE_KEYWORDS, weight=3.0, active=True)
-        self.register("docs", DOC_KEYWORDS, weight=2.0, active=True)
-    
-    def register(self, name: str, keywords: Set[str], weight: float = 3.0, active: bool = True):
-        """Register a new domain."""
-        self.domains[name] = Domain(name, {k.lower() for k in keywords}, weight, active)
-    
-    def activate(self, name: str):
-        """Activate a domain."""
-        if name in self.domains:
-            self.domains[name].active = True
-    
-    def deactivate(self, name: str):
-        """Deactivate a domain."""
-        if name in self.domains:
-            self.domains[name].active = False
-    
-    def add_keywords(self, domain_name: str, keywords: List[str]):
-        """Add keywords to an existing domain."""
-        if domain_name in self.domains:
-            self.domains[domain_name].keywords.update(k.lower() for k in keywords)
-    
-    def get_weight(self, keyword: str) -> float:
-        """Get weight for a keyword based on active domains."""
-        keyword = keyword.lower()
-        max_weight = 1.0
-        for domain in self.domains.values():
-            if domain.active and keyword in domain.keywords:
-                max_weight = max(max_weight, domain.weight)
-        return max_weight
-    
-    def get_all_active_keywords(self) -> Set[str]:
-        """Get all keywords from active domains."""
-        result = set()
-        for domain in self.domains.values():
-            if domain.active:
-                result.update(domain.keywords)
-        return result
-    
-    def list_domains(self) -> List[Dict]:
-        """List all domains with stats."""
-        return [
-            {"name": d.name, "keywords": len(d.keywords), "weight": d.weight, "active": d.active}
-            for d in self.domains.values()
-        ]
-
-
-# Global registry instance
-_REGISTRY = DomainRegistry()
-
-def get_registry() -> DomainRegistry:
-    """Get the global domain registry."""
-    return _REGISTRY
-
-
-# =============================================================================
-# VECTOR OPERATIONS (Hyperdimensional Computing)
+# CORE VECTOR OPERATIONS
 # =============================================================================
 
 def seed_to_vector(seed: str) -> np.ndarray:
-    """Convert text seed to N-dimensional bipolar HD vector."""
+    """Deterministic bipolar vector from any string."""
     h = hashlib.sha512(seed.encode()).digest()
     rng = np.random.RandomState(list(h[:4]))
     return rng.choice([-1, 1], size=N).astype(np.float32)
 
 
 def resonance(a: np.ndarray, b: np.ndarray) -> float:
-    """Compute resonance (normalized dot product) between two vectors."""
+    """Normalized dot product - coherence measure."""
     return float(np.dot(a, b) / N)
 
-
-# =============================================================================
-# TEXT PROCESSING
-# =============================================================================
 
 def text_to_keywords(text: str) -> List[str]:
     """Extract meaningful keywords from text."""
@@ -221,215 +82,222 @@ def text_to_keywords(text: str) -> List[str]:
     return list(set(w for w in words if len(w) > 2 and w not in STOPWORDS))
 
 
-def text_to_vector_weighted(text: str, registry: DomainRegistry = None) -> Tuple[np.ndarray, List[str], List[str]]:
-    """
-    Convert text to HD vector with domain-based weighting.
-    Domain keywords get higher weight in the bundle.
-    
-    Returns: (vector, all_keywords, domain_keywords_found)
-    """
-    if registry is None:
-        registry = get_registry()
-    
+def text_to_vector(text: str) -> np.ndarray:
+    """Convert text to HD vector by bundling keywords."""
     keywords = text_to_keywords(text)
     if not keywords:
-        return seed_to_vector(text), [], []
+        return seed_to_vector(text)
     
-    domain_keywords = registry.get_all_active_keywords()
-    domain_found = [k for k in keywords if k in domain_keywords]
-    
-    # Bundle keywords with weighting
     bundle = np.zeros(N, dtype=np.float32)
     for kw in keywords:
-        weight = registry.get_weight(kw)
-        bundle += weight * seed_to_vector(kw)
+        bundle += seed_to_vector(kw)
     
-    # Normalize to bipolar
     result = np.sign(bundle)
     result[result == 0] = 1
-    return result.astype(np.float32), keywords, domain_found
+    return result.astype(np.float32)
 
 
 # =============================================================================
-# PASSTHROUGH PROCESSOR
+# PASSTHROUGH v4 - FACT RESONANCE
 # =============================================================================
 
-class PassthroughProcessor:
+class PassthroughV4:
     """
-    Resonance-based relevance filter.
+    Token-saving filter that resonates against STORED FACTS.
     
-    "Resonate first, load later" - determines what context to load
-    BEFORE committing tokens to full retrieval.
+    The insight: User text should match against knowledge, not just names.
+    "50 meter boundary" finds FPRS via stored fact "50m boundary of existence".
     
     Usage:
-        proc = PassthroughProcessor()
-        proc.register_domain("myproject", ["widget", "gadget"])
-        result = proc.passthrough(user_input, ["widget", "other"])
-        # result["should_load"] contains contexts worth loading
+        proc = PassthroughV4("path/to/qais_field.npz")
+        result = proc.passthrough(user_input, ["FPRS", "ASDF", "mining"])
+        # result["should_load"] contains relevant contexts
     """
     
-    def __init__(self, registry: DomainRegistry = None):
-        self.registry = registry or get_registry()
-        self.known_contexts: Set[str] = set()
-    
-    def add_context(self, context: str):
-        """Add a known context to check against."""
-        self.known_contexts.add(context)
-    
-    def add_contexts(self, contexts: List[str]):
-        """Add multiple contexts."""
-        self.known_contexts.update(contexts)
-    
-    def register_domain(self, name: str, keywords: List[str], weight: float = 3.0):
-        """Register a project-specific domain."""
-        self.registry.register(name, set(keywords), weight=weight, active=True)
-    
-    def passthrough(self, text: str, candidates: Optional[List[str]] = None) -> Dict:
+    def __init__(self, field_path: str = None):
         """
-        Main passthrough function.
+        Initialize with QAIS field path.
         
         Args:
-            text: Input text to analyze
-            candidates: Contexts to check (uses known_contexts if None)
+            field_path: Path to qais_field.npz. If None, searches:
+                        1. Same directory as this script
+                        2. Current working directory
+        """
+        if field_path is None:
+            # Try script directory first
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            field_path = os.path.join(script_dir, "qais_field.npz")
+            if not os.path.exists(field_path):
+                # Try current directory
+                field_path = "qais_field.npz"
+        
+        self.field_path = field_path
+        self.fact_to_identities: Dict[str, Set[str]] = {}
+        self.fact_vectors: Dict[str, np.ndarray] = {}
+        self.identity_to_facts: Dict[str, Set[str]] = {}
+        self.loaded = False
+        
+        self._load_field()
+    
+    def _load_field(self):
+        """Load fact registry from QAIS field."""
+        if not os.path.exists(self.field_path):
+            return
+        
+        try:
+            data = np.load(self.field_path, allow_pickle=True)
+            stored = set(data['stored'].tolist())
+            
+            for key in stored:
+                parts = key.split('|', 2)
+                if len(parts) == 3:
+                    identity, role, fact = parts
+                    
+                    # fact -> identities
+                    if fact not in self.fact_to_identities:
+                        self.fact_to_identities[fact] = set()
+                        self.fact_vectors[fact] = text_to_vector(fact)
+                    self.fact_to_identities[fact].add(identity)
+                    
+                    # identity -> facts
+                    if identity not in self.identity_to_facts:
+                        self.identity_to_facts[identity] = set()
+                    self.identity_to_facts[identity].add(fact)
+            
+            self.loaded = True
+        except Exception as e:
+            pass
+    
+    def passthrough(self, text: str, candidates: List[str],
+                    threshold: float = 0.12,
+                    top_k: int = 3) -> Dict:
+        """
+        Main passthrough function with fact resonance.
+        
+        Args:
+            text: User input to analyze
+            candidates: Contexts to check (e.g., ["FPRS", "ASDF", "mining"])
+            threshold: Minimum fact resonance score (default 0.12)
+            top_k: Max evidence facts per match (default 3)
         
         Returns:
             Dict with:
-            - keywords: all extracted keywords
-            - domain_keywords: keywords matching active domains
-            - matches: contexts with confidence levels
+            - keywords: extracted keywords
+            - matches: contexts with confidence and evidence
             - should_load: HIGH/EXACT confidence contexts
             - confidence: overall confidence level
+            - facts_checked: number of facts in registry
         """
-        text_vec, keywords, domain_found = text_to_vector_weighted(text, self.registry)
+        text_vec = text_to_vector(text)
+        keywords = text_to_keywords(text)
         keywords_lower = set(keywords)
+        candidate_set = set(candidates)
         
-        check_contexts = list(candidates) if candidates else list(self.known_contexts)
+        # Phase 1: Direct keyword match (fastest)
+        direct_matches = set()
+        for candidate in candidates:
+            if candidate.lower() in keywords_lower:
+                direct_matches.add(candidate)
         
-        result = {
-            "keywords": keywords,
-            "domain_keywords": domain_found,
-            "matches": [],
-            "should_load": [],
-            "confidence": "NONE"
-        }
+        # Phase 2: Resonate against stored facts (if field loaded)
+        fact_scores = []
+        if self.loaded:
+            for fact, fact_vec in self.fact_vectors.items():
+                score = resonance(text_vec, fact_vec)
+                if score > threshold:
+                    fact_scores.append((fact, score, self.fact_to_identities[fact]))
+            fact_scores.sort(key=lambda x: -x[1])
         
-        for context in check_contexts:
-            ctx_lower = context.lower()
+        # Phase 3: Map resonating facts to candidate identities
+        identity_evidence: Dict[str, List[Tuple[str, float]]] = {}
+        
+        for fact, score, identities in fact_scores:
+            for identity in identities:
+                if identity in candidate_set:
+                    if identity not in identity_evidence:
+                        identity_evidence[identity] = []
+                    if len(identity_evidence[identity]) < top_k:
+                        identity_evidence[identity].append((fact, score))
+        
+        # Phase 4: Build results
+        matches = []
+        for candidate in candidates:
+            direct = candidate in direct_matches
+            evidence = identity_evidence.get(candidate, [])
             
-            # Check direct keyword match
-            direct_match = ctx_lower in keywords_lower
-            
-            # Compute resonance
-            score = resonance(text_vec, seed_to_vector(context))
-            
-            # Determine confidence
-            if direct_match:
-                confidence = "EXACT"
-            elif score > 0.12:
-                confidence = "HIGH"
-            elif score > 0.06:
-                confidence = "MEDIUM"
-            elif score > 0.02:
-                confidence = "LOW"
-            else:
-                confidence = "NOISE"
-            
-            if confidence != "NOISE":
-                result["matches"].append({
-                    "context": context,
-                    "score": round(score, 4),
+            if direct or evidence:
+                best_score = evidence[0][1] if evidence else 0.0
+                
+                if direct:
+                    confidence = "EXACT"
+                elif best_score > 0.4:
+                    confidence = "HIGH"
+                elif best_score > 0.2:
+                    confidence = "MEDIUM"
+                else:
+                    confidence = "LOW"
+                
+                matches.append({
+                    "context": candidate,
+                    "score": round(best_score, 4),
                     "confidence": confidence,
-                    "direct": direct_match
+                    "direct": direct,
+                    "evidence": [(f, round(s, 4)) for f, s in evidence[:top_k]]
                 })
         
         # Sort: EXACT first, then by score
         conf_order = {"EXACT": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
-        result["matches"].sort(key=lambda x: (conf_order.get(x["confidence"], 4), -x["score"]))
+        matches.sort(key=lambda x: (conf_order.get(x["confidence"], 4), -x["score"]))
         
-        # Load recommendations (EXACT and HIGH only)
-        for m in result["matches"]:
-            if m["confidence"] in ["EXACT", "HIGH"]:
-                result["should_load"].append(m["context"])
+        should_load = [m["context"] for m in matches if m["confidence"] in ["EXACT", "HIGH"]]
         
-        if result["matches"]:
-            result["confidence"] = result["matches"][0]["confidence"]
-        
-        return result
-    
-    def quick_check(self, text: str, context: str) -> Tuple[bool, str]:
-        """
-        Quick yes/no for a specific context.
-        
-        Returns: (should_load, confidence_level)
-        """
-        text_vec, keywords, _ = text_to_vector_weighted(text, self.registry)
-        
-        if context.lower() in set(keywords):
-            return (True, "EXACT")
-        
-        score = resonance(text_vec, seed_to_vector(context))
-        
-        if score > 0.12:
-            return (True, "HIGH")
-        elif score > 0.06:
-            return (True, "MEDIUM")
-        else:
-            return (False, "LOW" if score > 0.02 else "NOISE")
+        return {
+            "keywords": keywords,
+            "domain_keywords": [],  # Backward compat
+            "matches": matches,
+            "should_load": should_load,
+            "confidence": matches[0]["confidence"] if matches else "NONE",
+            "facts_checked": len(self.fact_vectors)
+        }
 
 
 # =============================================================================
 # CONVENIENCE API
 # =============================================================================
 
-_PROCESSOR: Optional[PassthroughProcessor] = None
+_PROCESSOR: Optional[PassthroughV4] = None
 
-def get_processor() -> PassthroughProcessor:
+def get_processor() -> PassthroughV4:
     """Get or create the global processor."""
     global _PROCESSOR
     if _PROCESSOR is None:
-        _PROCESSOR = PassthroughProcessor()
+        _PROCESSOR = PassthroughV4()
     return _PROCESSOR
 
 
-def passthrough(text: str, candidates: List[str] = None) -> Dict:
+def passthrough(text: str, candidates: List[str],
+                threshold: float = 0.12) -> Dict:
     """
-    Quick passthrough query.
+    Quick passthrough query with fact resonance.
     
     Args:
         text: Input text to analyze
         candidates: Contexts to check for relevance
+        threshold: Minimum resonance score
     
     Returns:
         Dict with matches and load recommendations
     """
-    return get_processor().passthrough(text, candidates)
-
-
-def register_project(name: str, keywords: List[str], weight: float = 3.0):
-    """
-    Register a project-specific domain.
-    
-    Args:
-        name: Domain name (e.g., "myproject")
-        keywords: List of project-specific keywords
-        weight: Weight multiplier (default 3.0)
-    """
-    get_processor().register_domain(name, keywords, weight)
-
-
-def add_contexts(contexts: List[str]):
-    """Add known contexts to the global processor."""
-    get_processor().add_contexts(contexts)
-
-
-def register_bond():
-    """Register BOND protocol domain (for BOND users)."""
-    register_project("bond", list(BOND_KEYWORDS), weight=3.0)
+    return get_processor().passthrough(text, candidates, threshold=threshold)
 
 
 def quick_check(text: str, context: str) -> Tuple[bool, str]:
     """Quick check if a context should be loaded."""
-    return get_processor().quick_check(text, context)
+    result = get_processor().passthrough(text, [context])
+    if result["matches"]:
+        m = result["matches"][0]
+        return (m["confidence"] in ["EXACT", "HIGH"], m["confidence"])
+    return (False, "NONE")
 
 
 # =============================================================================
@@ -437,34 +305,29 @@ def quick_check(text: str, context: str) -> Tuple[bool, str]:
 # =============================================================================
 
 if __name__ == "__main__":
-    print("=" * 60)
-    print("QAIS Passthrough v3 - Token-Saving Relevance Filter")
-    print("=" * 60)
+    print("=" * 70)
+    print("QAIS Passthrough v4 - Fact Resonance")
+    print("=" * 70)
     
-    # Example: Generic code
-    print("\n[Test 1: Generic code]")
-    result = passthrough(
-        "def fetch_user_data(): return api.request('/users')",
-        ["api", "fetch", "user", "pizza", "weather"]
-    )
-    print(f"Should load: {result['should_load']}")
-    print(f"Confidence: {result['confidence']}")
+    proc = get_processor()
+    print(f"Field loaded: {proc.loaded}")
+    print(f"Facts indexed: {len(proc.fact_vectors)}")
+    print(f"Identities indexed: {len(proc.identity_to_facts)}")
     
-    # Example: With project domain
-    print("\n[Test 2: With project domain]")
-    register_project("myapp", ["widget", "gadget", "flux"])
-    result2 = passthrough(
-        "The widget component needs flux state management",
-        ["widget", "flux", "gadget", "pizza"]
-    )
-    print(f"Should load: {result2['should_load']}")
-    print(f"Domain keywords: {result2['domain_keywords']}")
+    if proc.loaded:
+        # Test the original failing case
+        print("\n[Test: '50 meter boundary' -> should find FPRS]")
+        result = passthrough(
+            "What happens beyond the 50 meter boundary?",
+            ["FPRS", "ASDF", "mining", "QAIS"]
+        )
+        print(f"Keywords: {result['keywords']}")
+        print(f"Should load: {result['should_load']}")
+        for m in result['matches']:
+            print(f"  {m['context']}: {m['confidence']} ({m['score']})")
+            if m['evidence']:
+                print(f"    Evidence: {m['evidence'][:2]}")
+    else:
+        print("\nNo QAIS field found - run with qais_field.npz present")
     
-    # List domains
-    print("\n[Registered domains]")
-    for d in get_registry().list_domains():
-        print(f"  {d['name']}: {d['keywords']} keywords, weight={d['weight']}")
-    
-    print("\n" + "=" * 60)
-    print("✓ Ready for use. See docstring for integration examples.")
-    print("=" * 60)
+    print("\n" + "=" * 70)
