@@ -14,8 +14,9 @@ QAIS is modular. Use what you need:
 | **1** | `orbit_detector.py` | AI self-awareness tool | Python only |
 | **2** | + `qais_passthrough.py` | Token-saving context filter | + numpy |
 | **3** | + `qais_visual.py` | Image resonance memory | + numpy, Pillow |
-| **4** | + `qais_mcp_server.py` | Full integrated MCP tools | + MCP setup |
+| **4** | + `qais_mcp_server.py` | Full MCP tools + Session Heat Map | + MCP setup |
 | **5** | + `core_check.py` | Principle alignment / drift detection | Python only |
+| **6** | + `session_heatmap.py` | Standalone heat map (no MCP) | Python only |
 
 **You don't need everything.** Start with Level 1 or 2 and add as needed.
 
