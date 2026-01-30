@@ -1,5 +1,5 @@
 """
-QAIS MCP Server v2
+QAIS MCP Server v3.1 (Passthrough v5 + Session Heat Map)
 Quantum Approximate Identity Substrate
 True resonance memory for Claude.
 
@@ -8,21 +8,12 @@ True resonance memory for Claude.
 Part of the BOND Protocol
 https://github.com/moneyjarrod/BOND
 
-Tools:
-  - qais_resonate: Query field for matches
-  - qais_store: Store identity-role-fact bindings
-  - qais_exists: Check if entity exists
-  - qais_stats: Field statistics
-  - qais_passthrough: Token-saving relevance filter (NEW)
+v3.1 CHANGES:
+  - Added Session Heat Map for tracking concept activity
+  - {Chunk} now data-driven, not vibes-driven
+  - heatmap_touch, heatmap_hot, heatmap_chunk, heatmap_clear tools
 
-Usage:
-  1. Copy this file to your project folder
-  2. Add to claude_desktop_config.json (see QAIS_SYSTEM.md)
-  3. Restart Claude Desktop
-  4. Store your project's identities via qais_store
-
-Requirements:
-  pip install numpy
+Session 64 | J-Dub & Claude | 2026-01-30
 """
 
 import json
@@ -30,6 +21,8 @@ import hashlib
 import sys
 import os
 import re
+import time
+from collections import defaultdict
 
 try:
     import numpy as np
@@ -37,28 +30,121 @@ except ImportError:
     sys.exit(1)
 
 # =============================================================================
-# QAIS CORE - Hyperdimensional Computing
+# QAIS CORE
 # =============================================================================
 
-N = 4096  # Vector dimensions
+N = 4096
 
 def seed_to_vector(seed):
-    """Deterministic bipolar vector from any string."""
     h = hashlib.sha512(seed.encode()).digest()
     rng = np.random.RandomState(list(h[:4]))
     return rng.choice([-1, 1], size=N).astype(np.float32)
 
 def bind(a, b):
-    """XOR-like binding for bipolar vectors."""
     return a * b
 
 def resonance(query, field):
-    """Normalized dot product - coherence measure."""
     return float(np.dot(query, field) / N)
 
 
 # =============================================================================
-# PASSTHROUGH - Token-Saving Relevance Filter
+# SESSION HEAT MAP
+# =============================================================================
+
+class SessionHeatMap:
+    """Tracks concept activity during a session."""
+    
+    def __init__(self):
+        self.concepts = defaultdict(lambda: {"count": 0, "first": 0, "last": 0, "contexts": []})
+        self.session_start = time.time()
+    
+    def touch(self, concepts, context=""):
+        """Mark concept(s) as touched."""
+        now = time.time()
+        results = []
+        
+        for concept in concepts:
+            concept = concept.lower()
+            entry = self.concepts[concept]
+            if entry["count"] == 0:
+                entry["first"] = now
+            entry["count"] += 1
+            entry["last"] = now
+            if context:
+                entry["contexts"].append(context)
+            results.append({"concept": concept, "count": entry["count"]})
+        
+        return {"touched": len(results), "concepts": results}
+    
+    def hot(self, top_k=10):
+        """Get hottest concepts by activity."""
+        now = time.time()
+        scored = []
+        
+        for concept, entry in self.concepts.items():
+            age_minutes = (now - entry["last"]) / 60
+            
+            # Recency weighting
+            if age_minutes < 5:
+                recency = 2.0
+            elif age_minutes < 15:
+                recency = 1.5
+            elif age_minutes < 30:
+                recency = 1.0
+            else:
+                recency = 0.5
+            
+            score = entry["count"] * recency
+            
+            scored.append({
+                "concept": concept,
+                "count": entry["count"],
+                "score": round(score, 2),
+                "last_touch_mins": round(age_minutes, 1),
+                "contexts": entry["contexts"][-3:]
+            })
+        
+        scored.sort(key=lambda x: -x["score"])
+        return scored[:top_k]
+    
+    def for_chunk(self):
+        """Get summary formatted for {Chunk}."""
+        hot = self.hot(10)
+        now = time.time()
+        session_mins = (now - self.session_start) / 60
+        
+        # Cold concepts (touched early, not recently)
+        cold = []
+        for concept, entry in self.concepts.items():
+            age = (now - entry["last"]) / 60
+            if age > 15:
+                cold.append(concept)
+        
+        hot_names = [h["concept"] for h in hot[:5]]
+        
+        return {
+            "session_minutes": round(session_mins, 1),
+            "total_concepts": len(self.concepts),
+            "total_touches": sum(e["count"] for e in self.concepts.values()),
+            "hot": [{"concept": h["concept"], "count": h["count"], "why": h["contexts"]} for h in hot],
+            "cold": cold[:5],
+            "summary": f"{len(self.concepts)} concepts, hot: {', '.join(hot_names)}"
+        }
+    
+    def clear(self):
+        """Reset for new session."""
+        count = len(self.concepts)
+        self.concepts.clear()
+        self.session_start = time.time()
+        return {"cleared": count, "status": "reset"}
+
+
+# Global heat map instance
+HEATMAP = SessionHeatMap()
+
+
+# =============================================================================
+# ENHANCED TEXT PROCESSING (v5)
 # =============================================================================
 
 STOPWORDS = {
@@ -76,114 +162,69 @@ STOPWORDS = {
     'their', 'what', 'which', 'who', 'whom', 'about', 'let', 'tell', 'know',
     'think', 'make', 'take', 'see', 'come', 'look', 'use', 'find', 'give',
     'got', 'get', 'put', 'said', 'say', 'like', 'also', 'well', 'back',
-    'being', 'been', 'much', 'way', 'even', 'new', 'want', 'first', 'any'
+    'being', 'been', 'much', 'way', 'even', 'new', 'want', 'first', 'any',
+    'happens', 'does', 'mean', 'work', 'works', 'things', 'thing'
 }
 
-CODE_KEYWORDS = {
-    'function', 'class', 'method', 'module', 'package', 'library',
-    'variable', 'constant', 'parameter', 'argument', 'return', 'import',
-    'export', 'interface', 'type', 'enum', 'struct', 'trait', 'impl',
-    'loop', 'condition', 'branch', 'recursion', 'iteration', 'switch',
-    'async', 'await', 'callback', 'promise', 'thread', 'concurrent',
-    'parse', 'serialize', 'validate', 'transform', 'convert', 'compile',
-    'fetch', 'request', 'response', 'query', 'filter', 'map', 'reduce',
-    'error', 'exception', 'debug', 'test', 'fix', 'bug', 'issue',
-    'config', 'settings', 'environment', 'initialize', 'setup', 'init',
-    'array', 'list', 'dict', 'dictionary', 'set', 'queue', 'stack',
-    'tree', 'graph', 'node', 'edge', 'hash', 'table', 'buffer', 'cache',
-    'api', 'endpoint', 'route', 'handler', 'middleware', 'controller',
-    'model', 'view', 'service', 'repository', 'factory', 'singleton',
-    'commit', 'branch', 'merge', 'rebase', 'pull', 'push', 'clone'
+SYNONYMS = {
+    'meter': ['m', 'meters', 'metre'],
+    'm': ['meter', 'meters'],
+    'meters': ['m', 'meter'],
+    'config': ['configuration', 'configure'],
+    'configuration': ['config'],
+    'params': ['parameters', 'param'],
+    'parameters': ['params'],
+    'derive': ['compute', 'calculate', 'derived'],
+    'compute': ['derive', 'calculate'],
+    'store': ['save', 'persist', 'stored'],
+    'save': ['store', 'persist'],
 }
 
-# User can register project-specific keywords
-PROJECT_KEYWORDS = set()
+UNIT_EXPANSIONS = {
+    'm': 'meter',
+    'ms': 'millisecond',
+    's': 'second',
+    'km': 'kilometer',
+    'cm': 'centimeter',
+}
 
-def register_keywords(keywords):
-    """Register project-specific keywords for weighting."""
-    PROJECT_KEYWORDS.update(k.lower() for k in keywords)
+def normalize_number_units(text):
+    result = text
+    for abbrev, full in UNIT_EXPANSIONS.items():
+        pattern = r'(\d+)' + abbrev + r'\b'
+        replacement = r'\1 ' + full
+        result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+    return result
 
-def text_to_keywords(text):
-    """Extract meaningful keywords from text."""
+def expand_synonyms(keywords):
+    expanded = set(keywords)
+    for kw in keywords:
+        kw_lower = kw.lower()
+        if kw_lower in SYNONYMS:
+            expanded.update(SYNONYMS[kw_lower])
+    return list(expanded)
+
+def text_to_keywords_v5(text):
+    text = normalize_number_units(text)
     words = re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', text.lower())
-    return list(set(w for w in words if len(w) > 2 and w not in STOPWORDS))
+    keywords = [w for w in words if len(w) > 2 and w not in STOPWORDS]
+    keywords = expand_synonyms(keywords)
+    base_words = [w for w in words if len(w) > 2 and w not in STOPWORDS]
+    for i in range(len(base_words) - 1):
+        bigram = f"{base_words[i]}_{base_words[i+1]}"
+        keywords.append(bigram)
+    return list(set(keywords))
 
-def text_to_vector_weighted(text):
-    """Convert text to HD vector with domain weighting."""
-    keywords = text_to_keywords(text)
+def text_to_vector_v5(text):
+    keywords = text_to_keywords_v5(text)
     if not keywords:
-        return seed_to_vector(text), [], []
-    
-    all_domain = CODE_KEYWORDS | PROJECT_KEYWORDS
-    domain_found = [k for k in keywords if k in all_domain]
-    
+        return seed_to_vector(text)
     bundle = np.zeros(N, dtype=np.float32)
     for kw in keywords:
-        weight = 3.0 if kw in all_domain else 1.0
-        bundle += weight * seed_to_vector(kw)
-    
+        bundle += seed_to_vector(kw)
     result = np.sign(bundle)
     result[result == 0] = 1
-    return result.astype(np.float32), keywords, domain_found
-
-def passthrough(text, candidates):
-    """
-    Token-saving relevance filter.
-    Returns which candidates are worth loading based on text resonance.
-    
-    Confidence levels:
-    - EXACT: Direct keyword match in text
-    - HIGH: Strong resonance (>0.12)
-    - MEDIUM: Moderate resonance (>0.06)
-    - LOW: Weak resonance (>0.02)
-    - NOISE: Not relevant
-    """
-    text_vec, keywords, domain_found = text_to_vector_weighted(text)
-    keywords_lower = set(keywords)
-    
-    result = {
-        "keywords": keywords,
-        "domain_keywords": domain_found,
-        "matches": [],
-        "should_load": [],
-        "confidence": "NONE"
-    }
-    
-    for candidate in candidates:
-        ctx_lower = candidate.lower()
-        direct_match = ctx_lower in keywords_lower
-        score = resonance(text_vec, seed_to_vector(candidate))
-        
-        if direct_match:
-            confidence = "EXACT"
-        elif score > 0.12:
-            confidence = "HIGH"
-        elif score > 0.06:
-            confidence = "MEDIUM"
-        elif score > 0.02:
-            confidence = "LOW"
-        else:
-            confidence = "NOISE"
-        
-        if confidence != "NOISE":
-            result["matches"].append({
-                "context": candidate,
-                "score": round(score, 4),
-                "confidence": confidence,
-                "direct": direct_match
-            })
-    
-    conf_order = {"EXACT": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
-    result["matches"].sort(key=lambda x: (conf_order.get(x["confidence"], 4), -x["score"]))
-    
-    for m in result["matches"]:
-        if m["confidence"] in ["EXACT", "HIGH"]:
-            result["should_load"].append(m["context"])
-    
-    if result["matches"]:
-        result["confidence"] = result["matches"][0]["confidence"]
-    
-    return result
+    return result.astype(np.float32)
 
 
 # =============================================================================
@@ -191,8 +232,6 @@ def passthrough(text, candidates):
 # =============================================================================
 
 class QAISField:
-    """Persistent resonance field."""
-    
     def __init__(self, field_path=None):
         if field_path is None:
             script_dir = os.path.dirname(os.path.abspath(__file__))
@@ -202,6 +241,10 @@ class QAISField:
         self.role_fields = {}
         self.stored = set()
         self.count = 0
+        self.fact_to_identities = {}
+        self.fact_vectors = {}
+        self.identity_to_facts = {}
+        
         if os.path.exists(self.field_path):
             self._load()
     
@@ -212,8 +255,26 @@ class QAISField:
             self.role_fields = data['role_fields'].item()
             self.stored = set(data['stored'].tolist())
             self.count = int(data['count'])
+            self._build_fact_registry()
         except:
             pass
+    
+    def _build_fact_registry(self):
+        self.fact_to_identities = {}
+        self.fact_vectors = {}
+        self.identity_to_facts = {}
+        
+        for key in self.stored:
+            parts = key.split('|', 2)
+            if len(parts) == 3:
+                identity, role, fact = parts
+                if fact not in self.fact_to_identities:
+                    self.fact_to_identities[fact] = set()
+                    self.fact_vectors[fact] = text_to_vector_v5(fact)
+                self.fact_to_identities[fact].add(identity)
+                if identity not in self.identity_to_facts:
+                    self.identity_to_facts[identity] = set()
+                self.identity_to_facts[identity].add(fact)
     
     def _save(self):
         try:
@@ -237,6 +298,15 @@ class QAISField:
             self.role_fields[role] = np.zeros(N, dtype=np.float32)
         self.role_fields[role] += bind(id_vec, fact_vec)
         self.count += 1
+        
+        if fact not in self.fact_to_identities:
+            self.fact_to_identities[fact] = set()
+            self.fact_vectors[fact] = text_to_vector_v5(fact)
+        self.fact_to_identities[fact].add(identity)
+        if identity not in self.identity_to_facts:
+            self.identity_to_facts[identity] = set()
+        self.identity_to_facts[identity].add(fact)
+        
         self._save()
         return {"status": "stored", "key": key, "count": self.count}
     
@@ -272,7 +342,82 @@ class QAISField:
         return {
             "total_bindings": self.count,
             "roles": list(self.role_fields.keys()),
-            "role_count": len(self.role_fields)
+            "role_count": len(self.role_fields),
+            "facts_indexed": len(self.fact_vectors),
+            "identities_indexed": len(self.identity_to_facts)
+        }
+    
+    def passthrough_v5(self, text, candidates, threshold=0.08, top_k=3):
+        text_vec = text_to_vector_v5(text)
+        keywords = text_to_keywords_v5(text)
+        keywords_lower = set(k.lower() for k in keywords)
+        candidate_set = set(candidates)
+        
+        direct_matches = set()
+        for candidate in candidates:
+            cand_lower = candidate.lower()
+            if cand_lower in keywords_lower:
+                direct_matches.add(candidate)
+            if cand_lower in SYNONYMS:
+                for syn in SYNONYMS[cand_lower]:
+                    if syn in keywords_lower:
+                        direct_matches.add(candidate)
+                        break
+        
+        fact_scores = []
+        for fact, fact_vec in self.fact_vectors.items():
+            score = resonance(text_vec, fact_vec)
+            if score > threshold:
+                fact_scores.append((fact, score, self.fact_to_identities[fact]))
+        fact_scores.sort(key=lambda x: -x[1])
+        
+        identity_evidence = {}
+        for fact, score, identities in fact_scores:
+            for identity in identities:
+                if identity in candidate_set:
+                    if identity not in identity_evidence:
+                        identity_evidence[identity] = []
+                    if len(identity_evidence[identity]) < top_k:
+                        identity_evidence[identity].append((fact, score))
+        
+        matches = []
+        for candidate in candidates:
+            direct = candidate in direct_matches
+            evidence = identity_evidence.get(candidate, [])
+            
+            if direct or evidence:
+                best_score = evidence[0][1] if evidence else 0.0
+                
+                if direct:
+                    confidence = "EXACT"
+                elif best_score > 0.30:
+                    confidence = "HIGH"
+                elif best_score > 0.15:
+                    confidence = "MEDIUM"
+                else:
+                    confidence = "LOW"
+                
+                matches.append({
+                    "context": candidate,
+                    "score": round(best_score, 4),
+                    "confidence": confidence,
+                    "direct": direct,
+                    "evidence": [(f, round(s, 4)) for f, s in evidence[:top_k]]
+                })
+        
+        conf_order = {"EXACT": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}
+        matches.sort(key=lambda x: (conf_order.get(x["confidence"], 4), -x["score"]))
+        
+        should_load = [m["context"] for m in matches if m["confidence"] in ["EXACT", "HIGH"]]
+        
+        return {
+            "keywords": keywords,
+            "domain_keywords": [],
+            "matches": matches,
+            "should_load": should_load,
+            "confidence": matches[0]["confidence"] if matches else "NONE",
+            "facts_checked": len(self.fact_vectors),
+            "version": "v5"
         }
 
 
@@ -292,7 +437,7 @@ def get_field():
 TOOLS = [
     {
         "name": "qais_resonate",
-        "description": "Query the QAIS field for resonance matches. Returns candidates ranked by resonance score with confidence levels.",
+        "description": "Query the QAIS field for resonance matches.",
         "inputSchema": {
             "type": "object",
             "properties": {
@@ -334,16 +479,47 @@ TOOLS = [
     },
     {
         "name": "qais_passthrough",
-        "description": "Token-saving relevance filter. Given text and candidate contexts, returns which contexts are worth loading. Use BEFORE loading full context to save tokens.",
+        "description": "Token-saving relevance filter. Resonates against stored facts.",
         "inputSchema": {
             "type": "object",
             "properties": {
-                "text": {"type": "string", "description": "Input text to analyze (user message, code, etc.)"},
-                "candidates": {"type": "array", "items": {"type": "string"}, "description": "List of possible contexts to check (e.g., ['SKILL', 'FPRS', 'config'])"},
-                "project_keywords": {"type": "array", "items": {"type": "string"}, "description": "Optional: project-specific keywords to boost (e.g., ['bonfire', 'fprs'])"}
+                "text": {"type": "string", "description": "Input text to analyze"},
+                "candidates": {"type": "array", "items": {"type": "string"}, "description": "Contexts to check"}
             },
             "required": ["text", "candidates"]
         }
+    },
+    {
+        "name": "heatmap_touch",
+        "description": "Mark concept(s) as actively being worked on. Call when discussing a topic.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "concepts": {"type": "array", "items": {"type": "string"}, "description": "Concepts being touched"},
+                "context": {"type": "string", "description": "Optional: why (e.g., 'discussed depth merging')"}
+            },
+            "required": ["concepts"]
+        }
+    },
+    {
+        "name": "heatmap_hot",
+        "description": "Get hottest concepts by recent activity. Use for {Chunk}.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "top_k": {"type": "integer", "description": "How many to return (default 10)"}
+            }
+        }
+    },
+    {
+        "name": "heatmap_chunk",
+        "description": "Get heat map summary formatted for {Chunk} crystallization.",
+        "inputSchema": {"type": "object", "properties": {}}
+    },
+    {
+        "name": "heatmap_clear",
+        "description": "Reset heat map for new session.",
+        "inputSchema": {"type": "object", "properties": {}}
     }
 ]
 
@@ -360,7 +536,7 @@ def handle_request(request):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "qais-server", "version": "2.0.0"}
+                "serverInfo": {"name": "qais-server", "version": "3.1.0"}
             }
         }
     
@@ -382,10 +558,15 @@ def handle_request(request):
             elif tool_name == "qais_stats":
                 result = field.stats()
             elif tool_name == "qais_passthrough":
-                # Register project keywords if provided
-                if "project_keywords" in args:
-                    register_keywords(args["project_keywords"])
-                result = passthrough(args["text"], args["candidates"])
+                result = field.passthrough_v5(args["text"], args["candidates"])
+            elif tool_name == "heatmap_touch":
+                result = HEATMAP.touch(args["concepts"], args.get("context", ""))
+            elif tool_name == "heatmap_hot":
+                result = HEATMAP.hot(args.get("top_k", 10))
+            elif tool_name == "heatmap_chunk":
+                result = HEATMAP.for_chunk()
+            elif tool_name == "heatmap_clear":
+                result = HEATMAP.clear()
             else:
                 return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32601, "message": f"Unknown tool: {tool_name}"}}
             
