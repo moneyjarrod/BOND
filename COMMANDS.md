@@ -1,5 +1,30 @@
 # BOND Commands Reference
 
+## ⚡ THE CORE: Counter
+
+Before anything else, understand this:
+
+```
+COUNTER = USER MESSAGES since last {Sync}
+```
+
+| What Counts | Example |
+|-------------|--------|
+| ✅ User message | "hey what's up" |
+| ✅ User command | "{Sync}", "{Save}" |
+| ❌ Claude response | (never) |
+| ❌ Claude tool calls | (never) |
+
+**Placement:** FIRST LINE of every response. Not footer — header.
+
+```
+🗒️ 5/10   ← FIRST
+
+[Then content]
+```
+
+---
+
 ## Core Commands
 
 | Command | When | What It Does |
@@ -26,10 +51,10 @@
 
 **Output:**
 ```
+🗒️ 1/10
+
 [Confirmation of what was read]
 [Brief status if relevant]
-
-🗒️ 1/10
 ```
 
 ---
@@ -51,6 +76,8 @@
 
 **Output:**
 ```
+🗒️ N/10   ← NOT reset
+
 Proposing to save:
 - [file]: [what changes]
 
@@ -60,8 +87,6 @@ Confirm?
 
 Saved:
 - [file]: [done]
-
-🗒️ N/10   ← NOT reset
 ```
 
 **Critical:** {Save} does NOT reset the counter. Writing ≠ reading.
@@ -113,28 +138,28 @@ In your SKILL.md or memory, specify:
 
 ## Counter Enforcement (CRITICAL)
 
-**The Problem:** Claude drops the counter during multi-tool operations.
+**The Problem:** Claude drops the counter during conversational flow.
 
-**The Rule:** Every response ends with counter. NO EXCEPTIONS.
+**The Rule:** Every response STARTS with counter. NO EXCEPTIONS.
 
 ### Enforcement Checklist
 
 Before completing any response, Claude verifies:
 
 ```
-☐ Counter is present at END of response
-☐ Counter number is CORRECT (not guessed)
-☐ Counter appears AFTER all prose/results
+☐ Counter is FIRST LINE of response
+☐ Counter number is CORRECT (count USER messages)
+☐ Counter appears BEFORE all prose/results
 ```
 
 ### Common Failure Modes
 
 | Failure | Fix |
 |---------|-----|
-| Tool-heavy response, forgot counter | Add counter after final tool result |
-| Deep in problem-solving, lost track | Count user messages since last {Sync} |
-| Ended with emoji/signoff, no counter | Counter goes LAST, after everything |
-| Guessed wrong number | Scroll up and count manually |
+| Conversational reply, forgot counter | Counter FIRST, always |
+| Counted tool calls | Only count USER messages |
+| Counter at end (footer) | Move to FIRST LINE |
+| Guessed wrong number | Count user turns since {Sync} |
 
 ### The Mantra
 
@@ -148,18 +173,18 @@ Even if the response is:
 - An error message
 - A question
 
-**It ends with the counter.**
+**It starts with the counter.**
 
-### Example: Multi-Tool Response
+### Example: Any Response
 
 ```
+🗒️ 5/10   ← ALWAYS FIRST
+
 [tool call 1]
 [result]
 [tool call 2]
 [result]
 [prose explanation]
-
-🗒️ 5/10   ← ALWAYS HERE
 ```
 
 ---
@@ -228,6 +253,8 @@ If you see a message like "[conversation was compacted]" or "This conversation w
 
 **Output:**
 ```
+🗒️ N/10   ← NOT reset
+
 {Tick} — Session [N] Status
 
 Done:
@@ -238,8 +265,6 @@ Open:
 - [item]
 
 Next: [what's queued]
-
-🗒️ N/10   ← NOT reset
 ```
 
 **When to use:** 
@@ -272,6 +297,8 @@ Next: [what's queued]
 
 **Output:**
 ```
+🗒️ N/10   ← NOT reset
+
 ## {Chunk} — Session [N] Crystallization
 
 ### Completed
@@ -289,10 +316,6 @@ Next: [what's queued]
 
 ### Next Session
 [what to pick up]
-
----
-
-🗒️ N/10   ← NOT reset
 ```
 
 **When to use:**
@@ -344,13 +367,13 @@ YourProject/
 
 **Output:**
 ```
+🗒️ N/10   ← NOT reset
+
 {ArtD} — Artifacts restored
 
 - dashboard.html ✅
 
 [files appear in sidebar]
-
-🗒️ N/10   ← NOT reset
 ```
 
 **When to use:**
@@ -401,6 +424,8 @@ YourProject/
 
 **Output:**
 ```
+🗒️ N/10   ← NOT reset
+
 ## {Crystal} — Session [N] Crystallization
 
 ### Completed
@@ -424,8 +449,6 @@ YourProject/
 - Session[N]|tags ✅
 
 **Heatmap touched:** [N] concepts
-
-🗒️ N/10   ← NOT reset
 ```
 
 **When to use:**

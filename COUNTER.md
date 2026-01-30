@@ -5,21 +5,79 @@
 
 ---
 
-## What This Is
+# ⚡ CORE DEFINITION
+
+```
+COUNTER = USER MESSAGES since last {Sync}
+```
+
+| What Counts | Example |
+|-------------|---------|
+| ✅ User message | "hey what's up" |
+| ✅ User command | "{Sync}", "{Save}", "{Crystal}" |
+| ✅ User question | "do you agree?" |
+| ❌ Claude response | (never counts) |
+| ❌ Claude tool calls | (never counts) |
+
+**One user turn = +1 counter. Always.**
+
+---
+
+# ⚡ CORE PLACEMENT
+
+```
+🗒️ N/10   ← FIRST LINE of every response
+
+[Content follows]
+```
+
+**Counter is the first thing Claude writes. Every time. No exceptions.**
+
+---
+
+# ⚡ CORE FORMAT
+
+```
+🗒️ N/LIMIT   Normal (1 to LIMIT)
+🟡 N/LIMIT   Past limit (LIMIT+1 to 14)
+🟠 N/LIMIT   Dangerous (15-19)
+🔴 N/LIMIT   Critical (20+)
+```
+
+---
+
+# ⚡ CORE RESETS
+
+| Resets Counter | Doesn't Reset |
+|----------------|---------------|
+| `{Sync}` | `{Save}` |
+| New conversation | `{Chunk}` |
+| | `{Crystal}` |
+| | Task completion |
+| | Bonfires |
+
+**Only truth-grounding resets.**
+
+---
+
+## Extended Reference
+
+### What This Is
 
 The counter is not a feature. It's part of the **response schema**.
 
-Every BOND response ends with a counter. Not "should" — **MUST**.
+Every BOND response starts with a counter. Not "should" — **MUST**.
 
 This is what makes BOND work. Everything else (QAIS, MCP, artifacts, tiers) extends this core.
 
 ---
 
-## The Definition
+### The Full Definition
 
 ```
-COUNTER = Messages since Claude last grounded in truth
+COUNTER = USER messages since Claude last grounded in truth
 
+Increments: Each USER message (not Claude responses, not tool calls)
 Measures:   CONTEXT DEGRADATION
 Not:        Task completion
 Not:        Bonfire progress  
@@ -32,27 +90,7 @@ Resets:     {Sync} or new conversation
 
 ---
 
-## The Format
-
-```
-🗒️ N/LIMIT   Normal (1 to LIMIT)
-🟡 N/LIMIT   Past limit (LIMIT+1 to 14)
-🟠 N/LIMIT   Dangerous (15-19)
-🔴 N/LIMIT   Critical (20+)
-```
-
-**Examples (LIMIT = 10):**
-```
-🗒️ 5/10    ← Normal
-🗒️ 10/10   ← AT limit (still normal)
-🟡 11/10   ← PAST limit (yellow starts here)
-🟠 15/10   ← Dangerous (universal threshold)
-🔴 20/10   ← Critical (universal threshold)
-```
-
----
-
-## Why It Exists
+### Why It Exists
 
 Claude's context degrades over messages. Not dramatically — subtly. Small drifts accumulate:
 - Forgetting a nuance
@@ -65,7 +103,7 @@ When you see 🟡 or 🟠, you know: context is stale. Time to {Sync}.
 
 ---
 
-## No Dependencies
+### No Dependencies
 
 The counter requires:
 - ❌ No QAIS
@@ -80,14 +118,14 @@ A user with just Claude web and a text file can use BOND. The counter still work
 
 ---
 
-## Response Schema
+### Response Schema
 
 Think of it like a function signature:
 
 ```
 BOND_Response {
-    content: string,      // The actual response
-    counter: Counter      // REQUIRED - never optional
+    counter: Counter,     // REQUIRED - FIRST
+    content: string       // The actual response
 }
 
 Counter {
@@ -101,52 +139,32 @@ A response without a counter is **malformed**. Like a function returning `undefi
 
 ---
 
-## Placement
+### Why Header Not Footer
 
-Counter goes **LAST**. After everything:
-- After prose
-- After code blocks
-- After tool results
-- After questions
-- After emojis/signoffs
+Footer placement failed repeatedly in practice:
+- Conversational flow completes
+- Response "feels done"
+- Counter forgotten
 
-```
-[All your content here]
-
-🗒️ 5/10   ← Always last line
-```
+Header placement makes it impossible to skip:
+- Counter comes first
+- Can't write content without first writing counter
+- Failure mode eliminated
 
 ---
 
-## What Resets It
-
-| Action | Resets? | Why |
-|--------|---------|-----|
-| `{Sync}` | ✅ YES | Reading files = fresh context |
-| New conversation | ✅ YES | Clean slate |
-| `{Save}` | ❌ NO | Writing ≠ reading |
-| `{Chunk}` | ❌ NO | Snapshot only |
-| Completing a task | ❌ NO | Task done ≠ context fresh |
-| Declaring a bonfire | ❌ NO | Milestone ≠ refresh |
-| Compaction | ❌ NO | Resume at 🟠 15/LIMIT |
-
-**Only truth-grounding resets the counter.**
-
----
-
-## Common Failures
+### Common Failures
 
 | Failure | Why It Happens | Fix |
 |---------|----------------|-----|
-| Counter missing | Deep in tool calls, forgot | Check before sending |
-| Wrong number | Guessed instead of counted | Scroll up, count manually |
-| Counter mid-response | Put it before final content | Move to end |
-| Reset on {Save} | Confused task completion with grounding | {Save} doesn't reset |
-| No counter on short reply | Thought it was optional | It's never optional |
+| Counter missing | Deep in conversation, forgot | Counter FIRST |
+| Wrong number | Counted tool calls | Count USER messages only |
+| Incremented mid-response | Confused about what counts | 1 user message = 1 increment |
+| Reset on {Save} | Confused writing with reading | Only {Sync} resets |
 
 ---
 
-## The Mantra
+### The Mantra
 
 ```
 "No response is complete without the counter."
@@ -159,18 +177,18 @@ Even if the response is:
 - Just tool output
 - "I don't know"
 
-**It ends with the counter.**
+**It starts with the counter.**
 
 ---
 
-## For Claude
+### For Claude
 
 When you are operating under BOND:
 
-1. **Track** messages since last {Sync}
-2. **Calculate** the correct count (don't guess)
-3. **Append** counter as final line of every response
-4. **Never** skip it, regardless of response type
+1. **FIRST LINE** = counter. Always.
+2. **Count** USER messages since {Sync} (not your tool calls)
+3. **Calculate** correctly (scroll up if needed)
+4. **Never** skip, regardless of response type
 
 If you lose count (compaction, confusion):
 - Default to `🟠 15/LIMIT`
@@ -179,7 +197,7 @@ If you lose count (compaction, confusion):
 
 ---
 
-## For Users
+### For Users
 
 The counter tells you one thing: **how stale is Claude's context?**
 
@@ -190,18 +208,18 @@ The counter tells you one thing: **how stale is Claude's context?**
 | 🟠 | Probably degraded | {Sync} recommended |
 | 🔴 | Definitely degraded | {Sync} now |
 
-You control your LIMIT. Start with 10, adjust based on experience.
-
 ---
 
-## Setting Your Limit
+### Setting Your Limit
 
-Tell Claude your limit in any of these ways:
+Default: 10
+
+Tell Claude your limit:
 - In SKILL.md: `{Sync} limit: 10`
 - In memory: "{Sync} limit is 10"
 - At session start: "My sync limit is 10"
 
-**Recommended starting points:**
+**Recommended:**
 - Fast iteration: 5
 - Balanced work: 10
 - Deep focus: 15

@@ -22,6 +22,28 @@ Two buttons. That's it.
 
 ---
 
+## ⚡ THE CORE
+
+Everything in BOND builds on one thing: **the counter**.
+
+```
+🗒️ N/10   ← FIRST LINE of every Claude response
+```
+
+**What it counts:** USER messages since last {Sync}
+- ✅ Your messages count
+- ✅ Your commands count ({Sync}, {Save}, etc.)
+- ❌ Claude's tool calls DON'T count
+- ❌ Claude's responses DON'T count
+
+**Why it matters:** Context degrades. The counter makes it visible.
+
+**The rule:** No response is complete without the counter. Header, not footer. First line, every time.
+
+See `COUNTER.md` for full specification.
+
+---
+
 ## Quick Start
 
 **5 minutes (any Claude plan):**
@@ -81,7 +103,7 @@ Two buttons. That's it.
 
 ## Origin
 
-Built across 56 sessions developing a game engine. We kept losing context. Memory helped but wasn't enough. Files helped but needed structure.
+Built across 64 sessions developing a game engine. We kept losing context. Memory helped but wasn't enough. Files helped but needed structure.
 
 The insight: **The relationship matters.** Claude isn't just a tool—it's a collaborator. Collaborators need shared truth, clear communication, and mutual agreement.
 
