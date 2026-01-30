@@ -130,7 +130,19 @@ Example: If your limit is 15 and you're at 16, that's 🟠 not 🟡.
 | Bonfire declared | ❌ NO | Milestone ≠ refresh |
 | Compaction | ❌ NO | Resume at 🟠 15/X if lost |
 
-**The counter tracks CONTEXT DEGRADATION over message count, not task completion.**
+**⚠️ COMMON MISTAKE - {Save} Does NOT Reset:**
+Claude may conflate "task complete" with "counter reset." This is WRONG.
+- {Save} = "I wrote to files" → Counter INCREMENTS (report is a message)
+- {Sync} = "I read from files" → Counter RESETS to 1
+
+The counter tracks CONTEXT DEGRADATION, not task completion.
+Only READING fresh context resets drift. WRITING does not.
+
+Example of CORRECT behavior:
+```
+User: {Save}
+Claude: [writes to files, reports success] 🗒️ 7/10  ← NOT 1/10
+```
 
 If Claude loses count (compaction, confusion), default to `🟠 15/X` and recommend {Sync}.
 

@@ -52,6 +52,30 @@ In your SKILL.md or memory, specify:
 
 ---
 
+## What Resets the Counter
+
+| Action | Resets Counter? | Why |
+|--------|-----------------|-----|
+| `{Sync}` | ✅ YES | Reading files refreshes context |
+| New conversation | ✅ YES | Clean slate |
+| `{Save}` | ❌ NO | Writing ≠ reading |
+| `{Chunk}` | ❌ NO | Snapshot only |
+| Bonfire declared | ❌ NO | Milestone ≠ refresh |
+| Compaction | ❌ NO | Resume at 🟠 15/X |
+
+**⚠️ CRITICAL:** {Save} does NOT reset the counter.
+
+```
+WRONG:  User: {Save}  →  Claude: [report] 🗒️ 1/10
+RIGHT:  User: {Save}  →  Claude: [report] 🗒️ 7/10
+```
+
+The counter tracks CONTEXT DEGRADATION (drift from truth).
+- {Save} = "I wrote" → Counter increments
+- {Sync} = "I read" → Counter resets
+
+---
+
 ## After Compaction
 
 If you see a message like "[conversation was compacted]" or "This conversation was summarized", call `{Sync}` immediately.

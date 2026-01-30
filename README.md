@@ -45,6 +45,7 @@ Two buttons. That's it.
 | `SKILL_TEMPLATE.md` | Template for identity & core truth |
 | `MASTER_TEMPLATE.md` | Template for state tracking |
 | `COMMANDS.md` | Command reference |
+| `TROUBLESHOOTING.md` | Fix protocol violations (counter bugs, etc.) |
 | `QUICKSTART_CARD.md` | One-page cheatsheet |
 | `ARTIFACT_REGISTRY_TEMPLATE.md` | For Tier 3 artifact persistence |
 | `TIERED_MEMORY.md` | **Advanced:** 80% token reduction for complex projects |
