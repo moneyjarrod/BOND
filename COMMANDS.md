@@ -9,6 +9,65 @@
 
 ---
 
+## {Sync} Protocol
+
+**Trigger:** User says `{Sync}`
+
+**Action:**
+1. Read SKILL.md (identity/truth)
+2. Read MASTER.md or OPS file (current state)
+3. Optionally read code files if task requires
+4. Confirm grounding: "I'm here, [name]. 🔥🌊" or similar
+5. Reset counter to 1
+
+**Dependencies:** 
+- Tier 1: User pastes content
+- Tier 2+: MCP filesystem access
+
+**Output:**
+```
+[Confirmation of what was read]
+[Brief status if relevant]
+
+🗒️ 1/10
+```
+
+---
+
+## {Save} Protocol
+
+**Trigger:** User says `{Save}` OR Claude proposes save
+
+**Action:**
+1. State what will be written and where
+2. Wait for explicit agreement from user
+3. Only after "yes/confirmed/do it": write to files
+4. Report what was written
+5. Increment counter (does NOT reset)
+
+**Dependencies:**
+- Tier 2+: MCP filesystem write access
+- Tier 1: Claude provides content, user saves manually
+
+**Output:**
+```
+Proposing to save:
+- [file]: [what changes]
+
+Confirm?
+
+[after confirmation]
+
+Saved:
+- [file]: [done]
+
+🗒️ N/10   ← NOT reset
+```
+
+**Critical:** {Save} does NOT reset the counter. Writing ≠ reading.
+
+---
+
 ## Sync Counter System
 
 Claude tracks messages since last `{Sync}` with a visual counter at the end of each response.
@@ -150,12 +209,168 @@ If you see a message like "[conversation was compacted]" or "This conversation w
 
 ## Supporting Commands
 
-| Command | Purpose |
-|---------|---------|
-| `{Tick}` | Quick session snapshot (no file writes) |
-| `{Chunk}` | Handoff compression for context limits |
-| `{Relational}` | Architecture alignment check |
-| `{ArtD}` | Restore artifacts to sidebar |
+---
+
+## {Tick} Protocol
+
+**Trigger:** User says `{Tick}`
+
+**Purpose:** Quick status check without reading files. Lighter than {Sync}.
+
+**Action:**
+1. Report current understanding of session state
+2. List what's been accomplished this session
+3. Note any open threads or pending items
+4. Do NOT read files (that's {Sync})
+5. Increment counter (does NOT reset)
+
+**Dependencies:** None — works at all tiers
+
+**Output:**
+```
+{Tick} — Session [N] Status
+
+Done:
+- [item]
+- [item]
+
+Open:
+- [item]
+
+Next: [what's queued]
+
+🗒️ N/10   ← NOT reset
+```
+
+**When to use:** 
+- Quick check before stepping away
+- Verify Claude's understanding without full sync
+- Lighter weight than {Sync}
+
+**When NOT to use:**
+- Context feels stale (use {Sync})
+- Need to ground in files (use {Sync})
+- Counter is yellow/orange/red (use {Sync})
+
+---
+
+## {Chunk} Protocol
+
+**Trigger:** User says `{Chunk}`
+
+**Purpose:** Create a crystallization summary for handoff — to another session, another Claude instance, or future self.
+
+**Action:**
+1. Summarize what was worked on this session
+2. List key decisions and insights
+3. Note current state of work
+4. Identify open threads and next steps
+5. Format for easy paste into new session
+6. Do NOT reset counter
+
+**Dependencies:** None — works at all tiers
+
+**Output:**
+```
+## {Chunk} — Session [N] Crystallization
+
+### Completed
+- [major item]
+- [major item]
+
+### Key Decisions
+- [decision]: [why]
+
+### Current State
+[where things stand]
+
+### Open Threads
+- [thread]: [status]
+
+### Next Session
+[what to pick up]
+
+---
+
+🗒️ N/10   ← NOT reset
+```
+
+**When to use:**
+- End of session (planned handoff)
+- Context window getting full
+- Before expected compaction
+- Switching to different work stream
+
+**Key insight:** {Chunk} gives compaction good material to summarize. If you crystallize clearly, the compressed version retains more meaning.
+
+---
+
+## {ArtD} Protocol
+
+**Trigger:** User says `{ArtD}`
+
+**Purpose:** Restore persistent artifacts to the sidebar. Artifacts live in project folder (survive sessions) but must be copied to outputs (ephemeral) each session.
+
+**Action:**
+1. Read `ARTIFACT_REGISTRY.md` from project folder
+2. For each artifact in registry:
+   - Copy from source path to `/mnt/user-data/outputs/`
+3. Present files to sidebar
+4. Report what was restored
+5. Increment counter (does NOT reset)
+
+**Dependencies:** 
+- Tier 3 (requires MCP filesystem)
+- `ARTIFACT_REGISTRY.md` must exist
+- `artifacts/` folder with source files
+
+**File Structure:**
+```
+YourProject/
+├── ARTIFACT_REGISTRY.md    ← Lists what to restore
+└── artifacts/
+    ├── dashboard.html      ← Persistent source
+    └── other.html
+```
+
+**Registry Format:**
+```markdown
+## Artifact Registry
+
+| Name | Source Path | Type | Description |
+|------|-------------|------|-------------|
+| Dashboard | `artifacts/dashboard.html` | HTML | Status dashboard |
+```
+
+**Output:**
+```
+{ArtD} — Artifacts restored
+
+- dashboard.html ✅
+
+[files appear in sidebar]
+
+🗒️ N/10   ← NOT reset
+```
+
+**When to use:**
+- Session start (after {Sync})
+- After compaction
+- When artifacts disappeared from sidebar
+
+**Why artifacts disappear:** The outputs folder (`/mnt/user-data/outputs/`) is ephemeral — it wipes between sessions. Your source files in `artifacts/` persist. {ArtD} bridges the gap.
+
+---
+
+## Command Summary
+
+| Command | Reads Files | Writes Files | Resets Counter | Tier |
+|---------|-------------|--------------|----------------|------|
+| `{Sync}` | ✅ Yes | ❌ No | ✅ Yes | All |
+| `{Save}` | ❌ No | ✅ Yes | ❌ No | 2+ |
+| `{Tick}` | ❌ No | ❌ No | ❌ No | All |
+| `{Chunk}` | ❌ No | ❌ No | ❌ No | All |
+| `{ArtD}` | ✅ Registry | ✅ Copies | ❌ No | 3 |
 
 ---
 
