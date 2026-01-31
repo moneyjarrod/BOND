@@ -38,10 +38,10 @@ COUNTER = USER MESSAGES since last {Sync}
 # ⚡ CORE FORMAT
 
 ```
-🗒️ N/LIMIT   Normal (1 to LIMIT, including AT limit)
+🗒️ N/LIMIT   Normal (N ≤ LIMIT)
 🟡 N/LIMIT   Over YOUR limit (N > LIMIT, strictly greater)
-🟠 N/LIMIT   Dangerous (15-19, absolute)
-🔴 N/LIMIT   Critical (20+, absolute)
+🟠 N/LIMIT   Danger zone (N ≥ 15, absolute)
+🔴 N/LIMIT   Critical (N ≥ 20, absolute)
 ```
 
 **Combined indicators:** When both conditions apply, show both:
@@ -52,14 +52,23 @@ COUNTER = USER MESSAGES since last {Sync}
 
 **Key distinction:** Yellow triggers when OVER, not AT.
 ```
-10/10 → 🗒️ 10/10   (at limit = still normal)
-11/10 → 🟡 11/10   (over limit = yellow)
+LIMIT/LIMIT → 🗒️   (at limit = normal)
+(LIMIT+1)/LIMIT → 🟡   (over limit = yellow)
 ```
 
-**Example:** User sets limit=17, currently at 18:
-- Over their limit? Yes (18 > 17) → 🟡
-- In danger zone (15-19)? Yes → 🟠
-- Result: 🟡🟠 18/17
+**Example:** User sets LIMIT=10, currently at N=10:
+- N ≤ LIMIT? Yes (10 ≤ 10) → 🗒️
+- Result: 🗒️ 10/10
+
+**Example:** User sets LIMIT=10, currently at N=11:
+- N > LIMIT? Yes (11 > 10) → 🟡
+- N ≥ 15? No → no 🟠
+- Result: 🟡 11/10
+
+**Example:** User sets LIMIT=12, currently at N=16:
+- N > LIMIT? Yes (16 > 12) → 🟡
+- N ≥ 15? Yes → 🟠
+- Result: 🟡🟠 16/12
 
 ---
 
@@ -264,12 +273,25 @@ The counter tells you one thing: **how stale is Claude's context?**
 
 Default: 10
 
-Tell Claude your limit:
-- In SKILL.md: `{Sync} limit: 10`
-- In memory: "{Sync} limit is 10"
-- At session start: "My sync limit is 10"
+**Where to store it (by tier):**
 
-**Recommended:**
+| Tier | Location | Example |
+|------|----------|--------|
+| 1 | SKILL content you paste | `## CONFIG\ncounter_limit: 10` |
+| 2+ | OPS file or SKILL.md | Same format, Claude reads on {Sync} |
+| 2+ with QAIS | File + QAIS | `qais_store("CONFIG", "counter_limit", "10")` |
+
+**Why not memory edits?** Memory edit #6 is the *rule* (shared across BOND). Your limit is *config* (personal). If memory resets, the file preserves your value.
+
+**{Sync} behavior:** Claude reads CONFIG section, applies your limit. With QAIS, also resonates `CONFIG|counter_limit` as backup.
+
+**QAIS users:** Store config for redundancy:
+```
+qais_store("CONFIG", "counter_limit", "10")
+```
+If file read fails, QAIS resonance recovers the value.
+
+**Recommended limits:**
 - Fast iteration: 5
 - Balanced work: 10
 - Deep focus: 15

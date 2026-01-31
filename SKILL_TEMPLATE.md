@@ -114,8 +114,21 @@ Why? If counter is only in your SKILL.md, it fails when you change topics:
 
 **Solution:** Add this to your Claude memory edits:
 ```
-BOND Counter: FIRST LINE every response. 🗒️ N/10. Resets: {Sync}, {Full Restore}, new convo only. 🟡=11+ past, 🟠=15+ danger, 🔴=20+ critical. ALWAYS—even images, errors, code.
+BOND Counter: FIRST LINE every response. 🗒️ N/LIMIT. LIMIT from CONFIG section (default 10). Resets: {Sync}, {Full Restore}, new convo only. 🟡=N>LIMIT, 🟠=15-19, 🔴=20+. ALWAYS.
 ```
+
+**Then add to your SKILL.md or OPS file:**
+```
+## CONFIG
+counter_limit: 10
+```
+
+**QAIS users (Tier 2+ with MCP):** Also store in QAIS for redundancy:
+```
+qais_store("CONFIG", "counter_limit", "10")
+```
+
+The rule is generic (BOND). The value is yours (CONFIG). If memory resets, file or QAIS recovers your limit.
 
 Memory edits are injected into EVERY conversation regardless of topic. Counter survives topic drift.
 
