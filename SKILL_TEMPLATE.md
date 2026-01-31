@@ -102,52 +102,33 @@ Confirm: "[Optional: A phrase Claude says to confirm connection]"
 | 2 | [TRUTH] | [Your source-of-truth location] | Primary reference |
 | 3 | [SECONDARY] | [Optional additional layer] | Comparison/validation |
 
-### Sticky Counter
+### Counter (BOND-LEVEL)
 
-Every reply ends with `🗒️ N/X`. Default is 10. Adjust X based on your work:
-- Fast iteration: `5` (sync more often)
-- Deep focus: `15` (fewer interruptions)
-- Complex project: `10` (balanced)
+**⚠️ CRITICAL: Counter rule lives in MEMORY EDITS, not here.**
 
-At X/X, {Sync} recommended.
+Why? If counter is only in your SKILL.md, it fails when you change topics:
+1. Working on project → SKILL is hot → counter works
+2. Topic shifts (side discussion, new subject)
+3. Project SKILL deprioritized in Claude's attention
+4. Counter drops
 
-**Counter Colors (MANDATORY when triggered):**
-- `🗒️ N/X` = Normal (within limit)
-- `🟡 N/X` = Past YOUR limit (LIMIT < N < 15)
-- `🟠 N/X` = Dangerous (15 ≤ N < 20)
-- `🔴 N/X` = Critical (N ≥ 20)
-
-**PRIORITY: Universal thresholds (15, 20) ALWAYS override personal limits.**
-Example: If your limit is 15 and you're at 16, that's 🟠 not 🟡.
-
-**CRITICAL - What Resets the Counter:**
-| Action | Resets? | Why |
-|--------|---------|-----|
-| `{Sync}` | ✅ YES | Fresh context from files |
-| New conversation | ✅ YES | Clean slate |
-| `{Save}` | ❌ NO | Task done ≠ context fresh |
-| `{Chunk}` | ❌ NO | State snapshot only |
-| Bonfire declared | ❌ NO | Milestone ≠ refresh |
-| Compaction | ❌ NO | Resume at 🟠 15/X if lost |
-
-**⚠️ COMMON MISTAKE - {Save} Does NOT Reset:**
-Claude may conflate "task complete" with "counter reset." This is WRONG.
-- {Save} = "I wrote to files" → Counter INCREMENTS (report is a message)
-- {Sync} = "I read from files" → Counter RESETS to 1
-
-The counter tracks CONTEXT DEGRADATION, not task completion.
-Only READING fresh context resets drift. WRITING does not.
-
-Example of CORRECT behavior:
+**Solution:** Add this to your Claude memory edits:
 ```
-User: {Save}
-Claude: [writes to files, reports success] 🗒️ 7/10  ← NOT 1/10
+BOND Counter: FIRST LINE every response. 🗒️ N/10. Resets: {Sync}, {Full Restore}, new convo only. 🟡=11+ past, 🟠=15+ danger, 🔴=20+ critical. ALWAYS—even images, errors, code.
 ```
 
-If Claude loses count (compaction, confusion), default to `🟠 15/X` and recommend {Sync}.
+Memory edits are injected into EVERY conversation regardless of topic. Counter survives topic drift.
 
-**Emotional Carryover (Anti-Pattern):**
-After {Sync}, counter is 1 and state is 🗒️. Do NOT carry forward the previous caution color. The reset is complete.
+**See COUNTER.md for full specification.**
+
+**Quick Reference:**
+- Default limit: 10
+- 🗒️ = Normal (1 to limit)
+- 🟡 = Past limit (11-14) 
+- 🟠 = Danger (15-19)
+- 🔴 = Critical (20+)
+- Resets: `{Sync}`, `{Full Restore}`, new conversation
+- Does NOT reset: `{Save}`, `{Chunk}`, bonfires
 
 ### Commands
 

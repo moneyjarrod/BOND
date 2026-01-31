@@ -118,6 +118,37 @@ A user with just Claude web and a text file can use BOND. The counter still work
 
 ---
 
+### Implementation Location (CRITICAL)
+
+**The counter rule MUST live in Claude's memory edits, NOT in your SKILL.md.**
+
+Why? Topic drift failure pattern:
+
+| Step | What Happens |
+|------|-------------|
+| 1 | Counter rule in SKILL.md (project-specific) |
+| 2 | Working on project → SKILL is hot → counter works |
+| 3 | Topic shifts (side discussion, new subject) |
+| 4 | Project SKILL deprioritized in attention |
+| 5 | Counter drops |
+
+**Solution:** Put counter in memory edits. Memory is injected into EVERY conversation regardless of topic.
+
+**Recommended memory edit:**
+```
+BOND Counter: FIRST LINE every response. 🗒️ N/10. Resets: {Sync}, {Full Restore}, new convo only. 🟡=11+ past, 🟠=15+ danger, 🔴=20+ critical. ALWAYS—even images, errors, code.
+```
+
+Your SKILL.md can reference counter but should NOT define it:
+```
+### Counter
+
+**BOND-LEVEL** — Counter rule lives in memory edits, not here.
+This ensures counter works across ALL topics, not just this project.
+```
+
+---
+
 ### Response Schema
 
 Think of it like a function signature:
