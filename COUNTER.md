@@ -39,10 +39,21 @@ COUNTER = USER MESSAGES since last {Sync}
 
 ```
 🗒️ N/LIMIT   Normal (1 to LIMIT)
-🟡 N/LIMIT   Past limit (LIMIT+1 to 14)
-🟠 N/LIMIT   Dangerous (15-19)
-🔴 N/LIMIT   Critical (20+)
+🟡 N/LIMIT   Past YOUR limit (relative)
+🟠 N/LIMIT   Dangerous (15-19, absolute)
+🔴 N/LIMIT   Critical (20+, absolute)
 ```
+
+**Combined indicators:** When both conditions apply, show both:
+```
+🟡🟠 N/LIMIT   Past limit AND in danger zone
+🟡🔴 N/LIMIT   Past limit AND critical
+```
+
+**Example:** User sets limit=17, currently at 18:
+- Past their limit? Yes → 🟡
+- In danger zone (15-19)? Yes → 🟠
+- Result: 🟡🟠 18/17
 
 ---
 
@@ -136,7 +147,7 @@ Why? Topic drift failure pattern:
 
 **Recommended memory edit:**
 ```
-BOND Counter: FIRST LINE every response. 🗒️ N/10. Resets: {Sync}, {Full Restore}, new convo only. 🟡=11+ past, 🟠=15+ danger, 🔴=20+ critical. ALWAYS—even images, errors, code.
+BOND Counter: FIRST LINE every response. 🗒️ N/LIMIT. Resets: {Sync}, {Full Restore}, new convo only. 🟡=past limit, 🟠=15-19, 🔴=20+. Combine when both apply: 🟡🟠 or 🟡🔴. ALWAYS.
 ```
 
 Your SKILL.md can reference counter but should NOT define it:
@@ -160,7 +171,7 @@ BOND_Response {
 }
 
 Counter {
-    state: 🗒️ | 🟡 | 🟠 | 🔴,
+    state: 🗒️ | 🟡 | 🟠 | 🔴 | 🟡🟠 | 🟡🔴,
     current: int,
     limit: int
 }
@@ -235,9 +246,11 @@ The counter tells you one thing: **how stale is Claude's context?**
 | You See | What It Means | What To Do |
 |---------|---------------|------------|
 | 🗒️ | Context is fresh | Keep working |
-| 🟡 | Getting stale | Consider {Sync} soon |
-| 🟠 | Probably degraded | {Sync} recommended |
-| 🔴 | Definitely degraded | {Sync} now |
+| 🟡 | Past YOUR limit | Consider {Sync} soon |
+| 🟠 | In danger zone (15-19) | {Sync} recommended |
+| 🔴 | Critical (20+) | {Sync} now |
+| 🟡🟠 | Past limit AND dangerous | {Sync} recommended |
+| 🟡🔴 | Past limit AND critical | {Sync} now |
 
 ---
 
