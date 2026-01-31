@@ -114,7 +114,7 @@ Why? If counter is only in your SKILL.md, it fails when you change topics:
 
 **Solution:** Add this to your Claude memory edits:
 ```
-BOND Counter: FIRST LINE every response. 🗒️ N/LIMIT. LIMIT from CONFIG section (default 10). Resets: {Sync}, {Full Restore}, new convo only. 🟡=N>LIMIT, 🟠=15-19, 🔴=20+. ALWAYS.
+BOND Counter: Line 1. [emoji] N/LIMIT. LIMIT←CONFIG (default 10). Reset→N:=1 on {Sync}|{Full Restore}|new. 🗒️←(N≤LIMIT), 🟡←(N>LIMIT), 🟠←(N≥15), 🔴←(N≥20). ALWAYS.
 ```
 
 **Then add to your SKILL.md or OPS file:**
@@ -135,13 +135,14 @@ Memory edits are injected into EVERY conversation regardless of topic. Counter s
 **See COUNTER.md for full specification.**
 
 **Quick Reference:**
-- Default limit: 10
-- 🗒️ = Normal (1 to limit)
-- 🟡 = Past limit (11-14) 
-- 🟠 = Danger (15-19)
-- 🔴 = Critical (20+)
-- Resets: `{Sync}`, `{Full Restore}`, new conversation
-- Does NOT reset: `{Save}`, `{Chunk}`, bonfires
+```
+LIMIT ← CONFIG ∨ 10
+🗒️ ← (N ≤ LIMIT)
+🟡 ← (N > LIMIT)
+🟠 ← (N ≥ 15)
+🔴 ← (N ≥ 20)
+Reset: N := 1 on {Sync} | {Full Restore} | new conversation
+```
 
 ### Commands
 

@@ -47,7 +47,7 @@ class ClusterGenome:
     min_shared_matches: int = 1
     min_cluster_size: int = 2
     max_clusters: int = 5
-    topic_threshold: float = 0.5
+    topic_threshold: float = 0.3  # Lowered from 0.5 - S67 tuning
 
 @dataclass
 class SynthesisGenome:
