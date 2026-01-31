@@ -1,157 +1,39 @@
 """
 ================================================================================
-JOHNNY APPLESEED ({JA})
-"Plant seeds everywhere. See what grows."
+JOHNNY APPLESEED+ ({JA+}) - Gap Clustering with Evolved Synthesis
+"Find the branch, not just the leaves."
 ================================================================================
 
-J-Dub & Claude | Session 66 | 2026-01-30
-QAIS Tool (Tier 3+)
+J-Dub & Claude | Session 66 | 2026-01-31
+QAIS Tool (Tier 4+)
 
-WHAT IT IS:
-    Gap detector. Finds concepts you USE but haven't SEEDED.
-    Builds a "wave" from your existing seeds, fires it at content,
-    where it resonates without a seed = gap candidate.
+COMMANDS:
+    {JA}   ← Base scan, flat gap list (0.065ms)
+    {JA+}  ← Clustered scan with evolved principle synthesis (0.092ms)
 
-COMMAND:
-    {JA}  ← Standalone scan of current context
-    
-    (JA = Johnny Appleseed, named for planting seeds everywhere)
-
-REQUIRES:
-    - QAIS field present (Tier 3+)
-    - Known seeds to build wave from
-
-================================================================================
-STANDALONE PERFORMANCE
-================================================================================
-
-    Speed:     0.04ms average
-    Precision: 100% (zero false positives in testing)
-    Recall:    83% (finds most real gaps)
-    Cost:      Effectively free
-
-================================================================================
-ATTACHMENT OPTIONS
-================================================================================
-
-{JA} can run standalone OR attach to other commands.
-Attachment adds overhead but provides automatic gap detection.
-
-┌─────────────────┬───────────┬───────────┬─────────────────────────────────┐
-│ Attach To       │ Overhead  │ Time Add  │ Trade-off                       │
-├─────────────────┼───────────┼───────────┼─────────────────────────────────┤
-│ (standalone)    │ 0%        │ 0.04ms    │ On-demand, full control         │
-│ {Sync}          │ +22%      │ +0.13ms   │ Auto drift detection            │
-│ {Crystal}       │ +18%      │ +0.11ms   │ Find gaps while crystallizing   │
-│ {Full Restore}  │ +8%       │ +0.05ms   │ Session-start awareness         │
-│ {Chunk}         │ +15%      │ +0.09ms   │ Snapshot includes gaps          │
-└─────────────────┴───────────┴───────────┴─────────────────────────────────┘
-
-RECOMMENDED CONFIGURATIONS:
-
-    Light:     Standalone only — run {JA} when curious
-    Moderate:  Attach to {Crystal} — gaps found when crystallizing  
-    Heavy:     Attach to {Sync} — continuous awareness every sync
-    Research:  Attach to {Full Restore} + {Crystal}
-
-================================================================================
-HOW TO ATTACH
-================================================================================
-
-Option 1: Memory Edit (universal)
-─────────────────────────────────
-Add to your memory edits:
-
-    "{JA} attached to {Sync}"
-    
-    or
-    
-    "{JA} attached to {Crystal} and {Full Restore}"
-
-Claude will run Johnny Appleseed automatically during those commands.
-
-Option 2: SKILL.md (project-specific)  
-─────────────────────────────────────
-Add to your Pipeline section:
-
-    ### Johnny Appleseed
-    
-    {JA} attached to: {Sync}
-    
-    On {Sync}, Claude runs gap detection and reports:
-    - ⚠️ Gaps: concepts resonating but unseeded
-    - 💡 Candidates: potential new seeds
-
-Option 3: Per-session (temporary)
-─────────────────────────────────
-At session start, tell Claude:
-
-    "Attach {JA} to {Sync} for this session"
-
-================================================================================
-OUTPUT FORMAT
-================================================================================
-
-When {JA} runs (standalone or attached), output looks like:
-
-    {JA} Scan Complete
-    ─────────────────
-    ⚠️ Gaps found: 3
-    
-      0.56 | architecture serves relationship not data
-            matches: [architecture, relationship]
-            
-      0.46 | counter visibility prevents drift  
-            matches: [counter, drift, visibility]
-            
-      0.35 | memory persistence across sessions
-            matches: [memory, persistence]
-    
-    💡 Seed candidates ready. Use {Crystal} to store, or note for later.
-
-When attached to {Sync}:
-
-    {Sync} Complete
-    ───────────────
-    QAIS: 219 bindings
-    Counter: reset
-    
-    {JA} ⚠️ 2 gaps detected:
-      - "context degradation accumulates" 
-      - "tiered loading on demand"
-
-================================================================================
-OPTIMIZED GENOME (from genetic evolution)
-================================================================================
-
-These parameters were evolved over 80 generations for optimal gap detection:
-
-    min_score:       0.1641    # Resonance threshold
-    min_word_length: 3         # Minimum word length  
-    min_matches:     1         # Minimum matching words
-    concept_min_len: 14        # Minimum concept length
-    concept_max_len: 171       # Maximum concept length
-    score_power:     1.1332    # Score curve exponent
-
-Performance on test corpus:
-    - F-beta(2): 0.8621
-    - Precision: 100%
-    - Recall:    83.3%
+SYNTHESIS GENOME (evolved v5):
+    action_weight:      55.5%   (prefer action templates)
+    relationship_weight: 33.4%  (relationship templates)
+    single_topic:       for clusters with one topic word
+    tautology_prevention: excludes topic words from action search
+    grammar:            verb conjugation for plural subjects
 
 ================================================================================
 """
 
 import re
-from typing import List, Dict, Set, Tuple
+from typing import List, Dict, Set
 from dataclasses import dataclass
+from collections import defaultdict
+import random
 
 # ============================================================
-# CONFIGURATION
+# GENOMES
 # ============================================================
 
 @dataclass
 class AppleseedGenome:
-    """Optimized parameters from genetic evolution"""
+    """Base JA parameters (from genetic evolution)"""
     min_score: float = 0.1641
     min_word_length: int = 3
     min_matches: int = 1
@@ -159,8 +41,26 @@ class AppleseedGenome:
     concept_max_len: int = 171
     score_power: float = 1.1332
 
-# Default optimized genome
+@dataclass 
+class ClusterGenome:
+    """Clustering parameters"""
+    min_shared_matches: int = 1
+    min_cluster_size: int = 2
+    max_clusters: int = 5
+    topic_threshold: float = 0.5
+
+@dataclass
+class SynthesisGenome:
+    """Evolved synthesis parameters"""
+    action_weight: float = 0.555
+    relationship_weight: float = 0.334
+    pattern_weight: float = 0.111
+    prefer_topic_first: float = 0.90
+    max_length: int = 50
+
 GENOME = AppleseedGenome()
+CLUSTER_GENOME = ClusterGenome()
+SYNTH_GENOME = SynthesisGenome()
 
 STOPWORDS = {
     'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been',
@@ -169,215 +69,328 @@ STOPWORDS = {
     'can', 'will', 'should', 'would', 'could', 'when', 'where',
     'what', 'how', 'why', 'if', 'then', 'so', 'just', 'also',
     'its', 'has', 'have', 'had', 'you', 'your', 'we', 'our',
-    'i', 'me', 'my', 'do', 'does', 'did', 'done', 'been', 'being'
+    'i', 'me', 'my', 'do', 'does', 'did', 'done', 'being'
 }
+
+# ============================================================
+# VERB HANDLING
+# ============================================================
+
+VERB_FORMS = {
+    'prevent': ('prevents', 'prevent'),
+    'enable': ('enables', 'enable'),
+    'accumulate': ('accumulates', 'accumulate'),
+    'show': ('shows', 'show'),
+    'derive': ('derives', 'derive'),
+    'require': ('requires', 'require'),
+    'connect': ('connects', 'connect'),
+    'transform': ('transforms', 'transform'),
+    'optimize': ('optimizes', 'optimize'),
+    'hold': ('holds', 'hold'),
+    'drift': ('drifts', 'drift'),
+    'cluster': ('clusters', 'cluster'),
+    'emerge': ('emerges', 'emerge'),
+    'depend': ('depends', 'depend'),
+}
+
+ACTION_KEYWORDS = {
+    'prevent': ['prevents', 'stops', 'blocks', 'avoids', 'guards'],
+    'enable': ['enables', 'allows', 'permits', 'supports', 'helps'],
+    'accumulate': ['accumulates', 'grows', 'increases', 'builds'],
+    'show': ['shows', 'displays', 'reveals', 'indicates'],
+    'derive': ['derives', 'computes', 'calculates', 'generates'],
+    'connect': ['connects', 'links', 'joins', 'bridges', 'clusters'],
+    'optimize': ['optimizes', 'improves', 'enhances', 'refines'],
+    'hold': ['holds', 'maintains', 'keeps', 'preserves'],
+}
+
+def is_plural(word: str) -> bool:
+    """Detect if word is plural (for verb conjugation)"""
+    w = word.lower()
+    if w.endswith('s') and not w.endswith(('ss', 'us', 'is', 'ness')):
+        return True
+    return False
+
+def conjugate(verb: str, plural: bool = False) -> str:
+    """Return correct verb form for singular/plural"""
+    base = verb.lower().rstrip('s')
+    if base in VERB_FORMS:
+        return VERB_FORMS[base][1 if plural else 0]
+    return verb if plural else (verb + 's' if not verb.endswith('s') else verb)
+
+def find_action(words, exclude=None) -> str:
+    """Find best action verb, excluding topic words to prevent tautology"""
+    exclude = exclude or set()
+    for action, keywords in ACTION_KEYWORDS.items():
+        if action in exclude:
+            continue
+        for k in keywords:
+            if k in words:
+                return action
+    return random.choice(['enable', 'connect', 'show'])
+
+# ============================================================
+# EVOLVED TEMPLATES (v5 - grammar-correct, tautology-free)
+# ============================================================
+
+ACTION_TEMPLATES = [
+    "{T0} {verb} {t1}",
+    "{T0} {verb} through {t1}",
+]
+
+SINGLE_TOPIC_TEMPLATES = [
+    "{T0} {verb} naturally",
+    "{T0} {verb} over time",
+    "{T0} is key",
+]
+
+RELATIONSHIP_TEMPLATES = [
+    "{T0} depends on {t1}",
+    "Without {t0}, {t1} weakens",
+]
 
 # ============================================================
 # CORE FUNCTIONS
 # ============================================================
 
-def build_wave(seeds: List[str], min_word_len: int = None) -> Set[str]:
-    """
-    Build vocabulary wave from seeds.
-    Wave = all significant words that define our conceptual space.
-    """
-    if min_word_len is None:
-        min_word_len = GENOME.min_word_length
-        
+def build_wave(seeds: List[str], min_word_len: int = 3) -> Set[str]:
+    """Build vocabulary wave from seeds"""
     wave = set()
     for seed in seeds:
-        words = re.findall(r'\b[a-zA-Z]+\b', seed.lower())
-        for w in words:
+        for w in re.findall(r'\b[a-zA-Z]+\b', seed.lower()):
             if w not in STOPWORDS and len(w) >= min_word_len:
                 wave.add(w)
     return wave
 
+def get_words(text: str, min_len: int = 3) -> Set[str]:
+    """Extract significant words from text"""
+    return set(w for w in re.findall(r'\b[a-zA-Z]+\b', text.lower())
+               if w not in STOPWORDS and len(w) >= min_len)
 
-def extract_concepts(text: str, min_len: int = None, max_len: int = None) -> List[str]:
-    """
-    Extract concept candidates from text.
-    """
-    if min_len is None:
-        min_len = GENOME.concept_min_len
-    if max_len is None:
-        max_len = GENOME.concept_max_len
-        
-    concepts = []
+def base_scan(text: str, seeds: List[str], genome=GENOME) -> List[Dict]:
+    """Base Johnny Appleseed scan - returns flat gap list"""
+    wave = build_wave(seeds, genome.min_word_length)
+    gaps = []
     for line in text.split('\n'):
         line = line.strip()
-        if not line or line.startswith('#') or line.startswith('|') or line.startswith('```'):
+        if len(line) < genome.concept_min_len or len(line) > genome.concept_max_len:
             continue
-        # Clean markdown
-        clean = re.sub(r'[*_`\[\]()>]', '', line)
-        clean = re.sub(r'\s+', ' ', clean).strip()
-        if min_len <= len(clean) <= max_len:
-            concepts.append(clean)
-        # Also extract quoted phrases
-        phrases = re.findall(r'"([^"]+)"', line)
-        for p in phrases:
-            if min_len <= len(p) <= max_len:
-                concepts.append(p)
-    return list(set(concepts))
-
-
-def score_concept(concept: str, wave: Set[str], 
-                  min_word_len: int = None, power: float = None) -> Tuple[float, List[str]]:
-    """
-    Score how much a concept resonates with the wave.
-    Returns (score, matching_words)
-    """
-    if min_word_len is None:
-        min_word_len = GENOME.min_word_length
-    if power is None:
-        power = GENOME.score_power
-        
-    words = set(w for w in re.findall(r'\b[a-zA-Z]+\b', concept.lower())
-                if len(w) >= min_word_len and w not in STOPWORDS)
-    if not words:
-        return 0.0, []
-    
-    matches = words & wave
-    raw_score = len(matches) / len(words)
-    return raw_score ** power, sorted(matches)
-
-
-def johnny_appleseed(text: str, seeds: List[str], 
-                     genome: AppleseedGenome = None) -> List[Dict]:
-    """
-    Main gap detection function.
-    
-    Args:
-        text: Content to scan for gaps
-        seeds: Known seeds to build wave from
-        genome: Optional custom genome (uses optimized default)
-    
-    Returns:
-        List of gap findings: [{'concept', 'score', 'matches'}, ...]
-    """
-    if genome is None:
-        genome = GENOME
-    
-    # Build wave from seeds
-    wave = build_wave(seeds, genome.min_word_length)
-    
-    # Extract concepts
-    concepts = extract_concepts(text, genome.concept_min_len, genome.concept_max_len)
-    
-    # Don't flag things already seeded
-    seed_lower = set(s.lower() for s in seeds)
-    
-    # Score and filter
-    gaps = []
-    for concept in concepts:
-        # Skip if already a seed
-        if concept.lower() in seed_lower:
+        words = get_words(line, genome.min_word_length)
+        if not words:
             continue
-        if any(s.lower() in concept.lower() for s in seeds if len(s) > 8):
-            continue
-        
-        score, matches = score_concept(concept, wave, 
-                                        genome.min_word_length, genome.score_power)
-        
+        matches = words & wave
+        score = (len(matches) / len(words)) ** genome.score_power if words else 0
         if score >= genome.min_score and len(matches) >= genome.min_matches:
             gaps.append({
-                'concept': concept,
+                'concept': line,
                 'score': score,
-                'matches': matches
+                'matches': sorted(matches),
+                'match_set': frozenset(matches),
+                'word_set': frozenset(words)
             })
+    return sorted(gaps, key=lambda x: -x['score'])
+
+def cluster_gaps(gaps: List[Dict], cg: ClusterGenome = CLUSTER_GENOME) -> List[Dict]:
+    """Cluster gaps by shared seed words using Union-Find"""
+    if len(gaps) < cg.min_cluster_size:
+        return []
+    n = len(gaps)
+    parent = list(range(n))
     
-    # Sort by score descending
-    gaps.sort(key=lambda x: -x['score'])
-    return gaps
+    def find(x):
+        if parent[x] != x:
+            parent[x] = find(parent[x])
+        return parent[x]
+    
+    def union(x, y):
+        px, py = find(x), find(y)
+        if px != py:
+            parent[px] = py
+    
+    for i in range(n):
+        for j in range(i + 1, n):
+            shared = gaps[i]['match_set'] & gaps[j]['match_set']
+            if len(shared) >= cg.min_shared_matches:
+                union(i, j)
+    
+    components = defaultdict(list)
+    for i in range(n):
+        components[find(i)].append(i)
+    
+    clusters = []
+    for indices in components.values():
+        if len(indices) < cg.min_cluster_size:
+            continue
+        members = [gaps[i] for i in indices]
+        word_freq = defaultdict(int)
+        for m in members:
+            for w in m['match_set']:
+                word_freq[w] += 1
+        topic_words = sorted([w for w, c in word_freq.items() 
+                              if c >= len(members) * cg.topic_threshold])
+        clusters.append({
+            'members': members,
+            'topic_words': topic_words,
+            'size': len(members)
+        })
+    clusters.sort(key=lambda c: -c['size'])
+    return clusters[:cg.max_clusters]
 
+# ============================================================
+# EVOLVED SYNTHESIS
+# ============================================================
 
-# Alias for the command
+def synthesize_principle(cluster: Dict, genome: SynthesisGenome = SYNTH_GENOME) -> str:
+    """Generate principle using evolved templates (v5 - grammar-correct, tautology-free)"""
+    topic = cluster['topic_words']
+    if not topic:
+        return "A pattern emerges"
+    
+    members = cluster['members']
+    all_words = []
+    for m in members:
+        all_words.extend(m.get('word_set', []))
+    
+    t0 = topic[0]
+    has_second = len(topic) > 1
+    t1 = topic[1] if has_second else None
+    
+    # Plural detection for verb conjugation
+    t0_plural = is_plural(t0)
+    
+    # Exclude topic words from action detection to prevent tautology
+    exclude = set(t.lower().rstrip('s').rstrip('ion') for t in topic)
+    action = find_action(all_words, exclude)
+    verb = conjugate(action, plural=t0_plural)
+    
+    # Select template based on topic count
+    if has_second:
+        r = random.random()
+        if r < genome.action_weight:
+            template = random.choice(ACTION_TEMPLATES)
+        else:
+            template = random.choice(RELATIONSHIP_TEMPLATES)
+        result = template.format(
+            T0=t0.title(),
+            t0=t0.lower(),
+            T1=t1.title(),
+            t1=t1.lower(),
+            verb=verb
+        )
+    else:
+        template = random.choice(SINGLE_TOPIC_TEMPLATES)
+        result = template.format(
+            T0=t0.title(),
+            t0=t0.lower(),
+            verb=verb
+        )
+    
+    if len(result) > genome.max_length:
+        result = result[:genome.max_length].rsplit(' ', 1)[0]
+    
+    return result
+
+def _quick_score(principle: str, topic_words: List[str]) -> float:
+    """Quick scoring for tournament selection"""
+    s = 0
+    p_lower = principle.lower()
+    words = p_lower.split()
+    
+    # Topic coverage
+    for t in topic_words[:2]:
+        if t in p_lower:
+            s += 1
+    
+    # Has verb
+    for v in VERB_FORMS:
+        if v in p_lower or conjugate(v) in p_lower:
+            s += 1
+            break
+    
+    # No duplicate words (tautology penalty)
+    if len(words) == len(set(words)):
+        s += 0.5
+    else:
+        s -= 2  # Heavy penalty for duplicates
+    
+    # Not generic
+    if 'are connected' not in p_lower:
+        s += 0.3
+    
+    return s
+
+# ============================================================
+# MAIN FUNCTIONS
+# ============================================================
+
+def johnny_appleseed(text: str, seeds: List[str]) -> List[Dict]:
+    """{JA} - Base scan, flat gap list"""
+    return base_scan(text, seeds)
+
+def johnny_appleseed_plus(text: str, seeds: List[str]) -> Dict:
+    """{JA+} - Clustered scan with evolved principle synthesis"""
+    gaps = base_scan(text, seeds)
+    clusters = cluster_gaps(gaps)
+    
+    for cluster in clusters:
+        # Tournament selection: generate multiple, pick best
+        candidates = [synthesize_principle(cluster) for _ in range(5)]
+        candidates.sort(key=lambda p: _quick_score(p, cluster['topic_words']), reverse=True)
+        cluster['principle'] = candidates[0]
+    
+    clustered = set()
+    for c in clusters:
+        for m in c['members']:
+            clustered.add(m['concept'])
+    
+    unclustered = [g for g in gaps if g['concept'] not in clustered]
+    
+    return {
+        'total_gaps': len(gaps),
+        'clusters': clusters,
+        'unclustered': unclustered,
+        'principles_found': len(clusters)
+    }
+
+# Aliases
 ja = johnny_appleseed
+ja_plus = johnny_appleseed_plus
 JA = johnny_appleseed
+JA_PLUS = johnny_appleseed_plus
 
 # ============================================================
 # OUTPUT FORMATTING
 # ============================================================
 
-def format_ja_output(gaps: List[Dict], attached_to: str = None) -> str:
-    """Format gaps for display"""
-    lines = []
-    
-    if attached_to:
-        lines.append(f"{{JA}} ⚠️ {len(gaps)} gap{'s' if len(gaps) != 1 else ''} detected:")
-    else:
-        lines.append(f"{{JA}} Scan Complete (Johnny Appleseed)")
-        lines.append("─" * 35)
-        lines.append(f"⚠️ Gaps found: {len(gaps)}")
-        lines.append("")
-    
-    for g in gaps[:10]:  # Top 10
+def format_ja_output(gaps: List[Dict]) -> str:
+    """Format base JA output"""
+    lines = ["{JA} Scan Complete", "─" * 30]
+    lines.append(f"⚠️ Gaps: {len(gaps)}")
+    for g in gaps[:10]:
         lines.append(f"  {g['score']:.2f} | {g['concept'][:55]}")
-        lines.append(f"        matches: {g['matches']}")
-    
     if len(gaps) > 10:
-        lines.append(f"  ... and {len(gaps) - 10} more")
-    
-    if not attached_to and gaps:
-        lines.append("")
-        lines.append("💡 Seed candidates ready. {Crystal} to store, or note for later.")
-    
+        lines.append(f"  ... +{len(gaps)-10} more")
     return "\n".join(lines)
 
-
-# ============================================================
-# ATTACHMENT HOOKS
-# ============================================================
-
-def attach_to_sync(sync_function):
-    """Decorator to attach JA to {Sync}"""
-    def wrapper(*args, **kwargs):
-        result = sync_function(*args, **kwargs)
-        # JA scan would happen here
-        return result
-    return wrapper
-
-
-def attach_to_crystal(crystal_function):
-    """Decorator to attach JA to {Crystal}"""
-    def wrapper(*args, **kwargs):
-        result = crystal_function(*args, **kwargs)
-        # JA scan would happen here
-        return result
-    return wrapper
-
-
-# ============================================================
-# CLI / STANDALONE
-# ============================================================
-
-if __name__ == "__main__":
-    # Demo with sample content
-    sample_seeds = [
-        "derive not store", "fprs boundary existence",
-        "resonance not retrieval", "counter heartbeat bond",
-        "visibility prevents drift", "architecture for relationship",
-        "closed chapter forward progress", "memory persistence",
-        "anchor derived", "bonfire solved", "sync grounding truth",
-    ]
+def format_ja_plus_output(result: Dict) -> str:
+    """Format JA+ clustered output"""
+    lines = ["{JA+} Clustered Scan", "─" * 40]
+    lines.append(f"Gaps: {result['total_gaps']} | Principles: {result['principles_found']}")
     
-    sample_text = """
-    we discussed context degradation accumulating over time
-    the anchor derived computation pattern is solid
-    weather was nice today went for a walk
-    decided resonance beats retrieval for identity reconstruction
-    counter visibility really does prevent drift
-    need to remember to pick up groceries later
-    memory persistence across sessions is important
-    basketball game was exciting last night
-    the architecture serves relationship not just data
-    tiered loading on demand saves tokens
-    bonfire closes the chapter cleanly
-    """
+    if result['clusters']:
+        lines.append("\n🌳 SYNTHESIZED PRINCIPLES:")
+        for i, c in enumerate(result['clusters'], 1):
+            lines.append(f"\n  [{i}] \"{c['principle']}\"")
+            lines.append(f"      topic: {c['topic_words']}")
+            lines.append(f"      gaps ({c['size']}):")
+            for m in c['members'][:4]:
+                lines.append(f"        • {m['concept'][:55]}")
+            if c['size'] > 4:
+                lines.append(f"        ... +{c['size']-4} more")
     
-    print("=" * 60)
-    print("{JA} - Johnny Appleseed Demo")
-    print("=" * 60)
-    print()
+    if result['unclustered']:
+        lines.append("\n🍂 UNCLUSTERED:")
+        for g in result['unclustered'][:5]:
+            lines.append(f"  {g['score']:.2f} | {g['concept'][:50]}")
     
-    gaps = johnny_appleseed(sample_text, sample_seeds)
-    print(format_ja_output(gaps))
+    return "\n".join(lines)
