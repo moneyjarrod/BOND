@@ -38,20 +38,26 @@ COUNTER = USER MESSAGES since last {Sync}
 # ⚡ CORE FORMAT
 
 ```
-🗒️ N/LIMIT   Normal (1 to LIMIT)
-🟡 N/LIMIT   Past YOUR limit (relative)
+🗒️ N/LIMIT   Normal (1 to LIMIT, including AT limit)
+🟡 N/LIMIT   Over YOUR limit (N > LIMIT, strictly greater)
 🟠 N/LIMIT   Dangerous (15-19, absolute)
 🔴 N/LIMIT   Critical (20+, absolute)
 ```
 
 **Combined indicators:** When both conditions apply, show both:
 ```
-🟡🟠 N/LIMIT   Past limit AND in danger zone
-🟡🔴 N/LIMIT   Past limit AND critical
+🟡🟠 N/LIMIT   Over limit AND in danger zone
+🟡🔴 N/LIMIT   Over limit AND critical
+```
+
+**Key distinction:** Yellow triggers when OVER, not AT.
+```
+10/10 → 🗒️ 10/10   (at limit = still normal)
+11/10 → 🟡 11/10   (over limit = yellow)
 ```
 
 **Example:** User sets limit=17, currently at 18:
-- Past their limit? Yes → 🟡
+- Over their limit? Yes (18 > 17) → 🟡
 - In danger zone (15-19)? Yes → 🟠
 - Result: 🟡🟠 18/17
 
