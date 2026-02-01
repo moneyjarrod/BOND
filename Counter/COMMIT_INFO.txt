@@ -1,0 +1,37 @@
+=== GITHUB DESKTOP COMMIT ===
+
+SUMMARY:
+BOND Counter v5: User-side turn tracking with auto-reset
+
+DESCRIPTION:
+Complete solution for reliable turn counting in Claude conversations.
+
+## Problem Solved
+Claude's internal counter failed due to:
+- Tool chain context displacement (S70a)
+- Limit boundary pattern interference (S70b)
+- Multi-emission during tool chains (S70c)
+
+## Solution
+User-side tracking via AutoHotkey:
+- Script appends «tN» to messages automatically
+- Claude reads tag, no internal counting
+- Auto-resets on {Sync} or {Full Restore}
+
+## Features
+- Enter key auto-tags when Claude window active
+- Toggle ON/OFF with Ctrl+Shift+B
+- Auto-reset detects {Sync}/{Full Restore} as you type
+- Persists N across restarts
+- Works with Claude Desktop AND browser
+
+## Files
+- BOND_counter_v5.ahk — The script
+- BOND_COUNTER_README.md — Full documentation
+
+## Key Insight
+"User = source of truth. Claude just reads the tag."
+
+Counter failures become architecturally impossible.
+
+Session 70 — J-Dub & Claude
