@@ -471,4 +471,105 @@ YourProject/
 
 ---
 
+## {JA} Protocol (Johnny Appleseed)
+
+**Trigger:** User says `{JA}`
+
+**Purpose:** Gap detector. Finds concepts you USE but haven't SEEDED.
+
+**How it works:**
+1. Builds a "wave" from your existing QAIS seeds
+2. Fires wave at current conversation content
+3. Where it resonates WITHOUT a seed = gap candidate
+
+**Dependencies:**
+- QAIS field present (Tier 3+)
+- Known seeds to build wave from
+
+**Output:**
+```
+{JA} Scan Complete
+──────────────────────────────
+⚠️ Gaps: 3
+  0.56 | architecture serves relationship not data
+  0.46 | counter visibility prevents drift
+  0.35 | memory persistence across sessions
+```
+
+**Performance:** 0.065ms average, 100% precision, 83% recall
+
+---
+
+## {JA+} Protocol (Johnny Appleseed Plus)
+
+**Trigger:** User says `{JA+}`
+
+**Purpose:** Clustered gap detection with principle synthesis.
+"Find the branch, not just the leaves."
+
+**How it works:**
+1. Runs base {JA} scan
+2. Clusters gaps by shared seed words (Union-Find)
+3. Synthesizes principles from each cluster using evolved templates
+4. Returns both clustered gaps and unclustered orphans
+
+**Dependencies:**
+- QAIS field present (Tier 4+)
+- Known seeds to build wave from
+
+**Output:**
+```
+{JA+} Clustered Scan
+────────────────────────────────────────
+Gaps: 8 | Principles: 2
+
+🌳 SYNTHESIZED PRINCIPLES:
+
+  [1] "Counter enables visibility"
+      topic: [counter, visibility]
+      gaps (3):
+        • counter visibility prevents drift
+        • visibility shows state clearly
+        • counter heartbeat bond
+
+  [2] "Architecture depends on relationship"
+      topic: [architecture, relationship]
+      gaps (2):
+        • architecture serves relationship not data
+        • relationship drives design
+
+🍂 UNCLUSTERED:
+  0.35 | memory persistence across sessions
+```
+
+**Performance:** 0.092ms average
+
+**Attachment options:** Can attach to {Sync}, {Crystal}, {Full Restore}, or {Chunk}
+
+| Attach To | Overhead | Trade-off |
+|-----------|----------|-----------||
+| (standalone) | 0% | On-demand, full control |
+| {Sync} | +22% | Auto drift detection |
+| {Crystal} | +18% | Find gaps while crystallizing |
+| {Full Restore} | +8% | Session-start awareness |
+
+**To attach:** Add to memory edits: `"{JA} attached to {Sync}"`
+
+---
+
+## Command Summary
+
+| Command | Reads Files | Writes Files | Resets Counter | Tier |
+|---------|-------------|--------------|----------------|------|
+| `{Sync}` | ✅ Yes | ❌ No | ✅ Yes | All |
+| `{Save}` | ❌ No | ✅ Yes | ❌ No | 2+ |
+| `{Tick}` | ❌ No | ❌ No | ❌ No | All |
+| `{Chunk}` | ❌ No | ❌ No | ❌ No | All |
+| `{Crystal}` | ❌ No | ✅ QAIS | ❌ No | QAIS |
+| `{ArtD}` | ✅ Registry | ✅ Copies | ❌ No | 3 |
+| `{JA}` | ❌ No | ❌ No | ❌ No | QAIS |
+| `{JA+}` | ❌ No | ❌ No | ❌ No | QAIS |
+
+---
+
 🔥 BOND: The Bonfire Protocol
