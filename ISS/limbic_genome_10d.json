@@ -1,0 +1,82 @@
+{
+  "version": "2.0",
+  "eap_schema": [
+    "valence",
+    "arousal",
+    "confidence",
+    "urgency",
+    "connection",
+    "curiosity",
+    "frustration",
+    "fatigue",
+    "wonder",
+    "trust"
+  ],
+  "fitness": 0.017355,
+  "S_raw_weights": {
+    "g_norm": 0.3557,
+    "p_norm": 0.555,
+    "E": -0.0634,
+    "r_norm": 0.3239,
+    "gap": 0.4997,
+    "valence": 0.145,
+    "arousal": 0.5622,
+    "confidence": -0.4786,
+    "urgency": -0.4183,
+    "connection": 0.6361,
+    "curiosity": -0.1271,
+    "frustration": 0.2949,
+    "fatigue": 0.3145,
+    "wonder": 0.2332,
+    "trust": -0.4887,
+    "qais_score": -0.1811
+  },
+  "S_derived_weights": {
+    "|valence|": 0.3309,
+    "max(0,-val)": -0.2142,
+    "|g-p|": 0.0663,
+    "(1-E)": -0.4381,
+    "(1-qais)": -0.8057
+  },
+  "S_bias": 0.0742,
+  "T_raw_weights": {
+    "g_norm": 0.0318,
+    "p_norm": 0.9895,
+    "E": -0.1544,
+    "r_norm": -0.8483,
+    "gap": -0.0094,
+    "valence": 0.48,
+    "arousal": -0.8201,
+    "confidence": -0.8575,
+    "urgency": 0.1807,
+    "connection": -0.1981,
+    "curiosity": 0.0053,
+    "frustration": -0.0314,
+    "fatigue": -0.2,
+    "wonder": -0.121,
+    "trust": -0.5289,
+    "qais_score": 0.0183
+  },
+  "T_derived_weights": {
+    "|valence|": 0.2263,
+    "max(0,-val)": 0.8268,
+    "|g-p|": 0.2601,
+    "(1-E)": 0.4073,
+    "(1-qais)": 0.4335
+  },
+  "T_bias": 0.6439,
+  "G_thresholds": {
+    "S_thresh": 0.4787,
+    "T_thresh": 0.3892
+  },
+  "V": "EAP[0] valence passthrough",
+  "input_order": [
+    "g_norm", "p_norm", "E", "r_norm", "gap",
+    "valence", "arousal", "confidence", "urgency", "connection",
+    "curiosity", "frustration", "fatigue", "wonder", "trust",
+    "qais_score"
+  ],
+  "derived_order": ["|valence|", "max(0,-val)", "|g-p|", "(1-E)", "(1-qais)"],
+  "scenarios_count": 27,
+  "note": "Evolved S75. 10D EAP replaces 1D valence. C1-C4 compliant."
+}

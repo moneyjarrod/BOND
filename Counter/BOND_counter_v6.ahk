@@ -14,6 +14,8 @@
 ;
 ; HOTKEYS:
 ; Enter          = Tag message + send (when BOND ON + Claude active)
+; XButton2       = Insert 🧠 limbic trigger (when BOND ON + Claude active)
+; XButton1       = Blocked (prevents back-nav in Claude)
 ; Ctrl+Shift+B   = Toggle BOND ON/OFF
 ; Ctrl+Shift+R   = Manual reset to 0
 ; Ctrl+Shift+T   = Show current N
@@ -80,6 +82,7 @@ UpdateTray() {
     A_TrayMenu.Add(emoji . " " . TurnN . "/" . LIMIT, (*) => "")
     A_TrayMenu.Disable(emoji . " " . TurnN . "/" . LIMIT)
     A_TrayMenu.Add()
+    A_TrayMenu.Add("Set Counter...", (*) => SetCounter())
     A_TrayMenu.Add("Reset to 0", (*) => ResetCounter())
     A_TrayMenu.Add()
     A_TrayMenu.Add("Exit", (*) => ExitApp())
@@ -98,6 +101,19 @@ ResetCounter() {
     SaveCounter()
     ToolTip("BOND Reset: N = 0")
     SetTimer(() => ToolTip(), -2000)
+}
+
+SetCounter() {
+    global TurnN
+    ib := InputBox("Set turn counter:", "BOND Counter", "w200 h100", TurnN)
+    if (ib.Result = "OK") {
+        try {
+            TurnN := Integer(ib.Value)
+            SaveCounter()
+            ToolTip("Counter set to " . TurnN)
+            SetTimer(() => ToolTip(), -2000)
+        }
+    }
 }
 
 ToggleBond() {
@@ -181,4 +197,10 @@ InjectTagAndSend() {
 ; --- Claude-only: Enter tags and sends ---
 #HotIf IsClaudeActive() && BondActive
 Enter:: InjectTagAndSend()
+XButton2:: {                  ; Forward thumb = limbic trigger
+    SendText("🧠")
+    ToolTip("🧠 Limbic")
+    SetTimer(() => ToolTip(), -1000)
+}
+XButton1:: return             ; Back thumb = blocked (prevents nav)
 #HotIf
