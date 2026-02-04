@@ -20,7 +20,7 @@
 ; Ctrl+Shift+B   = Toggle BOND ON/OFF
 ; Ctrl+Shift+R   = Manual reset to 0
 ; Ctrl+Shift+T   = Show current N
-; Ctrl+Shift+O   = Calibrate send button (hover over orange arrow first)
+; Ctrl+F7        = Calibrate send button (hover over orange arrow first)
 ;
 ; INSTALLATION:
 ; 1. Install AutoHotkey v2: https://www.autohotkey.com/
@@ -44,6 +44,8 @@ global ResetPending := false
 global SendBtnOffsetR := 0
 global SendBtnOffsetB := 0
 global SendBtnCalibrated := false
+global LastSendTick := 0          ; Debounce: prevent double-fire
+global DEBOUNCE_MS := 500          ; Minimum ms between sends
 
 InitCounter()
 InitSendBtn()
@@ -79,6 +81,8 @@ InitSendBtn() {
 
 CalibrateSendBtn() {
     global SendBtnOffsetR, SendBtnOffsetB, SendBtnCalibrated, SendBtnFile
+    ToolTip("Calibrating...")
+    Sleep(200)
     CoordMode("Mouse", "Window")
     MouseGetPos(&mx, &my)
     WinGetPos(, , &winW, &winH, "A")
@@ -127,9 +131,7 @@ UpdateTray() {
     A_TrayMenu.Delete()
     A_TrayMenu.Add(BondActive ? "● BOND ON" : "○ BOND OFF", (*) => ToggleBond())
     A_TrayMenu.Add()
-    A_TrayMenu.Add(emoji . " " . TurnN . "/" . LIMIT, (*) => "")
-    A_TrayMenu.Disable(emoji . " " . TurnN . "/" . LIMIT)
-    A_TrayMenu.Add()
+    A_TrayMenu.Add(emoji . " " . TurnN . "/" . LIMIT . "  ✏️", (*) => SetCounter())
     A_TrayMenu.Add("Reset to 0", (*) => ResetCounter())
     A_TrayMenu.Add()
     A_TrayMenu.Add("Exit", (*) => ExitApp())
@@ -148,6 +150,20 @@ ResetCounter() {
     SaveCounter()
     ToolTip("BOND Reset: N = 0")
     SetTimer(() => ToolTip(), -2000)
+}
+
+SetCounter() {
+    global TurnN
+    ib := InputBox("Set turn counter to:", "BOND Counter", "w200 h100", String(TurnN))
+    if (ib.Result = "OK") {
+        try {
+            TurnN := Integer(ib.Value)
+            SaveCounter()
+            emoji := GetEmoji()
+            ToolTip(emoji . " Set to " . TurnN)
+            SetTimer(() => ToolTip(), -2000)
+        }
+    }
 }
 
 ToggleBond() {
@@ -184,7 +200,13 @@ FlagReset() {
 }
 
 InjectTagAndSend() {
-    global TurnN, ResetPending, LIMIT
+    global TurnN, ResetPending, LIMIT, LastSendTick, DEBOUNCE_MS
+    
+    ; Debounce: ignore if fired too recently (prevents double-fire on orange arrow)
+    now := A_TickCount
+    if (now - LastSendTick < DEBOUNCE_MS)
+        return
+    LastSendTick := now
     
     if ResetPending {
         TurnN := 0
@@ -216,7 +238,7 @@ InjectTagAndSend() {
     ToolTip("BOND " . (BondActive ? "ON" : "OFF") . " | " . emoji . " " . TurnN . "/" . LIMIT)
     SetTimer(() => ToolTip(), -2000)
 }
-^+o:: CalibrateSendBtn()      ; Ctrl+Shift+O = calibrate send button position
+F9:: CalibrateSendBtn()       ; F9 = calibrate send button position
 
 ; --- Hotstrings: detect {Sync} and {Full Restore} as typed ---
 :*:{Sync}::{
@@ -238,11 +260,16 @@ IsMouseNearSendBtn() {
     return IsNearSendBtn(mx, my)
 }
 
-; --- Claude-only: Orange arrow hook (only when mouse is over send button) ---
+; --- Claude-only hotkeys at InputLevel 1 ---
+; InputLevel 1 prevents Send("{Enter}") inside InjectTagAndSend from
+; re-triggering the Enter hotkey (fixes double-fire from orange arrow)
+#InputLevel 1
+
+; Orange arrow hook (only when mouse is over send button)
 #HotIf IsClaudeActive() && BondActive && IsMouseNearSendBtn()
 LButton:: InjectTagAndSend()
 
-; --- Claude-only: Enter and other hotkeys ---
+; Enter and other hotkeys
 #HotIf IsClaudeActive() && BondActive
 Enter:: InjectTagAndSend()
 XButton2:: {                  ; Forward thumb = limbic trigger
@@ -252,3 +279,4 @@ XButton2:: {                  ; Forward thumb = limbic trigger
 }
 XButton1:: return             ; Back thumb = blocked (prevents nav)
 #HotIf
+#InputLevel 0
