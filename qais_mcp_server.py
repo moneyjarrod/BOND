@@ -1,5 +1,5 @@
 """
-QAIS MCP Server v3.2
+QAIS MCP Server v3.3
 Quantum Approximate Identity Substrate
 True resonance memory for Claude.
 
@@ -7,6 +7,11 @@ True resonance memory for Claude.
 
 Part of the BOND Protocol
 https://github.com/moneyjarrod/BOND
+
+v3.3 CHANGES:
+  - Added bond_gate tool: conditional routing for BOND tool activation
+  - Binary triggers replace ambiguous emotional thresholds
+  - "Default: lean. Gate opens on concrete triggers."
 
 v3.2 CHANGES:
   - Added {Crystal} command: persistent crystallization
@@ -29,6 +34,7 @@ import re
 import time
 from collections import defaultdict
 from datetime import datetime
+from BOND_gate import get_gate
 
 try:
     import numpy as np
@@ -700,6 +706,20 @@ TOOLS = [
         "description": "Reset heat map for new session.",
         "inputSchema": {"type": "object", "properties": {}}
     },
+    # === Bond Gate ===
+    {
+        "name": "bond_gate",
+        "description": "Conditional routing gate. Call on restore, crystal, or message. Returns mode and action plan. Default=lean (no overhead). Claude calls once, follows returned actions.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "trigger": {"type": "string", "description": "Trigger type: 'restore' | 'crystal' | 'message'"},
+                "context": {"type": "string", "description": "Optional: topic or session context"},
+                "message": {"type": "string", "description": "For 'message' trigger: the user's message text"}
+            },
+            "required": ["trigger"]
+        }
+    },
     # === Crystal ===
     {
         "name": "crystal",
@@ -730,7 +750,7 @@ def handle_request(request):
             "result": {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "qais-server", "version": "3.2.0"}
+                "serverInfo": {"name": "qais-server", "version": "3.3.0"}
             }
         }
     
@@ -768,6 +788,15 @@ def handle_request(request):
                 result = HEATMAP.for_chunk()
             elif tool_name == "heatmap_clear":
                 result = HEATMAP.clear()
+            
+            # === Bond Gate ===
+            elif tool_name == "bond_gate":
+                gate = get_gate()
+                result = gate.evaluate(
+                    args["trigger"],
+                    args.get("context", ""),
+                    args.get("message", "")
+                )
             
             # === Crystal ===
             elif tool_name == "crystal":
