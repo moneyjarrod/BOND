@@ -1,0 +1,26 @@
+# BOND .gitignore
+# Data files (needed locally for MCP servers, not for public repo)
+
+# QAIS field data (personal bindings)
+qais_field.npz
+
+# ISS trained projections and genomes
+ISS/iss_projections.npz
+ISS/iss_projections_st.npz
+ISS/limbic_genome.json
+ISS/limbic_genome_10d.json
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Empty directories left from cleanup
+archives/
+experiments/
+artifacts/
+Python/
+User Scripts/
+
+# OS files
+.DS_Store
+Thumbs.db
