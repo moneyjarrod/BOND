@@ -4,23 +4,37 @@
 
 ## The Problem
 
-Claude's internal conversation counter can fail due to:
-- Tool chain context displacement
-- Compaction/memory issues  
-- Pattern interference at limit boundaries
-
-These failures cause desyncs between Claude's count and actual turn number.
+Claude's internal conversation counter drifts due to context displacement, compaction, and pattern interference. Auto-increment rules create conflicting instructions between memory edits, OPS files, and SKILL docs.
 
 ## The Solution
 
-**You become the source of truth.**
+**You are the source of truth. Claude never counts.**
 
-This AutoHotkey script:
-1. Appends `«tN»` to your messages automatically
-2. Claude reads your tag — no internal counting needed
+The AutoHotkey script:
+1. Appends `«tN/L»` to your messages automatically (N=count, L=limit)
+2. Claude parses your tag — no internal tracking needed
 3. Auto-resets when you type `{Sync}` or `{Full Restore}`
+4. Emoji computed client-side and included in tag
 
-Result: Counter failures become impossible.
+Result: Counter failures become impossible. Claude just reads what you send.
+
+---
+
+## Tag Format
+
+```
+«tN/L emoji»
+
+N = your turn count (you increment, not Claude)
+L = your session limit
+emoji = computed by AHK script
+
+Examples:
+  «t1/10 🗒️»    → first turn, limit 10, normal
+  «t5/10 🗒️»    → fifth turn, normal
+  «t12/10 🟡»   → over limit
+  «t15/10 🟡🟠» → over limit + getting long
+```
 
 ---
 
@@ -35,20 +49,20 @@ Download from: **https://www.autohotkey.com/**
 
 ### Step 2: Get the Script
 
-Save `BOND_counter_v5.ahk` to a permanent location:
-- `C:\Users\YourName\Documents\BOND\BOND_counter_v5.ahk`
+Save `BOND_counter_v6.ahk` to a permanent location:
+- `C:\Users\YourName\Documents\BOND\BOND_counter_v6.ahk`
 - Or anywhere you prefer
 
 ### Step 3: Run
 
-Double-click `BOND_counter_v5.ahk`
+Double-click `BOND_counter_v6.ahk`
 
 Look for tray icon (bottom-right, may need to click `^` to expand).
 
 ### Step 4: (Optional) Auto-Start with Windows
 
 1. Press `Win+R`, type `shell:startup`, press Enter
-2. Create shortcut to `BOND_counter_v5.ahk` in this folder
+2. Create shortcut to `BOND_counter_v6.ahk` in this folder
 3. Script runs automatically on login
 
 ---
@@ -63,25 +77,26 @@ Look for tray icon (bottom-right, may need to click `^` to expand).
 | **Ctrl+Shift+B** | Toggle BOND ON/OFF |
 | **Ctrl+Shift+R** | Manual reset to 0 |
 | **Ctrl+Shift+T** | Show current N |
+| **XButton2** | Insert 🧠 limbic trigger |
 
 ### Workflow
 
 1. Open Claude (Desktop or browser)
 2. Type your message
 3. Press **Enter**
-4. Script adds `«t1»` and sends
-5. Continue — each Enter increments: `«t2»`, `«t3»`, etc.
+4. Script adds `«t1/10 🗒️»` and sends
+5. Continue — each Enter increments: `«t2/10 🗒️»`, `«t3/10 🗒️»`, etc.
 
 ### Auto-Reset
 
 Type `{Sync}` or `{Full Restore}` in your message:
 - Script detects it as you type
 - Shows "Reset flagged" tooltip
-- Next Enter sends as `«t1»`
+- Next Enter sends as `«t1/L»`
 
 ### Toggle OFF
 
-Need normal Enter behavior? Press **Ctrl+Shift+B** to toggle OFF.
+Press **Ctrl+Shift+B** to toggle OFF.
 - BOND OFF = Enter works normally (no tagging)
 - BOND ON = Enter tags + sends
 
@@ -89,18 +104,19 @@ Need normal Enter behavior? Press **Ctrl+Shift+B** to toggle OFF.
 
 ## How Claude Uses It
 
-Claude's memory includes this rule:
+Claude's memory should include this rule:
 
 ```
-BOND Counter: Read N from user's «tN» tag.
-Display: [emoji] N/LIMIT.
-Reset ONLY on literal {Sync}|{Full Restore} (braces required).
-User = source of truth.
+BOND Counter: Parse «tN/L» from user. N=count, L=limit. 
+Display: [emoji] N/L. 
+🗒️←(N≤L), 🟡←(N>L), 🟠←(N≥15), 🔴←(N≥20). 
+Reset on {Sync}|{Full Restore} only. 
+User=source of truth. Never auto-increment.
 ```
 
-Claude extracts N from your tag and displays accordingly:
-- `«t5»` → 🗒️ 5/10
-- `«t12»` → 🟡 12/10
+Claude extracts N and L from your tag and displays accordingly:
+- `«t5/10 🗒️»` → 🗒️ 5/10
+- `«t12/10 🟡»` → 🟡 12/10
 
 No internal tracking. Your tag IS the count.
 
@@ -113,17 +129,6 @@ Right-click the tray icon:
 - **N = X** — Current count
 - **Reset to 0** — Manual reset
 - **Exit** — Close script
-
----
-
-## Data Storage
-
-Counter saved to: `%APPDATA%\BOND\turn_counter.txt`
-
-Survives:
-- Script restart
-- System reboot
-- Session changes
 
 ---
 
@@ -140,29 +145,9 @@ For Mac users: Keyboard Maestro or Hammerspoon could replicate this functionalit
 
 ---
 
-## Troubleshooting
-
-**Script not running?**
-- Check system tray (may be hidden under `^`)
-- Ensure AutoHotkey v2 is installed (not v1)
-
-**Enter not tagging?**
-- Check tray shows "BOND ON"
-- Ensure Claude window is focused
-- Press Ctrl+Shift+B to verify toggle state
-
-**Wrong N value?**
-- Press Ctrl+Shift+R to reset
-- Or type `{Sync}` to auto-reset on send
-
-**Hotkeys conflicting?**
-- Edit the script to change hotkey assignments
-- Look for `^+b`, `^+r`, `^+t` lines
-
----
-
 ## Version History
 
+- **v6** — Tag format `«tN/L emoji»`, client-side emoji, XButton2 limbic trigger
 - **v5** — Auto-reset on {Sync}/{Full Restore}, hotstring detection
 - **v4** — Clipboard-based detection (deprecated)
 - **v3** — Toggle ON/OFF
@@ -177,8 +162,4 @@ MIT — Part of the BOND project
 
 ---
 
-## Credits
-
-Created by J-Dub & Claude, Session 70.
-
-*"User = source of truth. Claude just reads the tag."*
+*"User = source of truth. Claude just reads the tag. Never auto-increment."*
