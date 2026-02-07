@@ -42,7 +42,7 @@ Press `Win+R`, type `shell:startup`, create shortcut to the script.
 
 `«t5/10 🗒️»` — Turn 5, limit 10, normal
 
-## Color Scheme
+## Color Scheme (computed by AHK, echoed by Claude)
 
 | Emoji | Meaning |
 |-------|---------|
@@ -50,6 +50,8 @@ Press `Win+R`, type `shell:startup`, create shortcut to the script.
 | 🟡 | N > LIMIT |
 | 🟠 | N ≥ 15 |
 | 🔴 | N ≥ 20 |
+
+Claude does not compute these — Claude echoes the emoji from the user's tag.
 
 ## Auto-Reset
 

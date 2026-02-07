@@ -228,9 +228,31 @@ When documenting milestones, bonfires, or solutions, ALWAYS include:
 
 ## THE STICKY COUNTER
 
-**Every Claude reply ends with a counter** showing messages since last `{Sync}`.
+**Every Claude reply starts with a counter** showing messages since last `{Sync}`.
 
 **CRITICAL:** The counter appears on EVERY response - including file generation, code blocks, quick answers, everything. No exceptions. If a response lacks a counter, that's a protocol violation.
+
+### ⚠️ PREREQUISITE: The Echo-Only Rule
+
+**The principle (non-negotiable):** Claude must echo the emoji from your tag. Claude must NOT compute the emoji independently.
+
+This was learned over 80+ sessions. Even with correct math rules in memory, Claude drifts on emoji computation. Semantic pressure ("at the limit *feels* red") overrides math. The fix: make Claude a reader, not a calculator.
+
+**Recommended implementation — memory edit (one line, always present):**
+```
+BOND Counter: Read user's «tN/L emoji» tag. Echo THEIR emoji exactly.
+Do not compute emoji independently. User display is source of truth.
+```
+
+This memory edit is injected into every conversation regardless of topic, which is why it works. If your memory slots are full or you have a different system, the requirement is simply: get the echo-only rule into Claude's persistent context. Options:
+
+| Method | Reliability | Notes |
+|--------|------------|-------|
+| **Memory edit** | ★★★ | Recommended. Always present. Battle-tested. |
+| **SKILL.md section** | ★★☆ | Works when SKILL is loaded. Weaker during topic drift. |
+| **Project instructions** | ★★☆ | If using Claude Projects. Scoped to that project. |
+
+Without this rule in Claude's persistent context, the counter **will** drift. The AHK script computes the correct emoji client-side — Claude just needs to be told to trust it.
 
 ### What Resets the Counter
 
@@ -248,7 +270,7 @@ When documenting milestones, bonfires, or solutions, ALWAYS include:
 
 If Claude loses count (compaction, confusion), default to `🟠 15/LIMIT` and recommend {Sync}.
 
-### Counter States
+### Counter States (computed by AHK, echoed by Claude)
 
 | Messages | Display | Meaning |
 |----------|---------|----------|

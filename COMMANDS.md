@@ -97,7 +97,7 @@ Saved:
 
 Claude tracks messages since last `{Sync}` with a visual counter at the end of each response.
 
-### Counter States
+### Counter States (computed by AHK, echoed by Claude)
 
 | State | Symbol | Meaning |
 |-------|--------|---------|
@@ -108,11 +108,16 @@ Claude tracks messages since last `{Sync}` with a visual counter at the end of e
 
 ### How It Works
 
+- AHK computes the emoji and includes it in the user's `«tN/L emoji»` tag
+- Claude reads the tag and echoes the emoji exactly — no independent computation
 - Counter shows `N/LIMIT` where N = messages since sync, LIMIT = your configured limit
 - Counter **continues past limit** (11/10, 12/10...) rather than resetting
 - **Yellow threshold** varies by user's limit (personal warning)
 - **Orange threshold** (15) is universal (dangerous for any user)
 - **Red threshold** (20) is universal (critical for any user)
+
+**Why echo-only?** Claude repeatedly drifted on emoji computation even with
+correct math rules. Semantic pressure overrides math. Single source: AHK. (S81)
 
 ### Example
 
@@ -148,7 +153,8 @@ Before completing any response, Claude verifies:
 
 ```
 ☐ Counter is FIRST LINE of response
-☐ Counter number is CORRECT (count USER messages)
+☐ Emoji matches user's tag EXACTLY (echo, don't compute)
+☐ N/L values match user's tag
 ☐ Counter appears BEFORE all prose/results
 ```
 
@@ -159,7 +165,8 @@ Before completing any response, Claude verifies:
 | Conversational reply, forgot counter | Counter FIRST, always |
 | Counted tool calls | Only count USER messages |
 | Counter at end (footer) | Move to FIRST LINE |
-| Guessed wrong number | Count user turns since {Sync} |
+| Wrong emoji (computed instead of echoed) | Read user's emoji, echo exactly |
+| "At limit feels red" semantic drift | Don't compute. Echo. (S81) |
 
 ### The Mantra
 

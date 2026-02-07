@@ -1,8 +1,12 @@
 #!/usr/bin/env python3
 """
-BOND Counter Validator - Single Source of Truth
+BOND Counter Validator - AHK-Side Reference Implementation
 
-THE MATH:
+This module contains the emoji computation math. It is the reference for
+AHK scripts and testing. Claude does NOT compute emojis -- Claude echoes
+the user's emoji exactly. See COUNTER.md for the echo-only rule (S81).
+
+THE MATH (computed by AHK, NOT by Claude):
     LIMIT ← CONFIG ∨ 10
     
     🗒️ : N ≤ LIMIT
@@ -18,7 +22,11 @@ EVALUATION:
     N=10, LIMIT=10:  10 ≤ 10 = TRUE  → 🗒️
     N=11, LIMIT=10:  11 > 10 = TRUE  → 🟡
 
-Import this module in any BOND tool that needs counter logic.
+Import this module in any BOND tool or AHK script that needs counter logic.
+
+Memory edit for Claude (echo-only, no math):
+    BOND Counter: Read user's <<tN/L emoji>> tag. Echo THEIR emoji exactly.
+    Do not compute emoji independently. User display is source of truth.
 """
 
 from dataclasses import dataclass

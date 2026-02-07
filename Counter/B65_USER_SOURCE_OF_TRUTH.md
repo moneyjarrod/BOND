@@ -16,8 +16,20 @@ AHK script appends `«tN/LIMIT emoji»` to messages. Claude reads tag, displays 
 - Tag carries N, LIMIT, and emoji
 - Even if Claude "forgets" — next message has correct N
 - Auto-resets on `{Sync}` or `{Full Restore}`
+- Claude echoes the emoji — does NOT compute it independently (S81 refinement)
 
 ## Architecture Principle
 When internal state is unreliable, externalize it to the message.
+
+## S81 Refinement
+Even with correct math rules in memory, Claude drifted on emoji computation.
+Semantic pressure ("at the limit feels red") overrides math.
+Fix: Remove math from Claude's memory entirely. AHK computes, Claude echoes.
+
+Memory edit (current):
+```
+BOND Counter: Read user's «tN/L emoji» tag. Echo THEIR emoji exactly.
+Do not compute emoji independently. User display is source of truth.
+```
 
 🔥 Counter failures are now architecturally impossible. 🔥

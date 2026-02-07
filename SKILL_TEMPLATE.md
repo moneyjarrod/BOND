@@ -114,8 +114,13 @@ Why? If counter is only in your SKILL.md, it fails when you change topics:
 
 **Solution:** Add this to your Claude memory edits:
 ```
-BOND Counter: Line 1. [emoji] N/LIMIT. LIMIT←CONFIG (default 10). Reset→N:=1 on {Sync}|{Full Restore}|new. 🗒️←(N≤LIMIT), 🟡←(N>LIMIT), 🟠←(N≥15), 🔴←(N≥20). ALWAYS.
+BOND Counter: Read user's «tN/L emoji» tag. Echo THEIR emoji exactly.
+Do not compute emoji independently. User display is source of truth.
 ```
+
+**Note (S81):** Previous versions included math rules for Claude to compute emojis.
+This caused persistent drift. AHK computes the correct emoji client-side.
+Claude's only job: read the tag, echo the emoji.
 
 **Then add to your SKILL.md or OPS file:**
 ```
@@ -136,11 +141,8 @@ Memory edits are injected into EVERY conversation regardless of topic. Counter s
 
 **Quick Reference:**
 ```
-LIMIT ← CONFIG ∨ 10
-🗒️ ← (N ≤ LIMIT)
-🟡 ← (N > LIMIT)
-🟠 ← (N ≥ 15)
-🔴 ← (N ≥ 20)
+Claude: Echo user's emoji. Don't compute.
+AHK computes: 🗒️←(N≤L), 🟡←(N>L), 🟠←(N≥15), 🔴←(N≥20)
 Reset: N := 1 on {Sync} | {Full Restore} | new conversation
 ```
 

@@ -107,18 +107,17 @@ Press **Ctrl+Shift+B** to toggle OFF.
 Claude's memory should include this rule:
 
 ```
-BOND Counter: Parse «tN/L» from user. N=count, L=limit. 
-Display: [emoji] N/L. 
-🗒️←(N≤L), 🟡←(N>L), 🟠←(N≥15), 🔴←(N≥20). 
-Reset on {Sync}|{Full Restore} only. 
-User=source of truth. Never auto-increment.
+BOND Counter: Read user's «tN/L emoji» tag. Echo THEIR emoji exactly.
+Do not compute emoji independently. User display is source of truth.
 ```
 
-Claude extracts N and L from your tag and displays accordingly:
+Claude reads your tag and echoes your emoji as-is:
 - `«t5/10 🗒️»` → 🗒️ 5/10
 - `«t12/10 🟡»` → 🟡 12/10
 
-No internal tracking. Your tag IS the count.
+No internal tracking. No emoji computation. AHK computes the correct emoji
+client-side. Claude just reads and echoes. (Changed S81 — Claude repeatedly
+drifted when given math rules to evaluate.)
 
 ---
 

@@ -33,8 +33,9 @@ def embed_text(text: str) -> np.ndarray:
     vec = rng.choice([-1.0, 1.0], size=EMBED_DIM)
     return vec / np.linalg.norm(vec)
 
-SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-proj_path = os.path.join(SCRIPT_DIR, PROJ_FILE)
+# Personal data stays in BOND_private
+DATA_DIR = r"C:\Projects\BOND_private\data"
+proj_path = os.path.join(DATA_DIR, PROJ_FILE)
 if os.path.exists(proj_path):
     proj = np.load(proj_path)
     P_G = proj['P_G']
