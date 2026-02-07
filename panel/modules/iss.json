@@ -1,0 +1,12 @@
+{
+  "id": "iss",
+  "name": "ISS",
+  "icon": "📐",
+  "description": "Invariant Semantic Substrate",
+  "status_endpoint": "/api/mcp/iss/status",
+  "display_fields": [
+    { "key": "version", "label": "Version", "icon": "📋" },
+    { "key": "dimensions", "label": "Forces", "icon": "📊" }
+  ],
+  "refresh_interval": 60
+}

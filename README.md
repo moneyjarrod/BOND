@@ -1,121 +1,170 @@
-# BOND
-### The Bonfire Protocol
+# 🔥🌊 BOND
 
-*Bidirectional Ongoing Navigation & Drift-prevention for Claude*
+**Persistence and continuity framework for human-AI collaboration.**
 
-**Two buttons. Lasting context.**
-
----
-
-## The Problem
-
-Every Claude session starts fresh. You re-explain context constantly, progress gets lost, and Claude drifts from your project's principles.
-
-## The Solution
-
-Two buttons. That's it.
-
-| Button | Command | What It Does |
-|--------|---------|--------------|
-| **A** | `{Sync}` | Claude reads your files, grounds in your truth |
-| **B** | `{Save}` | You both agree → Claude writes proven work |
+BOND gives Claude sessions memory, structure, and grounding through a counter system, entity architecture, and clipboard bridge — so context doesn't degrade and knowledge doesn't get lost between conversations.
 
 ---
 
-## ⚡ THE CORE
+## What BOND Does
 
-Everything in BOND builds on one thing: **the counter**.
+**The Problem:** Every Claude session starts fresh. You re-explain context, lose progress, and Claude drifts from your project's principles.
 
-```
-🗒️ N/10   ← FIRST LINE of every Claude response
-```
+**The Solution:** A structured protocol with two core mechanisms:
 
-**What it counts:** USER messages since last {Sync}
-- ✅ Your messages count
-- ✅ Your commands count ({Sync}, {Save}, etc.)
-- ❌ Claude's tool calls DON'T count
-- ❌ Claude's responses DON'T count
+1. **Counter** — Tracks context age so you know when to refresh. First line of every Claude response.
+2. **Entities** — Your knowledge organized into four classes (Doctrine, Project, Perspective, Library), each with defined tool boundaries and file structures that Claude reads on `{Sync}`.
 
-**Why it matters:** Context degrades. The counter makes it visible.
-
-**The rule:** No response is complete without the counter. Header, not footer. First line, every time.
-
-See `COUNTER.md` for full specification.
+Plus a **Control Panel** — a dark-themed React dashboard for managing entities, toggling tools, and sending commands through the clipboard bridge.
 
 ---
 
 ## Quick Start
 
-**5 minutes (any Claude plan):**
-1. Fill in `SKILL_TEMPLATE.md` with your project identity
-2. Fill in `MASTER_TEMPLATE.md` with your current state
-3. Paste SKILL content at session start
-4. Work naturally. Call `{Sync}` every ~10 messages.
-5. Watch the counter: 🗒️ normal → 🟡 past limit → 🟠 dangerous → 🔴 critical
+### Option A: Installation Wizard (Recommended)
 
-**Important:** Only `{Sync}` or a new conversation resets the counter. Saving work, completing tasks, or declaring milestones does NOT reset it - context still degrades over time.
+1. Download [`bond_wizard.html`](panel/bond_wizard.html) from this repo
+2. Open it in your browser
+3. Choose components, set your install path
+4. Download and run the generated `install.bat`
+5. Start the panel with `start_bond.bat`
 
-**See `SETUP_GUIDE.md` for full instructions and tier options.**
+### Option B: Manual Setup
 
----
+```bash
+# Clone the repo
+git clone https://github.com/moneyjarrod/BOND.git
+cd BOND
 
-## What's Included
+# Install and start the panel
+cd panel
+npm install
+node server.js
+```
 
-| File | Purpose |
-|------|---------|
-| `SETUP_GUIDE.md` | Complete instructions, pick your tier |
-| `SKILL_TEMPLATE.md` | Template for identity & core truth |
-| `MASTER_TEMPLATE.md` | Template for state tracking |
-| `COMMANDS.md` | Command reference |
-| `TROUBLESHOOTING.md` | Fix protocol violations (counter bugs, etc.) |
-| `QUICKSTART_CARD.md` | One-page cheatsheet |
-| `ARTIFACT_REGISTRY_TEMPLATE.md` | For Tier 3 artifact persistence |
-| `TIERED_MEMORY.md` | **Advanced:** 80% token reduction for complex projects |
-| `THREE_TIER_ARCHIVAL.md` | **Advanced:** Auto-graduation for growing projects |
-| `PORTAL_SYSTEM.md` | **Advanced:** Context switching between work streams |
-| `QAIS_SYSTEM.md` | **Advanced:** True resonance memory (48x SNR) |
-| `qais_mcp_server.py` | **Advanced:** QAIS MCP server for Claude Desktop |
-| `QAIS_SEEDS_TEMPLATE.md` | **Advanced:** Seed format reference |
-| `DIAGRAM.md` | Visual system flow |
-| `examples/` | Filled examples for different domains |
+Open `http://localhost:3000` in your browser.
+
+### Connect to Claude
+
+1. Copy `skills/bond/SKILL.md` into your Claude project as a skill file
+2. Type `{Full Restore}` in Claude to initialize the protocol
+3. Work naturally — Claude will show the counter on every response
 
 ---
 
-## Core Principles
+## Core Commands
 
-1. **Layered Truth** - SKILL (always true) → MASTER (true now) → Code (source of truth)
-2. **Code > Prose** - Working examples beat descriptions
-3. **Identify = Execute** - If Claude notices an update needed, do it NOW
-4. **Both Agree** - {Save} requires mutual confirmation
-5. **Proof Required** - Milestones need evidence
+| Command | What It Does |
+|---------|-------------|
+| `{Sync}` | Read project files, ground in truth, reset counter |
+| `{Full Restore}` | Complete reload with full depth read |
+| `{Save}` | Write proven work (both must agree) |
+| `{Chunk}` | Session snapshot — handoff file + crystal |
+| `{Enter ENTITY}` | Load an entity, apply tool boundaries |
+| `{Exit}` | Clear active entity |
+
+See [`docs/COMMANDS.md`](docs/COMMANDS.md) for full reference.
 
 ---
 
-## Tiers
+## Entity System
 
-| Tier | Setup | What You Get |
-|------|-------|--------------|
-| **1** | Web/App only | Manual paste + memory |
-| **2** | Desktop + MCP | Automated file sync |
-| **3** | + Custom Skill | Full automation + artifacts |
+Four classes with hard tool boundaries:
+
+| Class | Purpose | Tools |
+|-------|---------|-------|
+| **Doctrine** | Static truth, IS statements | Files, ISS |
+| **Project** | Bounded work with CORE constraint | Files, ISS, QAIS, Heatmap, Crystal |
+| **Perspective** | Unbounded growth, evolving lenses | Files, QAIS, Heatmap, Crystal |
+| **Library** | Read-only reference shelf | Files only |
+
+Each entity is a folder in `doctrine/` with an `entity.json` and markdown files. The panel lets you create, enter, view, and manage entities through a visual interface.
+
+See [`docs/ENTITIES.md`](docs/ENTITIES.md) for full architecture.
+
+---
+
+## Project Structure
+
+```
+BOND/
+├── panel/           ← React dashboard + Express sidecar
+├── doctrine/        ← Your entity folders
+├── state/           ← Active entity pointer
+├── skills/          ← Claude skill file
+├── docs/            ← Reference documentation
+└── bond_wizard.html ← Installation wizard
+```
+
+---
+
+## The Counter
+
+```
+«t3/10 🗒️»
+```
+
+Every Claude response starts with this tag. It tracks user messages since last `{Sync}`, making context degradation visible. When it climbs too high, you know it's time to refresh.
+
+See [`docs/COUNTER.md`](docs/COUNTER.md) for full specification.
+
+---
+
+## Architecture
+
+```
+┌──────────────┐     clipboard      ┌──────────────┐
+│  BOND Panel  │ ──── BOND:{cmd} ──→│   AHK Bridge │
+│  (React+Express)                  │  (optional)  │
+│  :3000       │                    │  pastes to   │
+│              │                    │  Claude      │
+└──────┬───────┘                    └──────────────┘
+       │
+       │ filesystem
+       ▼
+┌──────────────┐
+│  doctrine/   │  Entity folders with .md files
+│  state/      │  Active entity pointer
+│  .env        │  Configuration
+└──────────────┘
+```
+
+The panel reads/writes doctrine files and state through Express. Commands are relayed to Claude via clipboard — the panel copies `BOND:{command}`, and the optional AHK bridge auto-pastes it.
+
+---
+
+## Optional Components
+
+**AHK Bridge** — AutoHotkey script that watches the clipboard for `BOND:` prefixed commands and auto-pastes them into Claude. Windows only.
+
+**MCP Modules** — The panel includes a Systems tab for managing QAIS, ISS, Limbic, and EAP modules. These connect to separate MCP servers for advanced features like semantic memory and text analysis. Modules show as "offline" until their servers are configured.
+
+---
+
+## Requirements
+
+- **Node.js 18+** — for the Control Panel
+- **Git** — for cloning the repo
+- **Windows 10/11** — for the AHK clipboard bridge (optional)
+- **Python 3.10+** — for MCP modules (optional, advanced)
 
 ---
 
 ## Origin
 
-Built across 64 sessions developing a game engine. We kept losing context. Memory helped but wasn't enough. Files helped but needed structure.
+Built across 85+ sessions developing a game engine. We kept losing context. Memory helped but wasn't enough. Files helped but needed structure.
 
-The insight: **The relationship matters.** Claude isn't just a tool—it's a collaborator. Collaborators need shared truth, clear communication, and mutual agreement.
+The insight: **The relationship matters.** Claude isn't just a tool — it's a collaborator. Collaborators need shared truth, clear communication, and mutual agreement.
 
-Keep the fire burning across sessions. 🔥
+Keep the fire burning across sessions. 🔥🌊
 
 ---
 
 ## License
 
-MIT - Use freely, modify as needed, share with others.
+MIT — Use freely, modify as needed, share with others.
 
 ---
 
-🔥 **BOND: The Bonfire Protocol**
+🔥🌊 **BOND: The Bonfire Protocol**
 Built by J-Dub & Claude | 2026

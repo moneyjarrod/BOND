@@ -1,0 +1,1016 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOND — Installation Wizard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-deep:     #0d1117;
+    --bg-surface:  #161b22;
+    --bg-elevated: #1c2333;
+    --bg-hover:    #21283b;
+    --border:      #30363d;
+    --border-focus:#58a6ff;
+    --text-primary:   #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted:     #484f58;
+    --accent:      #e94560;
+    --accent-dim:  #e9456022;
+    --amber:       #d29922;
+    --amber-dim:   #d2992215;
+    --amber-glow:  #d2992240;
+    --teal:        #56d4dd;
+    --teal-dim:    #56d4dd15;
+    --green:       #3fb950;
+    --green-dim:   #3fb95015;
+    --font-mono:   'JetBrains Mono', 'Consolas', monospace;
+    --font-ui:     'Outfit', -apple-system, sans-serif;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: var(--font-ui);
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(210,153,34,0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 50%, rgba(86,212,221,0.03) 0%, transparent 50%),
+      var(--bg-deep);
+  }
+
+  /* ─── Wizard Container ───────────────────────────── */
+  .wizard {
+    width: 100%;
+    max-width: 680px;
+    min-height: 500px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* ─── Header ─────────────────────────────────────── */
+  .wizard-header {
+    text-align: center;
+    margin-bottom: 32px;
+  }
+
+  .wizard-logo {
+    font-size: 2.4rem;
+    letter-spacing: -2px;
+    margin-bottom: 4px;
+    animation: fadeInDown 0.6s ease;
+  }
+
+  .wizard-title {
+    font-size: 1.6rem;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--amber);
+    animation: fadeInDown 0.6s ease 0.1s both;
+  }
+
+  .wizard-subtitle {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    animation: fadeInDown 0.6s ease 0.2s both;
+  }
+
+  /* ─── Progress ───────────────────────────────────── */
+  .progress-bar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    margin-bottom: 28px;
+    animation: fadeIn 0.5s ease 0.3s both;
+  }
+
+  .step-dot {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    font-weight: 600;
+    border: 2px solid var(--border);
+    color: var(--text-muted);
+    background: var(--bg-surface);
+    transition: all 0.3s ease;
+    position: relative;
+  }
+
+  .step-dot.active {
+    border-color: var(--amber);
+    color: var(--amber);
+    background: var(--amber-dim);
+    box-shadow: 0 0 12px var(--amber-glow);
+  }
+
+  .step-dot.done {
+    border-color: var(--green);
+    color: var(--green);
+    background: var(--green-dim);
+  }
+
+  .step-line {
+    width: 48px;
+    height: 2px;
+    background: var(--border);
+    transition: background 0.3s ease;
+  }
+
+  .step-line.done {
+    background: var(--green);
+  }
+
+  /* ─── Card ───────────────────────────────────────── */
+  .wizard-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 28px 32px;
+    flex: 1;
+    animation: fadeInUp 0.4s ease;
+  }
+
+  .card-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    margin-bottom: 4px;
+    color: var(--text-primary);
+  }
+
+  .card-desc {
+    font-size: 0.82rem;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+  }
+
+  /* ─── Welcome ────────────────────────────────────── */
+  .welcome-features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 20px;
+  }
+
+  .welcome-feature {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+
+  .welcome-feature-icon {
+    font-size: 1.1rem;
+    flex-shrink: 0;
+    margin-top: 1px;
+  }
+
+  .welcome-feature-text strong {
+    color: var(--text-primary);
+    display: block;
+    font-size: 0.82rem;
+    margin-bottom: 2px;
+  }
+
+  /* ─── Component Selection ────────────────────────── */
+  .component-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .component {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    user-select: none;
+  }
+
+  .component:hover { border-color: var(--border-focus); }
+  .component.selected { border-color: var(--amber); background: var(--amber-dim); }
+  .component.required { border-color: rgba(210,153,34,0.3); }
+
+  .component-check {
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-sm);
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.7rem;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+  }
+
+  .component.selected .component-check {
+    border-color: var(--amber);
+    background: var(--amber);
+    color: var(--bg-deep);
+  }
+
+  .component.required .component-check {
+    border-color: var(--amber);
+    background: rgba(210,153,34,0.3);
+    color: var(--amber);
+  }
+
+  .component-info { flex: 1; }
+
+  .component-name {
+    font-weight: 600;
+    font-size: 0.88rem;
+    color: var(--text-primary);
+  }
+
+  .component-desc {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+  }
+
+  .component-badge {
+    font-family: var(--font-mono);
+    font-size: 0.6rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: var(--radius-sm);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  .badge-required {
+    background: rgba(210,153,34,0.15);
+    color: var(--amber);
+    border: 1px solid rgba(210,153,34,0.3);
+  }
+
+  .badge-optional {
+    background: rgba(86,212,221,0.1);
+    color: var(--teal);
+    border: 1px solid rgba(86,212,221,0.2);
+  }
+
+  /* ─── Path Config ────────────────────────────────── */
+  .path-group {
+    margin-bottom: 16px;
+  }
+
+  .path-label {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .path-input {
+    width: 100%;
+    padding: 10px 14px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    outline: none;
+    transition: border-color 0.15s ease;
+  }
+
+  .path-input:focus { border-color: var(--amber); }
+
+  .path-hint {
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+  }
+
+  /* ─── Review ─────────────────────────────────────── */
+  .review-section {
+    margin-bottom: 16px;
+  }
+
+  .review-label {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 6px;
+  }
+
+  .review-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .review-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .review-item .ri-icon { font-size: 0.7rem; }
+
+  .review-path {
+    padding: 8px 12px;
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    color: var(--teal);
+    word-break: break-all;
+  }
+
+  .script-preview {
+    background: var(--bg-deep);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    line-height: 1.7;
+    max-height: 220px;
+    overflow-y: auto;
+    white-space: pre;
+    margin-top: 12px;
+  }
+
+  /* ─── Complete ───────────────────────────────────── */
+  .complete-icon {
+    font-size: 3rem;
+    text-align: center;
+    margin-bottom: 12px;
+    animation: popIn 0.5s ease;
+  }
+
+  .complete-title {
+    text-align: center;
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--green);
+    margin-bottom: 6px;
+  }
+
+  .complete-desc {
+    text-align: center;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+  }
+
+  .next-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .next-step {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 10px 14px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+  }
+
+  .next-step-num {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: var(--amber-dim);
+    border: 1px solid rgba(210,153,34,0.3);
+    color: var(--amber);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: 0.65rem;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+
+  .next-step code {
+    font-family: var(--font-mono);
+    background: var(--bg-deep);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-size: 0.75rem;
+    color: var(--teal);
+  }
+
+  /* ─── Buttons ────────────────────────────────────── */
+  .wizard-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 20px;
+  }
+
+  .btn {
+    padding: 10px 24px;
+    font-family: var(--font-mono);
+    font-size: 0.82rem;
+    font-weight: 500;
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    border: 1px solid;
+  }
+
+  .btn-back {
+    background: transparent;
+    color: var(--text-secondary);
+    border-color: var(--border);
+  }
+  .btn-back:hover { background: var(--bg-hover); color: var(--text-primary); }
+
+  .btn-next {
+    background: var(--amber-dim);
+    color: var(--amber);
+    border-color: rgba(210,153,34,0.5);
+    font-weight: 600;
+  }
+  .btn-next:hover {
+    background: rgba(210,153,34,0.2);
+    box-shadow: 0 0 16px var(--amber-glow);
+  }
+
+  .btn-download {
+    background: rgba(63,185,80,0.1);
+    color: var(--green);
+    border-color: rgba(63,185,80,0.4);
+    font-weight: 600;
+  }
+  .btn-download:hover {
+    background: rgba(63,185,80,0.2);
+    box-shadow: 0 0 16px rgba(63,185,80,0.2);
+  }
+
+  .btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  .btn-ghost {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    cursor: pointer;
+    padding: 4px 8px;
+  }
+  .btn-ghost:hover { color: var(--text-secondary); }
+
+  /* ─── Animations ─────────────────────────────────── */
+  @keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes popIn {
+    0% { opacity: 0; transform: scale(0.5); }
+    70% { transform: scale(1.1); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+
+  /* ─── Scrollbar ──────────────────────────────────── */
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg-deep); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="wizard" id="wizard">
+  <!-- Header -->
+  <div class="wizard-header">
+    <div class="wizard-logo">🔥🌊</div>
+    <div class="wizard-title">BOND</div>
+    <div class="wizard-subtitle">Installation Wizard</div>
+  </div>
+
+  <!-- Progress -->
+  <div class="progress-bar" id="progress"></div>
+
+  <!-- Card (dynamic content) -->
+  <div class="wizard-card" id="card"></div>
+
+  <!-- Footer -->
+  <div class="wizard-footer" id="footer"></div>
+</div>
+
+<script>
+const STEPS = ['Welcome', 'Components', 'Configure', 'Review', 'Complete'];
+let step = 0;
+
+const state = {
+  components: {
+    panel:    { selected: true,  required: true,  name: 'Control Panel',   desc: 'React dashboard + Express sidecar', icon: '🖥️' },
+    starter: { selected: true,  required: false, name: 'Starter Entities', desc: 'Example doctrine, project, and library templates', icon: '📦' },
+    skills:  { selected: true,  required: false, name: 'Claude Skill',    desc: 'BOND skill file — teaches Claude the protocol', icon: '🎯' },
+    ahk:     { selected: true,  required: false, name: 'AHK Bridge',      desc: 'Clipboard bridge for Claude automation (Windows)', icon: '🔗' },
+    docs:    { selected: true,  required: false, name: 'Documentation',   desc: 'Commands reference, entity system guide, counter spec', icon: '📖' },
+  },
+  paths: {
+    install: 'C:\\BOND',
+    port: '3000',
+  },
+};
+
+function render() {
+  renderProgress();
+  renderCard();
+  renderFooter();
+}
+
+function renderProgress() {
+  const el = document.getElementById('progress');
+  let html = '';
+  STEPS.forEach((s, i) => {
+    const cls = i < step ? 'done' : i === step ? 'active' : '';
+    const icon = i < step ? '✓' : i + 1;
+    html += `<div class="step-dot ${cls}">${icon}</div>`;
+    if (i < STEPS.length - 1) {
+      html += `<div class="step-line ${i < step ? 'done' : ''}"></div>`;
+    }
+  });
+  el.innerHTML = html;
+}
+
+function renderFooter() {
+  const el = document.getElementById('footer');
+  if (step === 0) {
+    el.innerHTML = `
+      <div></div>
+      <button class="btn btn-next" onclick="next()">Get Started →</button>
+    `;
+  } else if (step === STEPS.length - 1) {
+    el.innerHTML = `
+      <div></div>
+      <button class="btn btn-next" onclick="window.location.reload()">Start Over</button>
+    `;
+  } else if (step === 3) {
+    el.innerHTML = `
+      <button class="btn btn-back" onclick="prev()">← Back</button>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-download" onclick="downloadScript()">⬇ Download install.bat</button>
+        <button class="btn btn-next" onclick="next()">Finish →</button>
+      </div>
+    `;
+  } else {
+    el.innerHTML = `
+      <button class="btn btn-back" onclick="prev()">← Back</button>
+      <button class="btn btn-next" onclick="next()">Continue →</button>
+    `;
+  }
+}
+
+function renderCard() {
+  const el = document.getElementById('card');
+  el.style.animation = 'none';
+  el.offsetHeight; // reflow
+  el.style.animation = 'fadeInUp 0.35s ease';
+
+  switch(step) {
+    case 0: return renderWelcome(el);
+    case 1: return renderComponents(el);
+    case 2: return renderConfigure(el);
+    case 3: return renderReview(el);
+    case 4: return renderComplete(el);
+  }
+}
+
+// ─── Step 0: Welcome ─────────────────────────────────
+function renderWelcome(el) {
+  el.innerHTML = `
+    <div class="card-title">Welcome to BOND</div>
+    <div class="card-desc">
+      Persistence and continuity framework for human-AI collaboration.
+      This wizard will set up your BOND environment.
+    </div>
+    <div class="welcome-features">
+      <div class="welcome-feature">
+        <span class="welcome-feature-icon">🖥️</span>
+        <div class="welcome-feature-text">
+          <strong>Control Panel</strong>
+          Dark-themed dashboard for managing entities, modules, and commands.
+        </div>
+      </div>
+      <div class="welcome-feature">
+        <span class="welcome-feature-icon">📜</span>
+        <div class="welcome-feature-text">
+          <strong>Entity System</strong>
+          Four-class architecture: Doctrine, Project, Perspective, Library.
+        </div>
+      </div>
+      <div class="welcome-feature">
+        <span class="welcome-feature-icon">🔗</span>
+        <div class="welcome-feature-text">
+          <strong>Clipboard Bridge</strong>
+          Panel → AHK → Claude. Seamless command relay.
+        </div>
+      </div>
+      <div class="welcome-feature">
+        <span class="welcome-feature-icon">🔮</span>
+        <div class="welcome-feature-text">
+          <strong>QAIS Memory</strong>
+          Quantum-Approximate Identity Substrate for persistent context.
+        </div>
+      </div>
+    </div>
+    <div style="font-size:0.75rem;color:var(--text-muted);font-family:var(--font-mono);text-align:center;">
+      Requirements: Node.js 18+ · Git · Windows 10/11 (for AHK bridge)
+    </div>
+  `;
+}
+
+// ─── Step 1: Components ──────────────────────────────
+function renderComponents(el) {
+  let html = `
+    <div class="card-title">Choose Components</div>
+    <div class="card-desc">Select what to install. The Control Panel is required.</div>
+    <div class="component-list">
+  `;
+  for (const [key, comp] of Object.entries(state.components)) {
+    const cls = comp.required ? 'required selected' : comp.selected ? 'selected' : '';
+    html += `
+      <div class="component ${cls}" onclick="${comp.required ? '' : `toggleComponent('${key}')`}" ${comp.required ? '' : ''}>
+        <div class="component-check">${comp.selected || comp.required ? '✓' : ''}</div>
+        <span style="font-size:1.1rem">${comp.icon}</span>
+        <div class="component-info">
+          <div class="component-name">${comp.name}</div>
+          <div class="component-desc">${comp.desc}</div>
+        </div>
+        <span class="component-badge ${comp.required ? 'badge-required' : 'badge-optional'}">
+          ${comp.required ? 'Required' : 'Optional'}
+        </span>
+      </div>
+    `;
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function toggleComponent(key) {
+  state.components[key].selected = !state.components[key].selected;
+  renderCard();
+}
+
+// ─── Step 2: Configure ──────────────────────────────
+function renderConfigure(el) {
+  el.innerHTML = `
+    <div class="card-title">Configure Paths</div>
+    <div class="card-desc">Set your installation directory and panel port.</div>
+
+    <div class="path-group">
+      <div class="path-label">📂 Install Directory</div>
+      <input class="path-input" type="text" value="${escapeHtml(state.paths.install)}"
+        oninput="state.paths.install = this.value" />
+      <div class="path-hint">BOND will create panel/, doctrine/, state/ inside this directory</div>
+    </div>
+
+    <div class="path-group">
+      <div class="path-label">🌐 Panel Port</div>
+      <input class="path-input" type="text" value="${state.paths.port}"
+        oninput="state.paths.port = this.value" style="width:120px;" />
+      <div class="path-hint">Express sidecar port (default: 3000)</div>
+    </div>
+
+    <div style="margin-top:16px;padding:12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-md);font-size:0.78rem;color:var(--text-secondary);">
+      <strong style="color:var(--amber)">📋 Directory structure:</strong>
+      <pre style="margin-top:8px;font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted);line-height:1.8;">${escapeHtml(state.paths.install)}\\
+├── panel\\          ← React dashboard + Express server
+├── doctrine\\       ← Entity files (your knowledge domains)
+├── state\\          ← Active entity pointer${state.components.skills.selected ? `
+├── skills\\         ← Claude skill file` : ''}${state.components.ahk.selected ? `
+├── bridge\\         ← AHK automation script` : ''}${state.components.docs.selected ? `
+├── docs\\           ← Commands, entities, counter reference` : ''}
+└── .env             ← Configuration</pre>
+    </div>
+  `;
+}
+
+// ─── Step 3: Review ──────────────────────────────────
+function renderReview(el) {
+  const selected = Object.entries(state.components).filter(([k,v]) => v.selected || v.required);
+  let html = `
+    <div class="card-title">Review & Install</div>
+    <div class="card-desc">Confirm your selections, then download the install script.</div>
+
+    <div class="review-section">
+      <div class="review-label">Components</div>
+      <div class="review-items">
+        ${selected.map(([k,v]) => `<span class="review-item"><span class="ri-icon">${v.icon}</span> ${v.name}</span>`).join('')}
+      </div>
+    </div>
+
+    <div class="review-section">
+      <div class="review-label">Install Path</div>
+      <div class="review-path">${escapeHtml(state.paths.install)}</div>
+    </div>
+
+    <div class="review-section">
+      <div class="review-label">Port</div>
+      <div class="review-path" style="display:inline-block;">${escapeHtml(state.paths.port)}</div>
+    </div>
+
+    <div class="review-section">
+      <div class="review-label">Generated Script Preview</div>
+      <div class="script-preview">${escapeHtml(generateScript())}</div>
+    </div>
+  `;
+  el.innerHTML = html;
+}
+
+// ─── Step 4: Complete ────────────────────────────────
+function renderComplete(el) {
+  el.innerHTML = `
+    <div class="complete-icon">🔥🌊</div>
+    <div class="complete-title">BOND is Ready</div>
+    <div class="complete-desc">Run the downloaded install.bat to set up your system.</div>
+    <div class="next-steps">
+      <div class="next-step">
+        <div class="next-step-num">1</div>
+        <div>Run <code>install.bat</code> as Administrator — it creates directories, installs dependencies, and configures your environment.</div>
+      </div>
+      <div class="next-step">
+        <div class="next-step-num">2</div>
+        <div>Start the panel with <code>start_bond.bat</code> or <code>cd panel && node server.js</code></div>
+      </div>
+      <div class="next-step">
+        <div class="next-step-num">3</div>
+        <div>Open <code>http://localhost:${state.paths.port}</code> in your browser to see the Control Panel.</div>
+      </div>
+      <div class="next-step">
+        <div class="next-step-num">4</div>
+        <div>Add the BOND skill to your Claude project — paste the skill file from <code>skills/bond/SKILL.md</code></div>
+      </div>
+      <div class="next-step">
+        <div class="next-step-num">5</div>
+        <div>Type <code>{Full Restore}</code> in Claude to initialize BOND. Welcome aboard. 🔥🌊</div>
+      </div>
+    </div>
+  `;
+}
+
+// ─── Script Generator ────────────────────────────────
+function generateScript() {
+  const p = state.paths.install;
+  const c = state.components;
+  const port = state.paths.port;
+
+  let s = `@echo off
+:: ═══════════════════════════════════════════════════
+:: BOND Installation Script
+:: Generated by BOND Wizard
+:: ═══════════════════════════════════════════════════
+echo.
+echo  🔥🌊 BOND Installer
+echo  ═══════════════════════════════════
+echo.
+
+set "BOND_ROOT=${p}"
+set "BOND_PORT=${port}"
+
+:: ─── Create Directory Structure ───────────────────
+echo [1/5] Creating directory structure...
+mkdir "%BOND_ROOT%" 2>nul
+mkdir "%BOND_ROOT%\\panel" 2>nul
+mkdir "%BOND_ROOT%\\doctrine" 2>nul
+mkdir "%BOND_ROOT%\\state" 2>nul`;
+
+  if (c.ahk.selected) {
+    s += `\nmkdir "%BOND_ROOT%\\bridge" 2>nul`;
+  }
+  if (c.skills.selected) {
+    s += `\nmkdir "%BOND_ROOT%\\skills\\bond" 2>nul`;
+  }
+  if (c.docs.selected) {
+    s += `\nmkdir "%BOND_ROOT%\\docs" 2>nul`;
+  }
+
+  s += `
+echo    Done.
+echo.
+
+:: ─── Write Configuration ──────────────────────────
+echo [2/5] Writing configuration...
+(
+  echo # BOND Configuration
+  echo BOND_ROOT=%BOND_ROOT%
+  echo DOCTRINE_PATH=%BOND_ROOT%\\doctrine
+  echo STATE_PATH=%BOND_ROOT%\\state
+  echo PORT=%BOND_PORT%
+  echo MCP_URL=http://localhost:3002
+) > "%BOND_ROOT%\\.env"
+echo    .env created.
+
+:: ─── Write State File ─────────────────────────────
+echo {"entity":null,"class":null,"path":null,"entered":null} > "%BOND_ROOT%\\state\\active_entity.json"
+echo    State file initialized.
+echo.`;
+
+  s += `
+
+:: ─── Install Panel ────────────────────────────────
+echo [3/5] Installing Control Panel...
+echo    Cloning BOND repository...
+cd /d "%BOND_ROOT%"
+git clone https://github.com/moneyjarrod/BOND.git panel_temp 2>nul
+if exist panel_temp\\panel (
+  xcopy /E /Y /Q "panel_temp\\panel\\*" "panel\\" >nul
+  echo    Panel files copied.
+) else (
+  echo    ⚠ Could not clone repo. Copy panel files manually.
+)
+
+cd /d "%BOND_ROOT%\\panel"
+if exist package.json (
+  echo    Installing Node dependencies...
+  call npm install
+  echo    Dependencies installed.
+) else (
+  echo    ⚠ No package.json found. Panel may need manual setup.
+)`;
+
+  if (c.starter.selected) {
+    s += `
+
+:: ─── Starter Entities ─────────────────────────────
+echo [4/5] Creating starter entities...
+
+:: Example Doctrine
+mkdir "%BOND_ROOT%\\doctrine\\BOND_MASTER" 2>nul
+(echo {"class":"doctrine","tools":{"filesystem":true,"iss":true},"display_name":"BOND Master"}) > "%BOND_ROOT%\\doctrine\\BOND_MASTER\\entity.json"
+(
+  echo # BOND Master Doctrine
+  echo.
+  echo Enter this entity to consult BOND's constitutional authority.
+  echo Add your own IS statements, protocol rules, and audit checklists.
+) > "%BOND_ROOT%\\doctrine\\BOND_MASTER\\BOND_MASTER.md"
+
+:: Example Project
+mkdir "%BOND_ROOT%\\doctrine\\MyProject" 2>nul
+(echo {"class":"project","tools":{"filesystem":true,"iss":true,"qais":true,"heatmap":true,"crystal":true},"core":"CORE.md"}) > "%BOND_ROOT%\\doctrine\\MyProject\\entity.json"
+(
+  echo # MyProject — CORE
+  echo.
+  echo ^<!-- Define your project boundaries here. What IS your project? What ISN'T it? --^>
+) > "%BOND_ROOT%\\doctrine\\MyProject\\CORE.md"
+
+:: Example Library
+mkdir "%BOND_ROOT%\\doctrine\\_reference" 2>nul
+(echo {"class":"library","tools":{"filesystem":true}}) > "%BOND_ROOT%\\doctrine\\_reference\\entity.json"
+(
+  echo # Reference Library
+  echo.
+  echo Drop reference documents here. Read-only knowledge shelf.
+) > "%BOND_ROOT%\\doctrine\\_reference\\index.md"
+echo    Starter entities created.`;
+  } else {
+    s += `\necho [4/5] Skipping starter entities.`;
+  }
+
+  if (c.skills.selected) {
+    s += `
+
+:: ─── Claude Skill ─────────────────────────────────
+if exist "panel_temp\\skills\\bond\\SKILL.md" (
+  copy /Y "panel_temp\\skills\\bond\\SKILL.md" "%BOND_ROOT%\\skills\\bond\\" >nul
+  echo    BOND skill file copied.
+) else (
+  echo    ⚠ Skill file not found in repo. Copy manually from GitHub.
+)`;
+  }
+
+  if (c.docs.selected) {
+    s += `
+
+:: ─── Documentation ────────────────────────────────
+if exist "panel_temp\\docs" (
+  xcopy /E /Y /Q "panel_temp\\docs\\*" "%BOND_ROOT%\\docs\\" >nul
+  echo    Documentation copied.
+) else (
+  echo    ⚠ Docs not found in repo.
+)`;
+  }
+
+  s += `
+
+:: ─── Cleanup ──────────────────────────────────────
+echo [5/5] Cleaning up...
+if exist "%BOND_ROOT%\\panel_temp" (
+  rmdir /S /Q "%BOND_ROOT%\\panel_temp"
+  echo    Temp files removed.
+)`;
+
+  s += `
+
+:: ─── Startup Script ───────────────────────────────
+(
+  echo @echo off
+  echo cd /d "%BOND_ROOT%\\panel"
+  echo echo 🔥🌊 Starting BOND Panel on port %BOND_PORT%...
+  echo node server.js
+) > "%BOND_ROOT%\\start_bond.bat"
+echo    start_bond.bat created.
+
+echo.
+echo  ═══════════════════════════════════
+echo  🔥🌊 BOND installation complete!
+echo  ═══════════════════════════════════
+echo.
+echo  Start:  %BOND_ROOT%\\start_bond.bat
+echo  Panel:  http://localhost:%BOND_PORT%
+echo  Skill:  Add skills\\bond\\SKILL.md to Claude
+echo.
+pause`;
+
+  return s;
+}
+
+// ─── Helpers ─────────────────────────────────────────
+function next() { if (step < STEPS.length - 1) { step++; render(); } }
+function prev() { if (step > 0) { step--; render(); } }
+
+function escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function downloadScript() {
+  const blob = new Blob([generateScript()], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'install_bond.bat';
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ─── Init ────────────────────────────────────────────
+render();
+</script>
+</body>
+</html>

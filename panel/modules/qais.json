@@ -1,0 +1,14 @@
+{
+  "id": "qais",
+  "name": "QAIS",
+  "icon": "🔮",
+  "description": "Quantum-Approximate Identity Substrate",
+  "status_endpoint": "/api/mcp/qais/stats",
+  "display_fields": [
+    { "key": "total_bindings", "label": "Bindings", "icon": "🔗" },
+    { "key": "total_identities", "label": "Identities", "icon": "👤" },
+    { "key": "total_roles", "label": "Roles", "icon": "🏷️" },
+    { "key": "facts_indexed", "label": "Facts", "icon": "📄" }
+  ],
+  "refresh_interval": 30
+}
