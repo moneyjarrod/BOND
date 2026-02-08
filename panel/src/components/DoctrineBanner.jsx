@@ -1,23 +1,46 @@
 // DoctrineBanner.jsx — BOND_MASTER distinguished slot
 // Sits above entity grid on Doctrine tab. Constitutional authority.
-// Amber theme, full-width, Enter + Audit actions.
+// S85: Added Link capability — BOND_MASTER exclusive.
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 
 const MASTER_ENTITY = 'BOND_MASTER';
 
-export default function DoctrineBanner({ entities, activeEntity, onEnter, onView, onExit }) {
+const CLASS_META = {
+  doctrine:    { icon: '📜' },
+  project:     { icon: '⚒️' },
+  perspective: { icon: '🔭' },
+  library:     { icon: '📚' },
+};
+
+export default function DoctrineBanner({ entities, allEntities, activeEntity, linkedEntity, onEnter, onView, onExit, onLink }) {
   const master = entities.find(e => e.name === MASTER_ENTITY);
   const [auditSent, setAuditSent] = useState(false);
+  const [showLinkPicker, setShowLinkPicker] = useState(false);
+  const pickerRef = useRef(null);
   const isActive = activeEntity?.name === MASTER_ENTITY;
+
+  // Close picker on outside click
+  useEffect(() => {
+    if (!showLinkPicker) return;
+    const handler = (e) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
+        setShowLinkPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showLinkPicker]);
 
   if (!master) return null;
 
   const displayName = master.display_name || 'BOND Master';
   const fileCount = master.files?.length || 0;
 
+  // Linkable entities: everything except BOND_MASTER
+  const linkable = (allEntities || entities).filter(e => e.name !== MASTER_ENTITY);
+
   const handleAudit = useCallback(async () => {
-    // Enter + write audit command to clipboard
     if (!isActive) {
       onEnter(master);
     }
@@ -27,6 +50,11 @@ export default function DoctrineBanner({ entities, activeEntity, onEnter, onView
       setTimeout(() => setAuditSent(false), 2000);
     } catch {}
   }, [isActive, master, onEnter]);
+
+  const handleLinkSelect = useCallback((entity) => {
+    setShowLinkPicker(false);
+    onLink(entity);
+  }, [onLink]);
 
   return (
     <div style={{
@@ -70,6 +98,25 @@ export default function DoctrineBanner({ entities, activeEntity, onEnter, onView
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {linkedEntity && (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 3,
+              padding: '2px 8px',
+              background: 'rgba(86,212,221,0.12)',
+              border: '1px solid rgba(86,212,221,0.3)',
+              borderRadius: 'var(--radius-sm)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '0.65rem',
+              fontWeight: 600,
+              color: 'var(--teal)',
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+            }}>
+              🔗 LINKED
+            </span>
+          )}
           {isActive && (
             <span style={{
               display: 'inline-flex',
@@ -124,7 +171,7 @@ export default function DoctrineBanner({ entities, activeEntity, onEnter, onView
       }} />
 
       {/* Action row */}
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', position: 'relative' }}>
         {isActive ? (
           <BannerBtn label="Exit" onClick={onExit} variant="exit" />
         ) : (
@@ -137,6 +184,87 @@ export default function DoctrineBanner({ entities, activeEntity, onEnter, onView
           variant="audit"
           disabled={auditSent}
         />
+
+        {/* Link button — only when BOND_MASTER is active and not already linked */}
+        {isActive && !linkedEntity && (
+          <div ref={pickerRef} style={{ position: 'relative' }}>
+            <BannerBtn
+              label="🔗 Link"
+              onClick={() => setShowLinkPicker(!showLinkPicker)}
+              variant="link"
+            />
+            {showLinkPicker && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                marginBottom: 6,
+                background: '#1e2030',
+                border: '1px solid rgba(210,153,34,0.5)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: '0 -8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(210,153,34,0.2)',
+                minWidth: 220,
+                maxHeight: 260,
+                overflowY: 'auto',
+                zIndex: 1000,
+                padding: '6px 0',
+              }}>
+                {linkable.length === 0 ? (
+                  <div style={{
+                    padding: '12px 16px',
+                    fontSize: '0.75rem',
+                    color: 'var(--text-muted)',
+                    fontFamily: 'var(--font-mono)',
+                  }}>
+                    No entities to link
+                  </div>
+                ) : (
+                  linkable.map(entity => {
+                    const cm = CLASS_META[entity.type] || CLASS_META.library;
+                    return (
+                      <button
+                        key={entity.name}
+                        onClick={() => handleLinkSelect(entity)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          width: '100%',
+                          padding: '8px 14px',
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text-primary)',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'background 0.1s ease',
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.background = 'rgba(210,153,34,0.12)';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.background = 'transparent';
+                        }}
+                      >
+                        <span style={{ flexShrink: 0 }}>{cm.icon}</span>
+                        <span style={{ flex: 1 }}>{entity.display_name || entity.name}</span>
+                        <span style={{
+                          fontSize: '0.6rem',
+                          color: 'var(--text-muted)',
+                          textTransform: 'uppercase',
+                          flexShrink: 0,
+                        }}>
+                          {entity.type?.slice(0, 3)}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Spacer + tools summary */}
         <div style={{ flex: 1 }} />
@@ -181,6 +309,12 @@ function BannerBtn({ label, onClick, variant = 'secondary', disabled = false }) 
       border: 'rgba(86,212,221,0.3)',
       color: 'var(--teal)',
       hoverBg: 'rgba(86,212,221,0.15)',
+    },
+    link: {
+      bg: 'rgba(210,153,34,0.08)',
+      border: 'rgba(210,153,34,0.35)',
+      color: '#d29922',
+      hoverBg: 'rgba(210,153,34,0.18)',
     },
   };
   const s = styles[variant] || styles.secondary;

@@ -31,6 +31,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('doctrine');
   const [viewerTarget, setViewerTarget] = useState(null);
   const [activeEntity, setActiveEntity] = useState(null);
+  const [linkedEntity, setLinkedEntity] = useState(null);
   const [loadedEntities, setLoadedEntities] = useState(() => {
     try { return JSON.parse(localStorage.getItem('bond_loaded') || '[]'); }
     catch { return []; }
@@ -44,6 +45,9 @@ export default function App() {
     fetch('/api/state').then(r => r.json()).then(state => {
       if (state.entity) {
         setActiveEntity({ name: state.entity, type: state.class, display_name: state.display_name });
+      }
+      if (state.linked) {
+        setLinkedEntity({ name: state.linked.entity, type: state.linked.class, display_name: state.linked.display_name });
       }
     }).catch(() => {});
   }, []);
@@ -90,9 +94,38 @@ export default function App() {
     try {
       await fetch('/api/state/exit', { method: 'POST' });
       setActiveEntity(null);
+      setLinkedEntity(null);
       try { await navigator.clipboard.writeText('BOND:{Exit}'); } catch {}
     } catch (err) {
       console.error('Exit failed:', err);
+    }
+  }, []);
+
+  const handleLink = useCallback(async (entity) => {
+    try {
+      const res = await fetch('/api/state/link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entity: entity.name }),
+      });
+      const data = await res.json();
+      if (data.linked) {
+        setLinkedEntity({ name: entity.name, type: entity.type, display_name: entity.display_name });
+      }
+    } catch (err) {
+      console.error('Link failed:', err);
+    }
+  }, []);
+
+  const handleUnlink = useCallback(async () => {
+    try {
+      const res = await fetch('/api/state/unlink', { method: 'POST' });
+      const data = await res.json();
+      if (data.unlinked) {
+        setLinkedEntity(null);
+      }
+    } catch (err) {
+      console.error('Unlink failed:', err);
     }
   }, []);
 
@@ -164,7 +197,7 @@ export default function App() {
         classCounts={classCounts}
       />
 
-      <EntityBar activeEntity={activeEntity} onExit={handleExit} />
+      <EntityBar activeEntity={activeEntity} linkedEntity={linkedEntity} onExit={handleExit} onUnlink={handleUnlink} />
 
       <nav className="tab-bar">
         {TABS.map((tab) => (
@@ -186,10 +219,13 @@ export default function App() {
           {currentTab.filter === 'doctrine' && (
             <DoctrineBanner
               entities={entities}
+              allEntities={entities}
               activeEntity={activeEntity}
+              linkedEntity={linkedEntity}
               onEnter={handleEnter}
               onView={handleView}
               onExit={handleExit}
+              onLink={handleLink}
             />
           )}
           <EntityCards

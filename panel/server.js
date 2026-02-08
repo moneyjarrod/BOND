@@ -447,6 +447,78 @@ app.post('/api/state/exit', async (req, res) => {
   }
 });
 
+// Link entity — BOND_MASTER exclusive. Attaches a secondary entity.
+app.post('/api/state/link', async (req, res) => {
+  try {
+    const { entity: linkTarget } = req.body;
+    if (!linkTarget) return res.status(400).json({ error: 'entity required' });
+
+    // Read current state
+    let state;
+    try { state = JSON.parse(await readFile(STATE_FILE, 'utf-8')); } catch {
+      return res.status(400).json({ error: 'No active entity' });
+    }
+
+    // Only BOND_MASTER can link
+    if (state.entity !== 'BOND_MASTER') {
+      return res.status(403).json({ error: 'Only BOND_MASTER can link entities' });
+    }
+
+    // Cannot link to self
+    if (linkTarget === 'BOND_MASTER') {
+      return res.status(400).json({ error: 'Cannot link to self' });
+    }
+
+    // Look up target entity
+    const targetPath = join(DOCTRINE_PATH, linkTarget);
+    const resolved = resolve(targetPath);
+    if (!resolved.startsWith(resolve(DOCTRINE_PATH))) {
+      return res.status(403).json({ error: 'Access denied' });
+    }
+
+    let targetConfig = {};
+    try {
+      targetConfig = JSON.parse(await readFile(join(targetPath, 'entity.json'), 'utf-8'));
+    } catch {
+      return res.status(404).json({ error: `Entity '${linkTarget}' not found` });
+    }
+
+    // Write linked state
+    state.linked = {
+      entity: linkTarget,
+      class: targetConfig.class || 'library',
+      display_name: targetConfig.display_name || null,
+      path: resolved,
+      linked_at: new Date().toISOString()
+    };
+    await writeFile(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
+
+    console.log(`🔗 Linked: BOND_MASTER ↔ ${linkTarget} (${state.linked.class})`);
+    res.json({ linked: true, state });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Unlink entity — remove secondary entity link
+app.post('/api/state/unlink', async (req, res) => {
+  try {
+    let state;
+    try { state = JSON.parse(await readFile(STATE_FILE, 'utf-8')); } catch {
+      return res.status(400).json({ error: 'No active entity' });
+    }
+
+    const prev = state.linked?.entity || null;
+    delete state.linked;
+    await writeFile(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
+
+    if (prev) console.log(`🔓 Unlinked: ${prev}`);
+    res.json({ unlinked: true, previous: prev });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Bridge ───────────────────────────────────────────────
 // Clipboard-only. Panel writes "BOND:{cmd}" → AHK OnClipboardChange.
 // HTTP bridge removed S85 (Dead Code Audit).
