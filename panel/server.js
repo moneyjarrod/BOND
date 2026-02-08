@@ -251,7 +251,7 @@ app.post('/api/doctrine', async (req, res) => {
     const starterContent = STARTER_CONTENT[entityClass](safeName);
     await writeFile(join(entityPath, starterName), starterContent);
 
-    console.log(`\u2728 Created ${entityClass}: ${safeName}`);
+    console.log(`✨ Created ${entityClass}: ${safeName}`);
     res.json({ created: true, name: safeName, class: entityClass, files: ['entity.json', starterName] });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -371,21 +371,60 @@ app.get('/api/config', (req, res) => {
     state_path: STATE_PATH,
     mcp_url: MCP_URL,
     ws_port: 3001,
-    version: '1.2.0-s85'
+    version: '1.3.0-s86'
   });
 });
 
 // ─── Entity State API (Enter-Mode) ────────────────────────
 const STATE_FILE = join(STATE_PATH, 'active_entity.json');
 const NULL_STATE = { entity: null, class: null, path: null, entered: null };
+const MASTER_ENTITY = 'BOND_MASTER';
 
-// Read current state
+// Hub-and-spoke link hydration: BOND_MASTER is the only entity that links.
+// Links array lives in BOND_MASTER/entity.json — single source of truth.
+async function hydrateLinks() {
+  try {
+    const masterConfig = JSON.parse(
+      await readFile(join(DOCTRINE_PATH, MASTER_ENTITY, 'entity.json'), 'utf-8')
+    );
+    const linkNames = masterConfig.links || [];
+    const links = [];
+    for (const name of linkNames) {
+      try {
+        const targetPath = join(DOCTRINE_PATH, name);
+        const targetConfig = JSON.parse(
+          await readFile(join(targetPath, 'entity.json'), 'utf-8')
+        );
+        links.push({
+          entity: name,
+          class: targetConfig.class || 'library',
+          display_name: targetConfig.display_name || null,
+          path: resolve(targetPath),
+        });
+      } catch {
+        // Linked entity missing — skip silently
+      }
+    }
+    return links;
+  } catch {
+    return [];
+  }
+}
+
+// Read current state — hydrates links from BOND_MASTER entity.json
 app.get('/api/state', async (req, res) => {
   try {
     const raw = await readFile(STATE_FILE, 'utf-8');
-    res.json(JSON.parse(raw));
+    const state = JSON.parse(raw);
+    // Hydrate links from hub when BOND_MASTER is active
+    if (state.entity === MASTER_ENTITY) {
+      state.links = await hydrateLinks();
+    } else {
+      state.links = [];
+    }
+    res.json(state);
   } catch {
-    res.json(NULL_STATE);
+    res.json({ ...NULL_STATE, links: [] });
   }
 });
 
@@ -419,6 +458,13 @@ app.post('/api/state/enter', async (req, res) => {
     };
     await writeFile(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
 
+    // Hydrate links if entering BOND_MASTER
+    if (entity === MASTER_ENTITY) {
+      state.links = await hydrateLinks();
+    } else {
+      state.links = [];
+    }
+
     // Bridge: panel clipboard handles {Enter} command (App.jsx)
     console.log(`🔓 Entered: ${entity} (${state.class})`);
     res.json({ entered: true, state });
@@ -447,7 +493,7 @@ app.post('/api/state/exit', async (req, res) => {
   }
 });
 
-// Link entity — BOND_MASTER exclusive. Attaches a secondary entity.
+// Link entity — BOND_MASTER hub-and-spoke. Persists to entity.json.
 app.post('/api/state/link', async (req, res) => {
   try {
     const { entity: linkTarget } = req.body;
@@ -460,60 +506,74 @@ app.post('/api/state/link', async (req, res) => {
     }
 
     // Only BOND_MASTER can link
-    if (state.entity !== 'BOND_MASTER') {
+    if (state.entity !== MASTER_ENTITY) {
       return res.status(403).json({ error: 'Only BOND_MASTER can link entities' });
     }
 
     // Cannot link to self
-    if (linkTarget === 'BOND_MASTER') {
+    if (linkTarget === MASTER_ENTITY) {
       return res.status(400).json({ error: 'Cannot link to self' });
     }
 
-    // Look up target entity
+    // Verify target exists
     const targetPath = join(DOCTRINE_PATH, linkTarget);
     const resolved = resolve(targetPath);
     if (!resolved.startsWith(resolve(DOCTRINE_PATH))) {
       return res.status(403).json({ error: 'Access denied' });
     }
-
-    let targetConfig = {};
     try {
-      targetConfig = JSON.parse(await readFile(join(targetPath, 'entity.json'), 'utf-8'));
+      await readFile(join(targetPath, 'entity.json'), 'utf-8');
     } catch {
       return res.status(404).json({ error: `Entity '${linkTarget}' not found` });
     }
 
-    // Write linked state
-    state.linked = {
-      entity: linkTarget,
-      class: targetConfig.class || 'library',
-      display_name: targetConfig.display_name || null,
-      path: resolved,
-      linked_at: new Date().toISOString()
-    };
-    await writeFile(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
+    // Persist to BOND_MASTER entity.json (source of truth)
+    const masterConfigPath = join(DOCTRINE_PATH, MASTER_ENTITY, 'entity.json');
+    const masterConfig = JSON.parse(await readFile(masterConfigPath, 'utf-8'));
+    const links = masterConfig.links || [];
+    if (!links.includes(linkTarget)) {
+      links.push(linkTarget);
+      masterConfig.links = links;
+      await writeFile(masterConfigPath, JSON.stringify(masterConfig, null, 2) + '\n');
+    }
 
-    console.log(`🔗 Linked: BOND_MASTER ↔ ${linkTarget} (${state.linked.class})`);
+    // Hydrate full link objects for response
+    state.links = await hydrateLinks();
+
+    console.log(`🔗 Linked: ${MASTER_ENTITY} → ${linkTarget}`);
     res.json({ linked: true, state });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-// Unlink entity — remove secondary entity link
+// Unlink entity — remove from BOND_MASTER hub. Persists to entity.json.
 app.post('/api/state/unlink', async (req, res) => {
   try {
+    const { entity: unlinkTarget } = req.body;
+    if (!unlinkTarget) return res.status(400).json({ error: 'entity required' });
+
+    // Read current state
     let state;
     try { state = JSON.parse(await readFile(STATE_FILE, 'utf-8')); } catch {
       return res.status(400).json({ error: 'No active entity' });
     }
 
-    const prev = state.linked?.entity || null;
-    delete state.linked;
-    await writeFile(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
+    if (state.entity !== MASTER_ENTITY) {
+      return res.status(403).json({ error: 'Only BOND_MASTER can unlink entities' });
+    }
 
-    if (prev) console.log(`🔓 Unlinked: ${prev}`);
-    res.json({ unlinked: true, previous: prev });
+    // Remove from BOND_MASTER entity.json (source of truth)
+    const masterConfigPath = join(DOCTRINE_PATH, MASTER_ENTITY, 'entity.json');
+    const masterConfig = JSON.parse(await readFile(masterConfigPath, 'utf-8'));
+    masterConfig.links = (masterConfig.links || []).filter(n => n !== unlinkTarget);
+    await writeFile(masterConfigPath, JSON.stringify(masterConfig, null, 2) + '\n');
+
+    // Hydrate remaining links
+    state.links = await hydrateLinks();
+
+    console.log(`🔓 Unlinked: ${unlinkTarget}`);
+    res.json({ unlinked: true, previous: unlinkTarget, state });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

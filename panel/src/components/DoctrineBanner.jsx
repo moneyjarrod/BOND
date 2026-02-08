@@ -1,6 +1,6 @@
 // DoctrineBanner.jsx — BOND_MASTER distinguished slot
 // Sits above entity grid on Doctrine tab. Constitutional authority.
-// S85: Added Link capability — BOND_MASTER exclusive.
+// S86: Multi-link hub-and-spoke. Persistent links via entity.json.
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 
@@ -13,7 +13,7 @@ const CLASS_META = {
   library:     { icon: '📚' },
 };
 
-export default function DoctrineBanner({ entities, allEntities, activeEntity, linkedEntity, onEnter, onView, onExit, onLink }) {
+export default function DoctrineBanner({ entities, allEntities, activeEntity, linkedEntities = [], onEnter, onView, onExit, onLink }) {
   const master = entities.find(e => e.name === MASTER_ENTITY);
   const [auditSent, setAuditSent] = useState(false);
   const [showLinkPicker, setShowLinkPicker] = useState(false);
@@ -37,8 +37,9 @@ export default function DoctrineBanner({ entities, allEntities, activeEntity, li
   const displayName = master.display_name || 'BOND Master';
   const fileCount = master.files?.length || 0;
 
-  // Linkable entities: everything except BOND_MASTER
-  const linkable = (allEntities || entities).filter(e => e.name !== MASTER_ENTITY);
+  // Linkable entities: everything except BOND_MASTER and already-linked
+  const linkedNames = new Set(linkedEntities.map(l => l.name));
+  const linkable = (allEntities || entities).filter(e => e.name !== MASTER_ENTITY && !linkedNames.has(e.name));
 
   const handleAudit = useCallback(async () => {
     if (!isActive) {
@@ -98,7 +99,7 @@ export default function DoctrineBanner({ entities, allEntities, activeEntity, li
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {linkedEntity && (
+          {linkedEntities.length > 0 && (
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',
@@ -114,7 +115,7 @@ export default function DoctrineBanner({ entities, allEntities, activeEntity, li
               letterSpacing: '0.5px',
               textTransform: 'uppercase',
             }}>
-              🔗 LINKED
+              🔗 {linkedEntities.length}
             </span>
           )}
           {isActive && (
@@ -185,8 +186,8 @@ export default function DoctrineBanner({ entities, allEntities, activeEntity, li
           disabled={auditSent}
         />
 
-        {/* Link button — only when BOND_MASTER is active and not already linked */}
-        {isActive && !linkedEntity && (
+        {/* Link button — only when BOND_MASTER is active and entities available */}
+        {isActive && linkable.length > 0 && (
           <div ref={pickerRef} style={{ position: 'relative' }}>
             <BannerBtn
               label="🔗 Link"

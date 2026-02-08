@@ -31,7 +31,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('doctrine');
   const [viewerTarget, setViewerTarget] = useState(null);
   const [activeEntity, setActiveEntity] = useState(null);
-  const [linkedEntity, setLinkedEntity] = useState(null);
+  const [linkedEntities, setLinkedEntities] = useState([]);
   const [loadedEntities, setLoadedEntities] = useState(() => {
     try { return JSON.parse(localStorage.getItem('bond_loaded') || '[]'); }
     catch { return []; }
@@ -46,8 +46,8 @@ export default function App() {
       if (state.entity) {
         setActiveEntity({ name: state.entity, type: state.class, display_name: state.display_name });
       }
-      if (state.linked) {
-        setLinkedEntity({ name: state.linked.entity, type: state.linked.class, display_name: state.linked.display_name });
+      if (state.links && state.links.length > 0) {
+        setLinkedEntities(state.links.map(l => ({ name: l.entity, type: l.class, display_name: l.display_name })));
       }
     }).catch(() => {});
   }, []);
@@ -81,6 +81,12 @@ export default function App() {
       if (data.entered) {
         handleLoad(entity);
         setActiveEntity({ name: entity.name, type: entity.type, display_name: entity.display_name });
+        // Hydrate links from server response
+        if (data.state?.links?.length > 0) {
+          setLinkedEntities(data.state.links.map(l => ({ name: l.entity, type: l.class, display_name: l.display_name })));
+        } else {
+          setLinkedEntities([]);
+        }
         setViewerTarget(entity.name);
         setActiveTab('viewer');
         try { await navigator.clipboard.writeText(`BOND:{Enter ${entity.name}}`); } catch {}
@@ -94,7 +100,7 @@ export default function App() {
     try {
       await fetch('/api/state/exit', { method: 'POST' });
       setActiveEntity(null);
-      setLinkedEntity(null);
+      setLinkedEntities([]);
       try { await navigator.clipboard.writeText('BOND:{Exit}'); } catch {}
     } catch (err) {
       console.error('Exit failed:', err);
@@ -109,20 +115,26 @@ export default function App() {
         body: JSON.stringify({ entity: entity.name }),
       });
       const data = await res.json();
-      if (data.linked) {
-        setLinkedEntity({ name: entity.name, type: entity.type, display_name: entity.display_name });
+      if (data.linked && data.state?.links) {
+        setLinkedEntities(data.state.links.map(l => ({ name: l.entity, type: l.class, display_name: l.display_name })));
       }
     } catch (err) {
       console.error('Link failed:', err);
     }
   }, []);
 
-  const handleUnlink = useCallback(async () => {
+  const handleUnlink = useCallback(async (entityName) => {
     try {
-      const res = await fetch('/api/state/unlink', { method: 'POST' });
+      const res = await fetch('/api/state/unlink', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ entity: entityName }),
+      });
       const data = await res.json();
-      if (data.unlinked) {
-        setLinkedEntity(null);
+      if (data.unlinked && data.state?.links) {
+        setLinkedEntities(data.state.links.map(l => ({ name: l.entity, type: l.class, display_name: l.display_name })));
+      } else if (data.unlinked) {
+        setLinkedEntities(prev => prev.filter(e => e.name !== entityName));
       }
     } catch (err) {
       console.error('Unlink failed:', err);
@@ -197,7 +209,7 @@ export default function App() {
         classCounts={classCounts}
       />
 
-      <EntityBar activeEntity={activeEntity} linkedEntity={linkedEntity} onExit={handleExit} onUnlink={handleUnlink} />
+      <EntityBar activeEntity={activeEntity} linkedEntities={linkedEntities} onExit={handleExit} onUnlink={handleUnlink} />
 
       <nav className="tab-bar">
         {TABS.map((tab) => (
@@ -221,7 +233,7 @@ export default function App() {
               entities={entities}
               allEntities={entities}
               activeEntity={activeEntity}
-              linkedEntity={linkedEntity}
+              linkedEntities={linkedEntities}
               onEnter={handleEnter}
               onView={handleView}
               onExit={handleExit}
