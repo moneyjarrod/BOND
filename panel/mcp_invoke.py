@@ -12,78 +12,50 @@ import numpy as np
 # Paths resolve from BOND_ROOT environment variable
 BOND_ROOT = os.environ.get('BOND_ROOT', os.path.join(os.path.dirname(__file__), '..'))
 QAIS_FIELD_PATH = os.environ.get('QAIS_FIELD_PATH', os.path.join(BOND_ROOT, 'data', 'qais_field.npz'))
-ISS_PATH = os.environ.get('ISS_PATH', os.path.join(BOND_ROOT, 'modules', 'iss'))
-QAIS_PATH = os.environ.get('QAIS_PATH', os.path.join(BOND_ROOT, 'modules', 'qais'))
+ISS_PATH = os.environ.get('ISS_PATH', os.path.join(BOND_ROOT, 'ISS'))
+QAIS_PATH = os.environ.get('QAIS_PATH', os.path.join(BOND_ROOT, 'QAIS'))
 
 # ─── QAIS Tools ────────────────────────────────────────────
 
+def _get_qais():
+    """Load QAISField from qais_core."""
+    sys.path.insert(0, QAIS_PATH)
+    from qais_core import QAISField
+    return QAISField(field_path=QAIS_FIELD_PATH)
+
 def qais_stats():
     """Full QAIS field stats."""
-    sys.path.insert(0, QAIS_PATH)
     try:
-        from qais_v4 import QAISField
-        q = QAISField()
-        q.load(QAIS_FIELD_PATH)
-        identities = set()
-        roles = set()
-        facts = set()
-        for key in q.stored:
-            parts = key.split('|', 2)
-            if len(parts) == 3:
-                identities.add(parts[0])
-                roles.add(parts[1])
-                facts.add(parts[2])
-        return {
-            "status": "active",
-            "total_bindings": q.count,
-            "total_identities": len(identities),
-            "total_roles": len(roles),
-            "facts_indexed": len(facts),
-            "roles_list": sorted(roles),
-        }
+        q = _get_qais()
+        result = q.stats()
+        result["status"] = "active"
+        return result
     except Exception as e:
         return {"error": str(e)}
 
 def qais_exists(input_str):
     """Check if identity exists in QAIS field."""
-    sys.path.insert(0, QAIS_PATH)
     try:
-        from qais_v4 import QAISField
-        q = QAISField()
-        q.load(QAIS_FIELD_PATH)
+        q = _get_qais()
         identity = input_str.strip()
-        exists = any(k.startswith(f"{identity}|") for k in q.stored)
+        result = q.exists(identity)
         bindings = [k for k in q.stored if k.startswith(f"{identity}|")]
-        return {
-            "identity": identity,
-            "exists": exists,
-            "binding_count": len(bindings),
-            "bindings": bindings[:20],  # Cap at 20
-        }
+        result["binding_count"] = len(bindings)
+        result["bindings"] = bindings[:20]
+        return result
     except Exception as e:
         return {"error": str(e)}
 
 def qais_resonate(input_str):
     """Resonate against QAIS field. Input: identity|role|candidate1,candidate2,..."""
-    sys.path.insert(0, QAIS_PATH)
     try:
-        from qais_v4 import QAISField
-        q = QAISField()
-        q.load(QAIS_FIELD_PATH)
-        
+        q = _get_qais()
         parts = input_str.split('|', 2)
         if len(parts) < 3:
             return {"error": "Format: identity|role|candidate1,candidate2,..."}
-        
         identity, role, candidates_str = parts
         candidates = [c.strip() for c in candidates_str.split(',')]
-        
-        results = []
-        for candidate in candidates:
-            score = q.resonate(identity.strip(), role.strip(), candidate)
-            results.append({"candidate": candidate, "score": float(score)})
-        
-        results.sort(key=lambda x: x["score"], reverse=True)
+        results = q.resonate(identity.strip(), role.strip(), candidates)
         return {"identity": identity, "role": role, "results": results}
     except Exception as e:
         return {"error": str(e)}
@@ -94,15 +66,16 @@ def iss_analyze(input_str):
     """Analyze text with ISS semantic forces."""
     sys.path.insert(0, ISS_PATH)
     try:
-        from iss_prototype import analyze_text
-        result = analyze_text(input_str.strip())
+        from iss_core import analyze
+        result = analyze(input_str.strip())
         return {
             "text": input_str.strip()[:100],
-            "G": round(float(result['G']), 4),
-            "P": round(float(result['P']), 4),
-            "E": round(float(result['E']), 4),
-            "r": round(float(result['r']), 4),
-            "gap": round(float(result['gap']), 4),
+            "G": result['G'],
+            "P": result['P'],
+            "E": result['E'],
+            "r": result['r'],
+            "gap": result['gap'],
+            "diagnosis": result.get('diagnosis', ''),
         }
     except Exception as e:
         return {"error": str(e)}
@@ -111,20 +84,21 @@ def iss_compare(input_str):
     """Compare multiple texts. Input: one text per line."""
     sys.path.insert(0, ISS_PATH)
     try:
-        from iss_prototype import analyze_text
+        from iss_core import analyze
         texts = [t.strip() for t in input_str.strip().split('\n') if t.strip()]
         if len(texts) < 2:
             return {"error": "Need 2+ texts (one per line)"}
         
         results = []
         for text in texts:
-            r = analyze_text(text)
+            r = analyze(text)
             results.append({
                 "text": text[:80],
-                "G": round(float(r['G']), 4),
-                "P": round(float(r['P']), 4),
-                "E": round(float(r['E']), 4),
-                "gap": round(float(r['gap']), 4),
+                "G": r['G'],
+                "P": r['P'],
+                "E": r['E'],
+                "gap": r['gap'],
+                "diagnosis": r.get('diagnosis', ''),
             })
         return {"comparisons": results}
     except Exception as e:
@@ -191,36 +165,26 @@ def limbic_scan(input_str):
 
 def qais_store(input_str):
     """Store identity|role|fact binding in QAIS field."""
-    sys.path.insert(0, QAIS_PATH)
     try:
-        from qais_v4 import QAISField
-        q = QAISField()
-        q.load(QAIS_FIELD_PATH)
+        q = _get_qais()
         parts = input_str.split('|', 2)
         if len(parts) < 3:
             return {"error": "Format: identity|role|fact"}
         identity, role, fact = parts[0].strip(), parts[1].strip(), parts[2].strip()
-        q.store(identity, role, fact)
-        q.save(QAIS_FIELD_PATH)
-        return {"stored": True, "identity": identity, "role": role, "fact": fact[:80]}
+        result = q.store(identity, role, fact)
+        return result
     except Exception as e:
         return {"error": str(e)}
 
 def qais_get(input_str):
     """Get fact for identity|role from QAIS field."""
-    sys.path.insert(0, QAIS_PATH)
     try:
-        from qais_v4 import QAISField
-        q = QAISField()
-        q.load(QAIS_FIELD_PATH)
+        q = _get_qais()
         parts = input_str.split('|', 1)
         if len(parts) < 2:
             return {"error": "Format: identity|role"}
         identity, role = parts[0].strip(), parts[1].strip()
-        prefix = f"{identity}|{role}|"
-        matches = [k for k in q.stored if k.startswith(prefix)]
-        facts = [k.split('|', 2)[2] if len(k.split('|', 2)) > 2 else k for k in matches]
-        return {"identity": identity, "role": role, "facts": facts, "count": len(facts)}
+        return q.get(identity, role)
     except Exception as e:
         return {"error": str(e)}
 
