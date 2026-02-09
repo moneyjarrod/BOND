@@ -27,6 +27,55 @@ const STATE_PATH = resolve(process.env.STATE_PATH
 const PORT = process.env.PORT || 3000;
 const MCP_URL = process.env.MCP_URL || 'http://localhost:3002';
 
+// ─── Class Tool Matrix (B69 Four-Class Architecture) ──────
+const CLASS_TOOLS = {
+  doctrine:    { filesystem: true, iss: true,  qais: false, heatmap: false, crystal: false },
+  project:     { filesystem: true, iss: true,  qais: true,  heatmap: true,  crystal: true },
+  perspective: { filesystem: true, iss: false, qais: true,  heatmap: true,  crystal: true },
+  library:     { filesystem: true, iss: false, qais: false, heatmap: false, crystal: false },
+};
+
+// ─── Tool Authorization Middleware (S90) ──────────────────
+// Maps MCP tool names to which capability gate they require
+const TOOL_CAPABILITY = {
+  iss_analyze: 'iss', iss_compare: 'iss', iss_limbic: 'iss', iss_status: 'iss',
+  qais_resonate: 'qais', qais_exists: 'qais', qais_store: 'qais',
+  qais_stats: 'qais', qais_get: 'qais', qais_passthrough: 'qais',
+  heatmap_touch: 'heatmap', heatmap_hot: 'heatmap',
+  heatmap_chunk: 'heatmap', heatmap_clear: 'heatmap',
+  crystal: 'crystal', bond_gate: 'crystal',
+};
+
+async function validateToolCall(toolName) {
+  // Read current entity state
+  try {
+    const raw = await readFile(join(STATE_PATH, 'active_entity.json'), 'utf-8');
+    const state = JSON.parse(raw);
+    if (!state.entity || !state.class) return { allowed: true };
+
+    const capability = TOOL_CAPABILITY[toolName];
+    if (!capability) return { allowed: true }; // unknown tool = permissive
+
+    const allowed = CLASS_TOOLS[state.class] || CLASS_TOOLS.library;
+    if (allowed[capability]) return { allowed: true };
+
+    return {
+      allowed: false,
+      error: {
+        blocked: true,
+        tool: toolName,
+        capability,
+        entity: state.entity,
+        entity_class: state.class,
+        reason: `Tool '${toolName}' requires '${capability}' capability, `
+          + `which is not permitted for ${state.class}-class entity '${state.entity}'.`,
+      }
+    };
+  } catch {
+    return { allowed: true }; // no state file = no boundaries
+  }
+}
+
 // ─── Doctrine Filesystem API ──────────────────────────────
 
 // List all entity folders
@@ -62,14 +111,7 @@ app.get('/api/doctrine', async (req, res) => {
 
       const type = entityConfig.class || 'doctrine';
 
-      // Class tool defaults (B69)
-      const CLASS_TOOLS = {
-        doctrine:    { filesystem: true, iss: true, qais: false, heatmap: false, crystal: false },
-        project:     { filesystem: true, iss: true, qais: true, heatmap: true, crystal: true },
-        perspective: { filesystem: true, iss: false, qais: true, heatmap: true, crystal: true },
-        library:     { filesystem: true, iss: false, qais: false, heatmap: false, crystal: false },
-      };
-
+      // Class tool defaults (B69) — uses module-level CLASS_TOOLS
       const defaults = CLASS_TOOLS[type] || CLASS_TOOLS.library;
       const tools = { ...defaults, ...(entityConfig.tools || {}) };
       // Enforce class boundaries — can only toggle what the class allows
@@ -142,13 +184,7 @@ app.put('/api/doctrine/:entity/tools', async (req, res) => {
       config = JSON.parse(await readFile(configPath, 'utf-8'));
     } catch { /* new config */ }
 
-    // Merge only allowed tools for this class
-    const CLASS_TOOLS = {
-      doctrine:    { filesystem: true, iss: true, qais: false, heatmap: false, crystal: false },
-      project:     { filesystem: true, iss: true, qais: true, heatmap: true, crystal: true },
-      perspective: { filesystem: true, iss: false, qais: true, heatmap: true, crystal: true },
-      library:     { filesystem: true, iss: false, qais: false, heatmap: false, crystal: false },
-    };
+    // Merge only allowed tools for this class — uses module-level CLASS_TOOLS
     const type = config.class || 'doctrine';
     const allowed = CLASS_TOOLS[type] || {};
     const incoming = req.body.tools || {};
@@ -331,6 +367,13 @@ app.post('/api/mcp/:system/invoke', async (req, res) => {
   const { tool, input } = req.body;
   if (!tool) return res.status(400).json({ error: 'tool required' });
 
+  // ─── Runtime capability enforcement (S90) ───
+  const auth = await validateToolCall(tool);
+  if (!auth.allowed) {
+    console.log(`⛔ Blocked: ${tool} (${auth.error.reason})`);
+    return res.status(403).json(auth.error);
+  }
+
   try {
     const { stdout, stderr } = await execFileAsync('python', [
       MCP_INVOKE_SCRIPT, system, tool, input || ''
@@ -371,7 +414,7 @@ app.get('/api/config', (req, res) => {
     state_path: STATE_PATH,
     mcp_url: MCP_URL,
     ws_port: 3001,
-    version: '1.2.0-s85'
+    version: '1.3.0-s90'
   });
 });
 
