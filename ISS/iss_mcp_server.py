@@ -18,6 +18,7 @@ import sys
 import numpy as np
 import os
 import hashlib
+from tool_auth import validate_tool_call
 
 # =============================================================================
 # ISS CORE
@@ -348,6 +349,12 @@ def handle_request(request):
     if method == "tools/call":
         tool_name = params.get("name")
         args = params.get("arguments", {})
+
+        # ─── Runtime capability enforcement (S90) ───
+        allowed, error = validate_tool_call(tool_name)
+        if not allowed:
+            return {"jsonrpc": "2.0", "id": req_id, "result": {
+                "content": [{"type": "text", "text": json.dumps(error, indent=2)}]}}
 
         try:
             if tool_name == "iss_analyze":
