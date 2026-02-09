@@ -10,6 +10,8 @@ const MODULE_TOOLS = {
   qais: [
     { id: 'resonate', label: 'Resonate', icon: '🔮', inputLabel: 'Identity|Role|Candidates (comma-sep)', needsInput: true },
     { id: 'exists', label: 'Exists?', icon: '❓', inputLabel: 'Identity to check', needsInput: true },
+    { id: 'store', label: 'Store', icon: '💾', inputLabel: 'Identity|Role|Fact', needsInput: true },
+    { id: 'get', label: 'Get', icon: '📥', inputLabel: 'Identity|Role', needsInput: true },
     { id: 'stats', label: 'Full Stats', icon: '📊', needsInput: false },
   ],
   iss: [

@@ -189,11 +189,48 @@ def limbic_scan(input_str):
 
 # ─── Dispatch ──────────────────────────────────────────────
 
+def qais_store(input_str):
+    """Store identity|role|fact binding in QAIS field."""
+    sys.path.insert(0, QAIS_PATH)
+    try:
+        from qais_v4 import QAISField
+        q = QAISField()
+        q.load(QAIS_FIELD_PATH)
+        parts = input_str.split('|', 2)
+        if len(parts) < 3:
+            return {"error": "Format: identity|role|fact"}
+        identity, role, fact = parts[0].strip(), parts[1].strip(), parts[2].strip()
+        q.store(identity, role, fact)
+        q.save(QAIS_FIELD_PATH)
+        return {"stored": True, "identity": identity, "role": role, "fact": fact[:80]}
+    except Exception as e:
+        return {"error": str(e)}
+
+def qais_get(input_str):
+    """Get fact for identity|role from QAIS field."""
+    sys.path.insert(0, QAIS_PATH)
+    try:
+        from qais_v4 import QAISField
+        q = QAISField()
+        q.load(QAIS_FIELD_PATH)
+        parts = input_str.split('|', 1)
+        if len(parts) < 2:
+            return {"error": "Format: identity|role"}
+        identity, role = parts[0].strip(), parts[1].strip()
+        prefix = f"{identity}|{role}|"
+        matches = [k for k in q.stored if k.startswith(prefix)]
+        facts = [k.split('|', 2)[2] if len(k.split('|', 2)) > 2 else k for k in matches]
+        return {"identity": identity, "role": role, "facts": facts, "count": len(facts)}
+    except Exception as e:
+        return {"error": str(e)}
+
 TOOLS = {
     "qais": {
         "stats": lambda _: qais_stats(),
         "exists": qais_exists,
         "resonate": qais_resonate,
+        "store": qais_store,
+        "get": qais_get,
     },
     "iss": {
         "analyze": iss_analyze,
