@@ -43,15 +43,15 @@ const BASE_PERSPECTIVES = Array.from({ length: 10 }, (_, i) => {
 export default function EntityCards({
   entities,
   filter,          // 'doctrine', 'project', 'perspective', or 'library'
-  loadedEntities,
+  linkedEntities,
   activeEntity,
   onView,
-  onLoad,
   onEnter,
   onToolToggle,
   onRename,
   onExit,
 }) {
+  const linkedNames = new Set((linkedEntities || []).map(e => typeof e === 'string' ? e : e.name));
   const cards = useMemo(() => {
     if (filter === 'perspective') {
       const detected = entities.filter(e => e.type === 'perspective');
@@ -94,10 +94,9 @@ export default function EntityCards({
         <EntityCard
           key={entity.name}
           entity={entity}
-          isLoaded={loadedEntities.includes(entity.name)}
+          isLinked={linkedNames.has(entity.name)}
           isActive={activeEntity?.name === entity.name}
           onView={onView}
-          onLoad={onLoad}
           onEnter={onEnter}
           onToolToggle={onToolToggle}
           onRename={onRename}
@@ -108,7 +107,7 @@ export default function EntityCards({
   );
 }
 
-function EntityCard({ entity, isLoaded, isActive, onView, onLoad, onEnter, onExit, onToolToggle, onRename }) {
+function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToolToggle, onRename }) {
   const isEmpty = entity.isBase && entity.seed_count === 0 && entity.files.length === 0;
   const meta = CLASS_META[entity.type] || CLASS_META.library;
   const tools = entity.tools || {};
@@ -196,7 +195,7 @@ function EntityCard({ entity, isLoaded, isActive, onView, onLoad, onEnter, onExi
           )}
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          {isLoaded && <span className="badge badge-active">LOADED</span>}
+          {isLinked && <span className="badge badge-linked" style={{ background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)' }}>LINKED</span>}
           {isActive && <span className="badge badge-active">ACTIVE</span>}
           {entity.core && <span className="badge badge-core">🔒 CORE</span>}
           <span className={`badge ${meta.badge}`}>{meta.label}</span>
@@ -254,7 +253,6 @@ function EntityCard({ entity, isLoaded, isActive, onView, onLoad, onEnter, onExi
       {/* Action buttons */}
       <div style={{ display: 'flex', gap: 8 }}>
         <ActionBtn label="View" disabled={isEmpty} onClick={() => onView(entity)} />
-        <ActionBtn label="Load" disabled={isEmpty || isLoaded} onClick={() => onLoad(entity)} />
         {isActive ? (
           <ActionBtn label="Exit" disabled={false} primary={true} onClick={() => onExit && onExit()} />
         ) : (

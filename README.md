@@ -84,11 +84,22 @@ See [`docs/ENTITIES.md`](docs/ENTITIES.md) for full architecture.
 
 ---
 
+## Doctrine Search (SLA)
+
+The panel includes a built-in search engine. When you enter an entity, its doctrine files and linked entities are automatically indexed client-side for instant search — zero API calls, zero tokens.
+
+Results show confidence badges (🟢 HIGH, 🟡 MED, 🔴 LOW) based on how well the system can discriminate a winner. Any result can be escalated to Claude via clipboard with a single click (~200 tokens).
+
+See [`docs/SEARCH.md`](docs/SEARCH.md) for details, or [`SLA/`](SLA/) for the full retrieval doctrine and reference implementations.
+
+---
+
 ## Project Structure
 
 ```
 BOND/
 ├── panel/           ← React dashboard + Express sidecar
+├── SLA/             ← Retrieval doctrine + reference implementations
 ├── doctrine/        ← Your entity folders
 ├── state/           ← Active entity pointer
 ├── skills/          ← Claude skill file
@@ -152,7 +163,7 @@ The panel reads/writes doctrine files and state through Express. Commands are re
 
 ## Origin
 
-Built across 85+ sessions developing a game engine. We kept losing context. Memory helped but wasn't enough. Files helped but needed structure.
+Built across 90+ sessions developing a game engine. We kept losing context. Memory helped but wasn't enough. Files helped but needed structure.
 
 The insight: **The relationship matters.** Claude isn't just a tool — it's a collaborator. Collaborators need shared truth, clear communication, and mutual agreement.
 

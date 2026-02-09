@@ -13,6 +13,7 @@ export default function EntityBar({ activeEntity, linkedEntities = [], onExit, o
 
   const meta = CLASS_META[activeEntity.type] || CLASS_META.doctrine;
   const label = activeEntity.display_name || activeEntity.name;
+  const canUnlink = activeEntity.name === 'BOND_MASTER';
 
   return (
     <div style={{ borderBottom: '1px solid var(--border)' }}>
@@ -99,32 +100,34 @@ export default function EntityBar({ activeEntity, linkedEntities = [], onExit, o
                 {linkedMeta.label} · linked
               </span>
             </div>
-            <button
-              onClick={() => onUnlink(linked.name)}
-              style={{
-                padding: '2px 10px',
-                fontSize: '0.68rem',
-                fontFamily: 'var(--font-mono)',
-                background: 'transparent',
-                color: 'var(--text-muted)',
-                border: '1px solid var(--border)',
-                borderRadius: 'var(--radius-sm)',
-                cursor: 'pointer',
-                transition: 'all 0.15s ease',
-              }}
-              onMouseEnter={e => {
-                e.target.style.background = 'rgba(233,69,96,0.1)';
-                e.target.style.color = 'var(--accent)';
-                e.target.style.borderColor = 'rgba(233,69,96,0.4)';
-              }}
-              onMouseLeave={e => {
-                e.target.style.background = 'transparent';
-                e.target.style.color = 'var(--text-muted)';
-                e.target.style.borderColor = 'var(--border)';
-              }}
-            >
-              Unlink
-            </button>
+            {canUnlink && (
+              <button
+                onClick={() => onUnlink(linked.name)}
+                style={{
+                  padding: '2px 10px',
+                  fontSize: '0.68rem',
+                  fontFamily: 'var(--font-mono)',
+                  background: 'transparent',
+                  color: 'var(--text-muted)',
+                  border: '1px solid var(--border)',
+                  borderRadius: 'var(--radius-sm)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s ease',
+                }}
+                onMouseEnter={e => {
+                  e.target.style.background = 'rgba(233,69,96,0.1)';
+                  e.target.style.color = 'var(--accent)';
+                  e.target.style.borderColor = 'rgba(233,69,96,0.4)';
+                }}
+                onMouseLeave={e => {
+                  e.target.style.background = 'transparent';
+                  e.target.style.color = 'var(--text-muted)';
+                  e.target.style.borderColor = 'var(--border)';
+                }}
+              >
+                Unlink
+              </button>
+            )}
           </div>
         );
       })}

@@ -4,6 +4,7 @@
 
 import { useState } from 'react';
 import { useEntityFiles, useFileContent } from '../hooks/useDoctrine';
+import SearchPanel from './SearchPanel';
 
 // Class-appropriate file icons (B69)
 const CLASS_FILE_ICON = {
@@ -18,12 +19,14 @@ const CORE_ICON = '🔒';
 export default function DoctrineViewer({
   viewerTarget,
   activeEntity,
-  loadedEntities,
-  onUnload,
+  linkedEntities,
   entityType,
   entityCore,
+  search,
 }) {
   const [selectedFile, setSelectedFile] = useState(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const linkedNames = new Set((linkedEntities || []).map(e => typeof e === 'string' ? e : e.name));
   const { files, loading: filesLoading } = useEntityFiles(viewerTarget);
   const { content, meta, loading: contentLoading } = useFileContent(viewerTarget, selectedFile);
 
@@ -37,7 +40,7 @@ export default function DoctrineViewer({
     );
   }
 
-  const isLoaded = loadedEntities.includes(viewerTarget);
+  const isLinked = linkedNames.has(viewerTarget);
   const isActive = activeEntity?.name === viewerTarget;
 
   return (
@@ -55,26 +58,40 @@ export default function DoctrineViewer({
           <span style={{ fontSize: '1.1rem' }}>📖</span>
           <span style={{ fontWeight: 600 }}>{viewerTarget}</span>
           {isActive && <span className="badge badge-active">ACTIVE</span>}
-          {isLoaded && !isActive && <span className="badge badge-active">LOADED</span>}
+          {isLinked && !isActive && <span className="badge badge-linked" style={{ background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)' }}>LINKED</span>}
         </div>
-        {(isLoaded || isActive) && (
-          <button
-            onClick={() => onUnload(viewerTarget)}
-            style={{
-              padding: '4px 12px',
-              fontSize: '0.75rem',
-              fontFamily: 'var(--font-mono)',
-              background: 'var(--bg-elevated)',
-              color: 'var(--status-suspend)',
-              border: '1px solid rgba(233,69,96,0.3)',
-              borderRadius: 'var(--radius-sm)',
-              cursor: 'pointer',
-            }}
-          >
-            Unload
-          </button>
-        )}
+        <div style={{ display: 'flex', gap: 6 }}>
+          {search && (
+            <button
+              onClick={() => setShowSearch(s => !s)}
+              style={{
+                padding: '4px 12px',
+                fontSize: '0.75rem',
+                fontFamily: 'var(--font-mono)',
+                background: showSearch ? 'var(--accent)' : 'var(--bg-elevated)',
+                color: showSearch ? '#fff' : 'var(--text-secondary)',
+                border: `1px solid ${showSearch ? 'var(--accent)' : 'var(--border)'}`,
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+              }}
+            >
+              🔍 Search
+            </button>
+          )}
+
+        </div>
       </div>
+
+      {/* Search panel (collapsible) */}
+      {showSearch && search && (
+        <div style={{
+          padding: '8px 0 12px',
+          borderBottom: '1px solid var(--border)',
+          marginBottom: 12,
+        }}>
+          <SearchPanel {...search} />
+        </div>
+      )}
 
       {/* Main content area */}
       <div style={{ display: 'flex', flex: 1, gap: 12, minHeight: 0 }}>

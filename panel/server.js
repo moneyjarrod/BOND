@@ -251,7 +251,7 @@ app.post('/api/doctrine', async (req, res) => {
     const starterContent = STARTER_CONTENT[entityClass](safeName);
     await writeFile(join(entityPath, starterName), starterContent);
 
-    console.log(`✨ Created ${entityClass}: ${safeName}`);
+    console.log(`\u2728 Created ${entityClass}: ${safeName}`);
     res.json({ created: true, name: safeName, class: entityClass, files: ['entity.json', starterName] });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -371,7 +371,7 @@ app.get('/api/config', (req, res) => {
     state_path: STATE_PATH,
     mcp_url: MCP_URL,
     ws_port: 3001,
-    version: '1.3.0-s86'
+    version: '1.2.0-s85'
   });
 });
 
@@ -380,14 +380,13 @@ const STATE_FILE = join(STATE_PATH, 'active_entity.json');
 const NULL_STATE = { entity: null, class: null, path: null, entered: null };
 const MASTER_ENTITY = 'BOND_MASTER';
 
-// Hub-and-spoke link hydration: BOND_MASTER is the only entity that links.
-// Links array lives in BOND_MASTER/entity.json — single source of truth.
-async function hydrateLinks() {
+// Link hydration: reads links from any entity's entity.json
+async function hydrateLinks(entityName) {
   try {
-    const masterConfig = JSON.parse(
-      await readFile(join(DOCTRINE_PATH, MASTER_ENTITY, 'entity.json'), 'utf-8')
+    const config = JSON.parse(
+      await readFile(join(DOCTRINE_PATH, entityName, 'entity.json'), 'utf-8')
     );
-    const linkNames = masterConfig.links || [];
+    const linkNames = config.links || [];
     const links = [];
     for (const name of linkNames) {
       try {
@@ -416,12 +415,8 @@ app.get('/api/state', async (req, res) => {
   try {
     const raw = await readFile(STATE_FILE, 'utf-8');
     const state = JSON.parse(raw);
-    // Hydrate links from hub when BOND_MASTER is active
-    if (state.entity === MASTER_ENTITY) {
-      state.links = await hydrateLinks();
-    } else {
-      state.links = [];
-    }
+    // Hydrate links from active entity
+    state.links = state.entity ? await hydrateLinks(state.entity) : [];
     res.json(state);
   } catch {
     res.json({ ...NULL_STATE, links: [] });
@@ -458,12 +453,8 @@ app.post('/api/state/enter', async (req, res) => {
     };
     await writeFile(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
 
-    // Hydrate links if entering BOND_MASTER
-    if (entity === MASTER_ENTITY) {
-      state.links = await hydrateLinks();
-    } else {
-      state.links = [];
-    }
+    // Hydrate links from entered entity
+    state.links = await hydrateLinks(entity);
 
     // Bridge: panel clipboard handles {Enter} command (App.jsx)
     console.log(`🔓 Entered: ${entity} (${state.class})`);
@@ -505,7 +496,7 @@ app.post('/api/state/link', async (req, res) => {
       return res.status(400).json({ error: 'No active entity' });
     }
 
-    // Only BOND_MASTER can link
+    // Only BOND_MASTER can dynamically link (hub-and-spoke)
     if (state.entity !== MASTER_ENTITY) {
       return res.status(403).json({ error: 'Only BOND_MASTER can link entities' });
     }
@@ -527,7 +518,7 @@ app.post('/api/state/link', async (req, res) => {
       return res.status(404).json({ error: `Entity '${linkTarget}' not found` });
     }
 
-    // Persist to BOND_MASTER entity.json (source of truth)
+    // Persist to BOND_MASTER entity.json (hub, source of truth)
     const masterConfigPath = join(DOCTRINE_PATH, MASTER_ENTITY, 'entity.json');
     const masterConfig = JSON.parse(await readFile(masterConfigPath, 'utf-8'));
     const links = masterConfig.links || [];
@@ -538,7 +529,7 @@ app.post('/api/state/link', async (req, res) => {
     }
 
     // Hydrate full link objects for response
-    state.links = await hydrateLinks();
+    state.links = await hydrateLinks(MASTER_ENTITY);
 
     console.log(`🔗 Linked: ${MASTER_ENTITY} → ${linkTarget}`);
     res.json({ linked: true, state });
@@ -559,18 +550,19 @@ app.post('/api/state/unlink', async (req, res) => {
       return res.status(400).json({ error: 'No active entity' });
     }
 
+    // Only BOND_MASTER can dynamically unlink (hub-and-spoke)
     if (state.entity !== MASTER_ENTITY) {
       return res.status(403).json({ error: 'Only BOND_MASTER can unlink entities' });
     }
 
-    // Remove from BOND_MASTER entity.json (source of truth)
+    // Remove from BOND_MASTER entity.json (hub, source of truth)
     const masterConfigPath = join(DOCTRINE_PATH, MASTER_ENTITY, 'entity.json');
     const masterConfig = JSON.parse(await readFile(masterConfigPath, 'utf-8'));
     masterConfig.links = (masterConfig.links || []).filter(n => n !== unlinkTarget);
     await writeFile(masterConfigPath, JSON.stringify(masterConfig, null, 2) + '\n');
 
     // Hydrate remaining links
-    state.links = await hydrateLinks();
+    state.links = await hydrateLinks(MASTER_ENTITY);
 
     console.log(`🔓 Unlinked: ${unlinkTarget}`);
     res.json({ unlinked: true, previous: unlinkTarget, state });

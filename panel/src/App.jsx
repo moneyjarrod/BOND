@@ -14,6 +14,7 @@ import DoctrineBanner from './components/DoctrineBanner';
 import { useEntities } from './hooks/useDoctrine';
 // useBridge removed S85 (Dead Code Audit) — clipboard is native in App.jsx
 import { useModules } from './hooks/useModules';
+import { useSearch } from './hooks/useSearch';
 import './styles/bond.css';
 
 const TABS = [
@@ -32,13 +33,11 @@ export default function App() {
   const [viewerTarget, setViewerTarget] = useState(null);
   const [activeEntity, setActiveEntity] = useState(null);
   const [linkedEntities, setLinkedEntities] = useState([]);
-  const [loadedEntities, setLoadedEntities] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('bond_loaded') || '[]'); }
-    catch { return []; }
-  });
+  // LOADED state removed S90 — replaced by ACTIVE + LINKED badges
 
   const { entities, loading, error, refresh } = useEntities();
   const { modules } = useModules();
+  const search = useSearch(activeEntity?.name, linkedEntities);
 
   // Load active entity state from server on mount
   useEffect(() => {
@@ -52,9 +51,7 @@ export default function App() {
     }).catch(() => {});
   }, []);
 
-  useEffect(() => {
-    localStorage.setItem('bond_loaded', JSON.stringify(loadedEntities));
-  }, [loadedEntities]);
+
 
   // ─── Entity actions ─────────────────────────────────────
 
@@ -63,12 +60,6 @@ export default function App() {
     setActiveTab('viewer');
   }, []);
 
-  const handleLoad = useCallback((entity) => {
-    setLoadedEntities(prev => {
-      if (prev.includes(entity.name)) return prev;
-      return [...prev, entity.name];
-    });
-  }, []);
 
   const handleEnter = useCallback(async (entity) => {
     try {
@@ -79,7 +70,6 @@ export default function App() {
       });
       const data = await res.json();
       if (data.entered) {
-        handleLoad(entity);
         setActiveEntity({ name: entity.name, type: entity.type, display_name: entity.display_name });
         // Hydrate links from server response
         if (data.state?.links?.length > 0) {
@@ -94,7 +84,7 @@ export default function App() {
     } catch (err) {
       console.error('Enter failed:', err);
     }
-  }, [handleLoad]);
+  }, []);
 
   const handleExit = useCallback(async () => {
     try {
@@ -141,12 +131,7 @@ export default function App() {
     }
   }, []);
 
-  const handleUnload = useCallback((entityName) => {
-    setLoadedEntities(prev => prev.filter(n => n !== entityName));
-    if (activeEntity?.name === entityName) {
-      setActiveEntity(null);
-    }
-  }, [activeEntity]);
+
 
   // Rename entity display name
   const handleRename = useCallback(async (entityName, displayName) => {
@@ -245,10 +230,9 @@ export default function App() {
               ? entities.filter(e => e.name !== 'BOND_MASTER')
               : entities}
             filter={currentTab.filter}
-            loadedEntities={loadedEntities}
+            linkedEntities={linkedEntities}
             activeEntity={activeEntity}
             onView={handleView}
-            onLoad={handleLoad}
             onEnter={handleEnter}
             onToolToggle={handleToolToggle}
             onRename={handleRename}
@@ -271,10 +255,10 @@ export default function App() {
           <DoctrineViewer
             viewerTarget={viewerTarget}
             activeEntity={activeEntity}
-            loadedEntities={loadedEntities}
-            onUnload={handleUnload}
+            linkedEntities={linkedEntities}
             entityType={entities.find(e => e.name === viewerTarget)?.type}
             entityCore={entities.find(e => e.name === viewerTarget)?.core}
+            search={search}
           />
         )}
       </main>
