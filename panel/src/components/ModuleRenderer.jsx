@@ -240,6 +240,15 @@ export default function ModuleRenderer({ module, onClose }) {
                 >
                   {toolLoading ? '⏳' : '▶'}
                 </button>
+                {toolInput && (
+                  <button
+                    onClick={() => { setToolInput(''); setToolResult(null); }}
+                    className="module-tool-btn"
+                    title="Clear input"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -253,13 +262,34 @@ export default function ModuleRenderer({ module, onClose }) {
 
           {/* Tool Result */}
           {toolResult && !toolLoading && (
-            <div className="module-tool-result">
+            <div className="module-tool-result" style={{ position: 'relative' }}>
               {toolResult.error ? (
                 <span style={{ color: 'var(--red, #e74c3c)' }}>Error: {toolResult.error}</span>
               ) : (
-                <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
-                  {JSON.stringify(toolResult.data, null, 2)}
-                </pre>
+                <>
+                  <button
+                    onClick={() => {
+                      const text = JSON.stringify(toolResult.data, null, 2);
+                      navigator.clipboard.writeText(text).then(() => {
+                        const btn = document.getElementById(`copy-btn-${module.id}`);
+                        if (btn) { btn.textContent = '✓'; setTimeout(() => btn.textContent = '📋', 1500); }
+                      });
+                    }}
+                    id={`copy-btn-${module.id}`}
+                    title="Copy to clipboard"
+                    style={{
+                      position: 'absolute', top: 6, right: 6,
+                      background: 'var(--bg-elevated)', border: '1px solid var(--border)',
+                      color: 'var(--text-muted)', padding: '2px 6px', borderRadius: 'var(--radius-sm, 4px)',
+                      fontSize: '0.7rem', cursor: 'pointer', transition: 'all 0.15s',
+                    }}
+                  >
+                    📋
+                  </button>
+                  <pre style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word', paddingRight: 30 }}>
+                    {JSON.stringify(toolResult.data, null, 2)}
+                  </pre>
+                </>
               )}
             </div>
           )}
