@@ -33,13 +33,14 @@ export default function App() {
   const [viewerTarget, setViewerTarget] = useState(null);
   const [activeEntity, setActiveEntity] = useState(null);
   const [linkedEntities, setLinkedEntities] = useState([]);
+  const [bondConfig, setBondConfig] = useState({ save_confirmation: true });
   // LOADED state removed S90 — replaced by ACTIVE + LINKED badges
 
   const { entities, loading, error, refresh } = useEntities();
   const { modules } = useModules();
   const search = useSearch(activeEntity?.name, linkedEntities);
 
-  // Load active entity state from server on mount
+  // Load active entity state + config from server on mount
   useEffect(() => {
     fetch('/api/state').then(r => r.json()).then(state => {
       if (state.entity) {
@@ -48,6 +49,9 @@ export default function App() {
       if (state.links && state.links.length > 0) {
         setLinkedEntities(state.links.map(l => ({ name: l.entity, type: l.class, display_name: l.display_name })));
       }
+    }).catch(() => {});
+    fetch('/api/config/bond').then(r => r.json()).then(cfg => {
+      setBondConfig(cfg);
     }).catch(() => {});
   }, []);
 
@@ -165,6 +169,21 @@ export default function App() {
     }
   }, [refresh]);
 
+  // Save confirmation toggle
+  const handleSaveConfirmToggle = useCallback(async () => {
+    const newVal = !bondConfig.save_confirmation;
+    setBondConfig(prev => ({ ...prev, save_confirmation: newVal }));
+    try {
+      await fetch('/api/config/bond', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ save_confirmation: newVal }),
+      });
+    } catch (err) {
+      console.error('Config toggle failed:', err);
+    }
+  }, [bondConfig]);
+
   // Count entities by class for header
   const classCounts = {
     doctrine: entities.filter(e => e.type === 'doctrine').length,
@@ -192,6 +211,8 @@ export default function App() {
         activeEntity={activeEntity}
         modules={modules}
         classCounts={classCounts}
+        saveConfirmation={bondConfig.save_confirmation}
+        onSaveConfirmToggle={handleSaveConfirmToggle}
       />
 
       <EntityBar activeEntity={activeEntity} linkedEntities={linkedEntities} onExit={handleExit} onUnlink={handleUnlink} />

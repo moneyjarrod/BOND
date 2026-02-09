@@ -418,6 +418,33 @@ app.get('/api/config', (req, res) => {
   });
 });
 
+// ─── Config API (S90) ─────────────────────────────────
+const CONFIG_FILE = join(STATE_PATH, 'config.json');
+const DEFAULT_CONFIG = { save_confirmation: true };
+
+async function readConfig() {
+  try {
+    return JSON.parse(await readFile(CONFIG_FILE, 'utf-8'));
+  } catch {
+    return { ...DEFAULT_CONFIG };
+  }
+}
+
+app.get('/api/config/bond', async (req, res) => {
+  res.json(await readConfig());
+});
+
+app.put('/api/config/bond', async (req, res) => {
+  try {
+    const current = await readConfig();
+    const updated = { ...current, ...req.body };
+    await writeFile(CONFIG_FILE, JSON.stringify(updated, null, 2) + '\n');
+    res.json({ saved: true, config: updated });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ─── Entity State API (Enter-Mode) ────────────────────────
 const STATE_FILE = join(STATE_PATH, 'active_entity.json');
 const NULL_STATE = { entity: null, class: null, path: null, entered: null };

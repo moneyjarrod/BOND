@@ -11,6 +11,8 @@ export default function Header({
   activeEntity = null,
   modules = [],
   classCounts = {},
+  saveConfirmation = true,
+  onSaveConfirmToggle,
 }) {
   const activeCount = modules.filter(m => m.status === 'active').length;
   const qais = modules.find(m => m.id === 'qais');
@@ -51,6 +53,18 @@ export default function Header({
         <StatusItem label="ISS" value={String(issLabel)} className={iss?.status === 'active' ? 'active' : ''} />
         <Sep />
         <StatusItem label="📋" value="clip" className="active" />
+        <Sep />
+        <span
+          className="status-item"
+          onClick={onSaveConfirmToggle}
+          title={saveConfirmation ? 'Save confirmation: ON — click to toggle' : 'Save confirmation: OFF — click to toggle'}
+          style={{ cursor: 'pointer', userSelect: 'none' }}
+        >
+          <span className="status-label">💾</span>
+          <span className={`status-value ${saveConfirmation ? 'active' : ''}`}
+            style={{ opacity: saveConfirmation ? 1 : 0.4 }}
+          >{saveConfirmation ? '✓' : '—'}</span>
+        </span>
       </div>
     </header>
   );
