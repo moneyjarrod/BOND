@@ -11,7 +11,8 @@ export default defineConfig({
       '/api/mcp': 'http://localhost:3000',
       '/api/modules': 'http://localhost:3000',
       '/api/state': 'http://localhost:3000',
-      '/api/bindings': 'http://localhost:3000'
+      '/api/bindings': 'http://localhost:3000',
+      '/api/handoff': 'http://localhost:3000'
     }
   }
 });

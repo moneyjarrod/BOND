@@ -716,3 +716,166 @@ body {
   border: 1px solid rgba(231, 76, 60, 0.25);
   color: var(--red, #e74c3c);
 }
+
+/* ─── Handoff Generator (S94) ─────────────────────────── */
+
+.handoff-modal {
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px 24px;
+  width: 640px;
+  max-width: 95vw;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+.handoff-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.handoff-title {
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--accent-amber);
+  letter-spacing: 0.5px;
+}
+
+.handoff-loading {
+  padding: 40px;
+  text-align: center;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.handoff-error {
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  background: rgba(233, 69, 96, 0.1);
+  border: 1px solid rgba(233, 69, 96, 0.3);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--accent);
+}
+
+.handoff-success {
+  padding: 8px 12px;
+  margin-bottom: 10px;
+  background: rgba(63, 185, 80, 0.1);
+  border: 1px solid rgba(63, 185, 80, 0.3);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--status-active);
+}
+
+.handoff-bridge-bar {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.handoff-bridge-btn {
+  flex: 1;
+  padding: 7px 12px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.handoff-bridge-btn:hover {
+  border-color: var(--teal);
+  color: var(--text-primary);
+  background: var(--bg-hover);
+}
+
+.handoff-bridge-btn.sent {
+  border-color: var(--status-active);
+  color: var(--status-active);
+}
+
+.handoff-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.handoff-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.handoff-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  letter-spacing: 0.5px;
+}
+
+.handoff-section-source {
+  font-weight: 400;
+  font-size: 0.65rem;
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.handoff-textarea {
+  width: 100%;
+  padding: 8px 10px;
+  background: var(--bg-deep);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  resize: vertical;
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.handoff-textarea:focus {
+  border-color: var(--border-focus);
+}
+
+.handoff-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+.handoff-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.cmd-btn-handoff {
+  border-color: var(--accent-amber) !important;
+  color: var(--accent-amber) !important;
+}
+
+.cmd-btn-handoff:hover {
+  background: rgba(209, 154, 102, 0.12) !important;
+  color: var(--text-primary) !important;
+}

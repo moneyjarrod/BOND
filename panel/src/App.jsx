@@ -12,6 +12,7 @@ import CreateEntity from './components/CreateEntity';
 import EntityBar from './components/EntityBar';
 import DoctrineBanner from './components/DoctrineBanner';
 import ProjectMasterBanner from './components/ProjectMasterBanner';
+import HandoffGenerator from './components/HandoffGenerator';
 import { useEntities } from './hooks/useDoctrine';
 // useBridge removed S85 (Dead Code Audit) — clipboard is native in App.jsx
 import { useModules } from './hooks/useModules';
@@ -35,6 +36,7 @@ export default function App() {
   const [activeEntity, setActiveEntity] = useState(null);
   const [linkedEntities, setLinkedEntities] = useState([]);
   const [bondConfig, setBondConfig] = useState({ save_confirmation: true });
+  // LOADED state removed S90 — replaced by ACTIVE + LINKED badges
 
   const { entities, loading, error, refresh } = useEntities();
   const { modules } = useModules();
@@ -55,12 +57,15 @@ export default function App() {
     }).catch(() => {});
   }, []);
 
+
+
   // ─── Entity actions ─────────────────────────────────────
 
   const handleView = useCallback((entity) => {
     setViewerTarget(entity.name);
     setActiveTab('viewer');
   }, []);
+
 
   const handleEnter = useCallback(async (entity) => {
     try {
@@ -72,6 +77,7 @@ export default function App() {
       const data = await res.json();
       if (data.entered) {
         setActiveEntity({ name: entity.name, type: entity.type, display_name: entity.display_name });
+        // Hydrate links from server response
         if (data.state?.links?.length > 0) {
           setLinkedEntities(data.state.links.map(l => ({ name: l.entity, type: l.class, display_name: l.display_name })));
         } else {
@@ -131,6 +137,9 @@ export default function App() {
     }
   }, []);
 
+
+
+  // Rename entity display name
   const handleRename = useCallback(async (entityName, displayName) => {
     try {
       await fetch(`/api/doctrine/${entityName}/name`, {
@@ -138,6 +147,7 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ display_name: displayName }),
       });
+      // Update activeEntity if it's the one being renamed
       if (activeEntity?.name === entityName) {
         setActiveEntity(prev => ({ ...prev, display_name: displayName }));
       }
@@ -147,6 +157,7 @@ export default function App() {
     }
   }, [refresh, activeEntity]);
 
+  // B69: Tool toggle — persists to entity.json via sidecar
   const handleToolToggle = useCallback(async (entityName, toolId, value) => {
     try {
       await fetch(`/api/doctrine/${entityName}/tools`, {
@@ -154,12 +165,13 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tools: { [toolId]: value } }),
       });
-      refresh();
+      refresh(); // Re-fetch entities to get updated tool state
     } catch (err) {
       console.error('Tool toggle failed:', err);
     }
   }, [refresh]);
 
+  // Save confirmation toggle
   const handleSaveConfirmToggle = useCallback(async () => {
     const newVal = !bondConfig.save_confirmation;
     setBondConfig(prev => ({ ...prev, save_confirmation: newVal }));
@@ -174,6 +186,7 @@ export default function App() {
     }
   }, [bondConfig]);
 
+  // Count entities by class for header
   const classCounts = {
     doctrine: entities.filter(e => e.type === 'doctrine').length,
     project: entities.filter(e => e.type === 'project').length,
@@ -181,11 +194,16 @@ export default function App() {
     library: entities.filter(e => e.type === 'library').length,
   };
 
-  const [showCreate, setShowCreate] = useState(null);
+  // Handoff generator modal
+  const [showHandoff, setShowHandoff] = useState(false);
+
+  // Create entity modal
+  const [showCreate, setShowCreate] = useState(null); // null or class string
 
   const handleEntityCreated = useCallback((data) => {
     setShowCreate(null);
     refresh();
+    // Auto-navigate to the new entity in viewer
     setViewerTarget(data.name);
     setActiveTab('viewer');
   }, [refresh]);
@@ -283,7 +301,7 @@ export default function App() {
         )}
       </main>
 
-      <CommandBar />
+      <CommandBar onGenerateHandoff={() => setShowHandoff(true)} />
 
       {showCreate && (
         <CreateEntity
@@ -291,6 +309,10 @@ export default function App() {
           onCreated={handleEntityCreated}
           onCancel={() => setShowCreate(null)}
         />
+      )}
+
+      {showHandoff && (
+        <HandoffGenerator onClose={() => setShowHandoff(false)} />
       )}
     </div>
   );

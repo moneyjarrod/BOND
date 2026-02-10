@@ -14,7 +14,7 @@ const COMMANDS = [
 
 const BRIDGE_PREFIX = 'BOND:';
 
-export default function CommandBar() {
+export default function CommandBar({ onGenerateHandoff }) {
   const [sentCmd, setSentCmd] = useState(null);
 
   const handleClick = useCallback(async (cmd) => {
@@ -63,6 +63,15 @@ export default function CommandBar() {
           <span>{cmd.label}</span>
         </button>
       ))}
+      <span style={{ width: 1, height: 20, background: 'var(--border)', flexShrink: 0 }} />
+      <button
+        className="cmd-btn cmd-btn-handoff"
+        onClick={onGenerateHandoff}
+        title="Generate session handoff document"
+      >
+        <span className="cmd-icon">📋</span>
+        <span>Handoff</span>
+      </button>
     </div>
   );
 }
