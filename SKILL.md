@@ -2,7 +2,7 @@
 name: bond
 description: >-
   BOND protocol. Triggers: Sync, Save, Crystal, Chunk, Tick, Enter, Exit,
-  Full Restore, Warm Restore, Drift, counter, emoji, bonfire, drift,
+  Full Restore, Warm Restore, Handoff, Drift, counter, emoji, bonfire, drift,
   session, entity, doctrine, perspective, project class, library class,
   save protocol, sync limit, compaction, context degradation.
 ---
@@ -13,7 +13,7 @@ description: >-
 Echo user's tag exactly. Do NOT compute emoji.
 First line of every response. No exceptions.
 Resets: {Sync}, {Full Restore}, new conversation.
-No reset: {Save}, {Chunk}, {Warm Restore}, bonfire, task completion, compaction.
+No reset: {Save}, {Chunk}, {Warm Restore}, {Handoff}, bonfire, task completion, compaction.
 Lost count: recommend {Sync}.
 
 ## SYNC
@@ -24,9 +24,14 @@ Lost count: recommend {Sync}.
   Layer 2 (contextual): SLA query against archive (excluding Layer 1). Entity + user message as signal.
   Output: Confidence badges — 🔺 GREEN/YELLOW/RED triangle + per-section 🟢/🟡/🔴/⚪ badges.
   No counter reset. Use {Full Restore} for cold boot, {Warm Restore} for pickup.
+{Handoff}: Draft WORK, DECISIONS, THREADS, FILES sections for session handoff.
+  Output format: code block with ===SECTION=== delimiters (preserves markdown through clipboard).
+  Panel pre-fills CONTEXT + STATE. Claude drafts the four content sections from conversation context.
+  If no panel, Claude drafts all six sections manually.
+  No counter reset.
 
 ## COMMANDS
-{Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (last handoff + archive query with badges) | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot | {Tick} quick status | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Relational} arch re-anchor | {Drift?} self-check
+{Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (last handoff + archive query with badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot | {Tick} quick status | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Relational} arch re-anchor | {Drift?} self-check
 
 ## ENTITIES (B69)
 Doctrine: static IS, Files+ISS, no growth. Project: bounded, Files+QAIS+Heatmap+Crystal+ISS, carries CORE. Perspective: unbounded growth, Files+QAIS+Heatmap+Crystal, no ISS. Library: reference, Files only.
