@@ -1,6 +1,6 @@
 // DoctrineBanner.jsx — BOND_MASTER distinguished slot
 // Sits above entity grid on Doctrine tab. Constitutional authority.
-// S86: Multi-link hub-and-spoke. Persistent links via entity.json.
+// S85: Added Link capability — BOND_MASTER exclusive.
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 
@@ -99,7 +99,7 @@ export default function DoctrineBanner({ entities, allEntities, activeEntity, li
         </div>
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {linkedEntities.length > 0 && (
+          {isActive && linkedEntities.length > 0 && (
             <span style={{
               display: 'inline-flex',
               alignItems: 'center',

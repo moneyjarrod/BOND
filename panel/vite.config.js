@@ -10,7 +10,8 @@ export default defineConfig({
       '/api/config': 'http://localhost:3000',
       '/api/mcp': 'http://localhost:3000',
       '/api/modules': 'http://localhost:3000',
-      '/api/state': 'http://localhost:3000'
+      '/api/state': 'http://localhost:3000',
+      '/api/bindings': 'http://localhost:3000'
     }
   }
 });
