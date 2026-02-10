@@ -14,7 +14,7 @@ const COMMANDS = [
 
 const BRIDGE_PREFIX = 'BOND:';
 
-export default function CommandBar({ onGenerateHandoff }) {
+export default function CommandBar({ onGenerateHandoff, onWarmRestore }) {
   const [sentCmd, setSentCmd] = useState(null);
 
   const handleClick = useCallback(async (cmd) => {
@@ -64,6 +64,14 @@ export default function CommandBar({ onGenerateHandoff }) {
         </button>
       ))}
       <span style={{ width: 1, height: 20, background: 'var(--border)', flexShrink: 0 }} />
+      <button
+        className="cmd-btn cmd-btn-warm"
+        onClick={onWarmRestore}
+        title="Run Warm Restore — SPECTRA retrieval with badges"
+      >
+        <span className="cmd-icon">🔥</span>
+        <span>Warm</span>
+      </button>
       <button
         className="cmd-btn cmd-btn-handoff"
         onClick={onGenerateHandoff}

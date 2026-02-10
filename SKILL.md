@@ -19,8 +19,8 @@ Lost count: recommend {Sync}.
 ## SYNC
 {Sync}: 1) Read project SKILL 2) Read OPS/MASTER 3) Read state/active_entity.json — if entity set, read all files at path field; then read entity's entity.json for links array, load linked entities' .md files; if null, skip 4) Reset counter.
 {Full Restore}: {Sync} + full depth read.
-{Warm Restore}: Selective session pickup via SLA (warm_restore.py). Two layers:
-  Layer 1 (always): Read highest-numbered HANDOFF_S{N}.md from handoffs/. No query. Guaranteed context.
+{Warm Restore}: Selective session pickup via SLA. Panel runs SPECTRA (warm_restore.py via /api/warm-restore endpoint), writes result to state/warm_restore_output.md. Claude reads pre-computed output. Two layers:
+  Layer 1 (always): Most recent handoff. Guaranteed context.
   Layer 2 (contextual): SLA query against archive (excluding Layer 1). Entity + user message as signal.
   Output: Confidence badges — 🔺 GREEN/YELLOW/RED triangle + per-section 🟢/🟡/🔴/⚪ badges.
   No counter reset. Use {Full Restore} for cold boot, {Warm Restore} for pickup.

@@ -876,6 +876,16 @@ body {
   border-top: 1px solid var(--border);
 }
 
+.cmd-btn-warm {
+  border-color: var(--teal) !important;
+  color: var(--teal) !important;
+}
+
+.cmd-btn-warm:hover {
+  background: rgba(79, 209, 197, 0.12) !important;
+  color: var(--text-primary) !important;
+}
+
 .cmd-btn-handoff {
   border-color: var(--accent-amber) !important;
   color: var(--accent-amber) !important;

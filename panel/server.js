@@ -166,6 +166,11 @@ These boundaries are enforced through the read pipeline. When a project is enter
 
 const FRAMEWORK_ENTITY_NAMES = Object.keys(FRAMEWORK_ENTITIES);
 
+// ─── Template Path (S95) ──────────────────────────────────
+// Doctrine .md files too large for inline strings ship as templates/.
+// Bootstrap copies them to doctrine/ if they don't exist.
+const TEMPLATES_PATH = resolve(join(process.cwd(), 'templates', 'doctrine'));
+
 // Bootstrap: ensure framework entities exist on startup
 async function bootstrapFrameworkEntities() {
   // Ensure doctrine and state directories exist
@@ -212,6 +217,33 @@ async function bootstrapFrameworkEntities() {
     await writeFile(configFile, JSON.stringify(
       { save_confirmation: true }, null, 2
     ) + '\n');
+  }
+
+  // Copy template .md files to doctrine entities (S95)
+  // Templates ship large doctrine docs that are too big for inline strings.
+  // Only copies if target doesn't exist (preserves user edits).
+  if (existsSync(TEMPLATES_PATH)) {
+    try {
+      const templateEntities = await readdir(TEMPLATES_PATH, { withFileTypes: true });
+      for (const tDir of templateEntities) {
+        if (!tDir.isDirectory()) continue;
+        const srcDir = join(TEMPLATES_PATH, tDir.name);
+        const dstDir = join(DOCTRINE_PATH, tDir.name);
+        await mkdir(dstDir, { recursive: true });
+        const templateFiles = await readdir(srcDir);
+        for (const tf of templateFiles) {
+          if (!tf.endsWith('.md')) continue;
+          const dstFile = join(dstDir, tf);
+          if (!existsSync(dstFile)) {
+            const content = await readFile(join(srcDir, tf), 'utf-8');
+            await writeFile(dstFile, content);
+            console.log(`   \u2192 Template: ${tDir.name}/${tf}`);
+          }
+        }
+      }
+    } catch (err) {
+      console.warn('Template copy warning:', err.message);
+    }
   }
 }
 
@@ -1004,6 +1036,45 @@ ${files || 'No files recorded.'}
     res.json({ written: true, filename, path: resolved });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Warm Restore API (S95) ──────────────────────────────
+// Panel calls this endpoint, server runs warm_restore.py,
+// writes output to state/warm_restore_output.md for Claude to read.
+const WARM_RESTORE_SCRIPT = resolve(join(BOND_ROOT, 'warm_restore.py'));
+
+app.post('/api/warm-restore', async (req, res) => {
+  const { query } = req.body;
+  try {
+    const args = [WARM_RESTORE_SCRIPT, 'restore'];
+    if (query) args.push(query);
+
+    const { stdout, stderr } = await execFileAsync('python', args, {
+      timeout: 15000,
+      cwd: BOND_ROOT,
+      env: { ...process.env, BOND_ROOT, PYTHONIOENCODING: 'utf-8' },
+    });
+
+    // Write output to state file for Claude to read via filesystem MCP
+    const outputPath = join(STATE_PATH, 'warm_restore_output.md');
+    await writeFile(outputPath, stdout);
+
+    console.log(`🔍 Warm Restore: query="${query || '(entity-only)'}"`);
+    res.json({
+      success: true,
+      output: stdout,
+      outputFile: outputPath,
+      query: query || null,
+      stderr: stderr || null,
+    });
+  } catch (err) {
+    console.error('Warm Restore error:', err.message);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+      stderr: err.stderr || null,
+    });
   }
 });
 

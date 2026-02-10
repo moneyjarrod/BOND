@@ -209,6 +209,43 @@ export default function App() {
     library: entities.filter(e => e.type === 'library').length,
   };
 
+  // Warm Restore handler
+  const [warmRestoreStatus, setWarmRestoreStatus] = useState(null);
+  const handleWarmRestore = useCallback(async () => {
+    const query = window.prompt('Warm Restore query (leave empty for entity-only):');
+    if (query === null) return; // cancelled
+    setWarmRestoreStatus('running');
+    try {
+      const res = await fetch('/api/warm-restore', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: query || '' }),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        window.alert(`Warm Restore error: ${errData.error || errData.stderr || res.status}`);
+        setWarmRestoreStatus('error');
+        setTimeout(() => setWarmRestoreStatus(null), 3000);
+        return;
+      }
+      const data = await res.json();
+      if (data.success) {
+        // Bridge to Claude — Claude reads state/warm_restore_output.md
+        try { await navigator.clipboard.writeText('BOND:{Warm Restore}'); } catch {}
+        setWarmRestoreStatus('done');
+        setTimeout(() => setWarmRestoreStatus(null), 2000);
+      } else {
+        window.alert(`Warm Restore failed: ${data.error || 'Unknown error'}`);
+        setWarmRestoreStatus('error');
+        setTimeout(() => setWarmRestoreStatus(null), 3000);
+      }
+    } catch (err) {
+      window.alert(`Warm Restore fetch error: ${err.message}`);
+      setWarmRestoreStatus('error');
+      setTimeout(() => setWarmRestoreStatus(null), 3000);
+    }
+  }, []);
+
   // Handoff generator modal
   const [showHandoff, setShowHandoff] = useState(false);
 
@@ -316,7 +353,10 @@ export default function App() {
         )}
       </main>
 
-      <CommandBar onGenerateHandoff={() => setShowHandoff(true)} />
+      <CommandBar
+        onGenerateHandoff={() => setShowHandoff(true)}
+        onWarmRestore={handleWarmRestore}
+      />
 
       {showCreate && (
         <CreateEntity
