@@ -327,6 +327,7 @@ export default function App() {
             onToolToggle={handleToolToggle}
             onRename={handleRename}
             onExit={handleExit}
+            onCreate={() => setShowCreate(currentTab.filter)}
           />
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
             <button

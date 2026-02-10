@@ -50,6 +50,7 @@ export default function EntityCards({
   onToolToggle,
   onRename,
   onExit,
+  onCreate,
 }) {
   const linkedNames = new Set((linkedEntities || []).map(e => typeof e === 'string' ? e : e.name));
   const cards = useMemo(() => {
@@ -84,6 +85,15 @@ export default function EntityCards({
         <div className="placeholder-icon">{meta.icon}</div>
         <div className="placeholder-text">No {meta.name.toLowerCase()} entities found</div>
         <div className="placeholder-sub">Add a folder with entity.json to doctrine/ directory</div>
+        {onCreate && (
+          <button
+            className="btn-create-entity"
+            style={{ marginTop: 16 }}
+            onClick={onCreate}
+          >
+            + New {meta.name}
+          </button>
+        )}
       </div>
     );
   }

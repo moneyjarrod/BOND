@@ -66,101 +66,9 @@ BOND_MASTER IS NOT:
       tools: { filesystem: true, iss: true },
       links: [],
     },
-    files: {
-      'PROJECT_MASTER.md': `# Project Master — Project Lifecycle Authority
-
-## What PROJECT_MASTER IS
-
-PROJECT_MASTER is the organizational authority over project lifecycle within BOND.
-It governs how projects are created, structured, linked, and maintained.
-
-PROJECT_MASTER IS:
-- A doctrine entity. Peer to BOND_MASTER, not subordinate.
-- Authority over project-class entities and their lifecycle.
-- The bridge between framework constitution (doctrine) and project constitution (CORE).
-
-PROJECT_MASTER IS NOT:
-- Above BOND_MASTER. They are peers. BOND governs protocol, PM governs projects.
-- A project itself. It defines how projects work, not what they build.
-- A replacement for CORE. CORE is a project's local constitution. PM defines the pattern.
-
-## CORE vs Doctrine
-
-Two distinct layers. Structurally similar, different masters.
-- Doctrine = framework constitution. Governed by BOND_MASTER.
-- CORE = project constitution. Governed by the project, referenced by PROJECT_MASTER.
-- If doctrine conflicts with CORE, CORE wins inside the project boundary.
-
-## Project Lifecycle
-
-### Phases
-
-**Created** \u2192 Project entity exists. entity.json written, CORE.md file present but empty, auto-linked to PROJECT_MASTER. This is code-level creation \u2014 the project exists structurally but is not yet operational.
-
-**Initialized** \u2192 CORE.md has been populated with content. Any content \u2014 scope, goals, constraints, principles, a single guiding sentence. PM does not prescribe what CORE contains, only that it contains something. A project with an empty CORE is not initialized. Claude should guide the user through populating CORE on first entry.
-
-**Active** \u2192 Normal operation. Sessions happen, handoffs accumulate, crystals get written. BOND protocol governs the work. PM does not manage active sessions \u2014 that is BOND_MASTER's domain.
-
-**Complete** \u2192 The project's mission is fulfilled or explicitly closed by the user. Completion is a user declaration, not an automatic state. A completed project may be reclassified to library (reference archive) or left as-is.
-
-### CORE Enforcement
-
-CORE population is the gate between Created and Initialized. When Claude enters a project with an empty CORE, Claude should:
-1. Acknowledge the project and its class/tools.
-2. Note that CORE is unpopulated.
-3. Guide the user: "What is this project? Let's define it before we start."
-4. Write the CORE together \u2014 user's words, Claude's structure.
-
-Claude continues to flag an empty CORE on every {Sync} and {Enter} until populated. This is doctrinal enforcement, not code-blocking \u2014 work can technically proceed, but Claude treats an empty CORE as an unresolved issue.
-
-No restrictions exist on CORE content. A CORE may be a single sentence or a detailed constitution. The content belongs to the project (B4: CORE sovereignty). PM's authority is limited to requiring that it exists.
-
-### Health Signals
-
-PM defines what a healthy project looks like. These are not enforced \u2014 they are signals Claude can surface when relevant:
-- CORE populated: yes/no
-- Last handoff: how recent
-- Open threads: accumulating without resolution
-- Session gap: time since last active session
-
-These signals live in the data that already exists (handoffs, CORE file, entity state). Derive, not store.
-
-## Mantra
-
-"Doctrine defines the pattern. CORE defines the project."
-`,
-      'PROJECT_BOUNDARIES.md': `# Project Boundaries — Doctrine Authority
-
-## What This Document IS
-
-This doctrine defines the boundary rules between project-class entities and the doctrine layer. These rules are loaded when a project is entered via link to PROJECT_MASTER, and govern Claude's behavior for the duration of that session.
-
-## Boundary Rules
-
-### B1: Doctrine Is Read-Only to Projects
-Project-class entities cannot write to, modify, or delete files belonging to any doctrine-class entity. Doctrine flows into projects as reference. It does not flow back. This includes BOND_MASTER, PROJECT_MASTER, and any user-created doctrine entities.
-
-### B2: Framework Entities Are Immutable
-BOND_MASTER and PROJECT_MASTER are framework entities. No project may alter their configuration, files, links, tool settings, or display names. This is enforced both in code (server.js FRAMEWORK_ENTITIES) and here in doctrine.
-
-### B3: Class and Tool Matrix Are Not Self-Modifiable
-A project cannot change its own class designation or tool matrix. Class is set at creation and governed by PROJECT_MASTER. Tool boundaries are defined by the class matrix in BOND_MASTER doctrine. A project operates within its granted capabilities, it does not expand them.
-
-### B4: CORE Is Sovereign Inside the Boundary
-Within its own directory, a project's CORE is the highest authority. Doctrine provides the frame, CORE defines the content. If doctrine and CORE conflict on project-internal matters, CORE wins. But CORE cannot override boundary rules B1-B3 — those belong to PROJECT_MASTER.
-
-### B5: Links Are Directional by Default
-PROJECT_MASTER links to projects (authority flows down). Projects may link to other projects or to library/perspective entities for reference. Projects do not link to doctrine entities — doctrine is accessed through the existing load pipeline, not through project-level links.
-
-## Why Doctrine, Not Code
-
-These boundaries are enforced through the read pipeline. When a project is entered and PROJECT_MASTER is linked, Claude loads this file and operates within these rules. The doctrine IS the enforcement. This avoids retrofitting server middleware for scope checking while maintaining the same guarantee: projects cannot reach up.
-
-## Mantra
-
-"The boundary is the gift. Build freely inside it."
-`,
-    },
+    // PM doctrine files shipped via templates/doctrine/PROJECT_MASTER/ (S98)
+    // PROJECT_MASTER.md and PROJECT_BOUNDARIES.md bootstrap from templates on first boot.
+    files: {},
   },
 };
 
@@ -200,7 +108,7 @@ async function bootstrapFrameworkEntities() {
       }
     }
 
-    console.log(`   ✓ ${name} (framework entity)`);
+    console.log(`   \u2713 ${name} (framework entity)`);
   }
 
   // Ensure state file exists
@@ -395,7 +303,7 @@ app.put('/api/doctrine/:entity/tools', async (req, res) => {
   try {
     // Framework entities have immutable tool config
     if (FRAMEWORK_ENTITY_NAMES.includes(req.params.entity)) {
-      return res.status(403).json({ error: `${req.params.entity} is a framework entity — tools are immutable` });
+      return res.status(403).json({ error: `${req.params.entity} is a framework entity \u2014 tools are immutable` });
     }
     const entityPath = join(DOCTRINE_PATH, req.params.entity);
     const resolved = resolve(entityPath);
@@ -430,7 +338,7 @@ app.put('/api/doctrine/:entity/name', async (req, res) => {
   try {
     // Framework entities have immutable names
     if (FRAMEWORK_ENTITY_NAMES.includes(req.params.entity)) {
-      return res.status(403).json({ error: `${req.params.entity} is a framework entity — name is immutable` });
+      return res.status(403).json({ error: `${req.params.entity} is a framework entity \u2014 name is immutable` });
     }
     const entityPath = join(DOCTRINE_PATH, req.params.entity);
     const resolved = resolve(entityPath);
@@ -460,7 +368,7 @@ app.put('/api/doctrine/:entity/name', async (req, res) => {
 // Create new entity (B69 Four-Class)
 const STARTER_CONTENT = {
   doctrine: (name) => `# ${name}\n\n<!-- Doctrine: IS statements. Static truth. -->\n`,
-  project: (name) => `# ${name} — CORE\n\n<!-- Project CORE: immutable boundary. Define scope and constraints. -->\n`,
+  project: (name) => `# ${name} \u2014 CORE\n\n> **What is this project?** One sentence that defines the mission.\n\n> **What does "done" look like?** When is this project complete?\n\n> **What constraints matter?** Budget, timeline, tools, principles.\n\n*Replace these prompts with your CORE. Any content initializes the project.*\n`,
   perspective: (name) => `# ${name}\n\n<!-- Perspective seed. This file will grow through resonance. -->\n`,
   library: (name) => `# ${name}\n\n<!-- Library reference. Read-only knowledge. -->\n`,
 };
@@ -489,7 +397,7 @@ app.post('/api/doctrine', async (req, res) => {
     }
     // Framework entities cannot be created via API
     if (FRAMEWORK_ENTITY_NAMES.includes(safeName)) {
-      return res.status(403).json({ error: `${safeName} is a framework entity — cannot be created manually` });
+      return res.status(403).json({ error: `${safeName} is a framework entity \u2014 cannot be created manually` });
     }
     const entityPath = join(DOCTRINE_PATH, safeName);
     const resolved = resolve(entityPath);
@@ -500,7 +408,7 @@ app.post('/api/doctrine', async (req, res) => {
     try {
       await stat(entityPath);
       return res.status(409).json({ error: `Entity '${safeName}' already exists` });
-    } catch { /* good — doesn't exist */ }
+    } catch { /* good \u2014 doesn't exist */ }
 
     // Create folder
     await mkdir(entityPath, { recursive: true });
@@ -605,7 +513,7 @@ app.post('/api/mcp/:system/invoke', async (req, res) => {
   // ─── Runtime capability enforcement (S90) ───
   const auth = await validateToolCall(tool);
   if (!auth.allowed) {
-    console.log(`⛔ Blocked: ${tool} (${auth.error.reason})`);
+    console.log(`\u26D4 Blocked: ${tool} (${auth.error.reason})`);
     return res.status(403).json(auth.error);
   }
 
@@ -649,7 +557,7 @@ app.get('/api/config', (req, res) => {
     state_path: STATE_PATH,
     mcp_url: MCP_URL,
     ws_port: 3001,
-    version: '1.4.0-s92'
+    version: '1.5.0-s98'
   });
 });
 
@@ -762,7 +670,7 @@ app.post('/api/state/enter', async (req, res) => {
     state.links = await hydrateLinks(entity);
 
     // Bridge: panel clipboard handles {Enter} command (App.jsx)
-    console.log(`🔓 Entered: ${entity} (${state.class})`);
+    console.log(`\uD83D\uDD13 Entered: ${entity} (${state.class})`);
     res.json({ entered: true, state });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -781,7 +689,7 @@ app.post('/api/state/exit', async (req, res) => {
 
     // Bridge: panel clipboard handles {Exit} command (App.jsx)
     if (prev.entity) {
-      console.log(`🔒 Exited: ${prev.entity}`);
+      console.log(`\uD83D\uDD12 Exited: ${prev.entity}`);
     }
     res.json({ exited: true, previous: prev.entity });
   } catch (err) {
@@ -835,7 +743,7 @@ app.post('/api/state/link', async (req, res) => {
     // Hydrate full link objects for response
     state.links = await hydrateLinks(state.entity);
 
-    console.log(`🔗 Linked: ${state.entity} → ${linkTarget}`);
+    console.log(`\uD83D\uDD17 Linked: ${state.entity} \u2192 ${linkTarget}`);
     res.json({ linked: true, state });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -867,7 +775,7 @@ app.post('/api/state/unlink', async (req, res) => {
     // Hydrate remaining links
     state.links = await hydrateLinks(state.entity);
 
-    console.log(`🔓 Unlinked: ${unlinkTarget} from ${state.entity}`);
+    console.log(`\uD83D\uDD13 Unlinked: ${unlinkTarget} from ${state.entity}`);
     res.json({ unlinked: true, previous: unlinkTarget, state });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -997,7 +905,7 @@ app.post('/api/handoff/write', async (req, res) => {
     const date = new Date().toISOString().split('T')[0];
     const title = entityName || 'NO_ENTITY';
 
-    const content = `# HANDOFF S${session} — ${title}
+    const content = `# HANDOFF S${session} \u2014 ${title}
 ## Written: ${date}
 ## Session: ${session}
 
@@ -1032,7 +940,7 @@ ${files || 'No files recorded.'}
     }
 
     await writeFile(filePath, content);
-    console.log(`\u{1F4CB} Handoff written: ${filename}`);
+    console.log(`\uD83D\uDCCB Handoff written: ${filename}`);
     res.json({ written: true, filename, path: resolved });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1060,7 +968,7 @@ app.post('/api/warm-restore', async (req, res) => {
     const outputPath = join(STATE_PATH, 'warm_restore_output.md');
     await writeFile(outputPath, stdout);
 
-    console.log(`🔍 Warm Restore: query="${query || '(entity-only)'}"`);
+    console.log(`\uD83D\uDD0D Warm Restore: query="${query || '(entity-only)'}"`);
     res.json({
       success: true,
       output: stdout,
@@ -1079,7 +987,7 @@ app.post('/api/warm-restore', async (req, res) => {
 });
 
 // ─── Bridge ───────────────────────────────────────────────
-// Clipboard-only. Panel writes "BOND:{cmd}" → AHK OnClipboardChange.
+// Clipboard-only. Panel writes "BOND:{cmd}" \u2192 AHK OnClipboardChange.
 // HTTP bridge removed S85 (Dead Code Audit).
 
 // ─── Production static serving ────────────────────────────
@@ -1100,12 +1008,12 @@ const server = createServer(app);
 // Bootstrap framework entities before starting
 bootstrapFrameworkEntities().then(() => {
   server.listen(PORT, () => {
-    console.log(`🔥🌊 BOND Panel sidecar on http://localhost:${PORT}`);
+    console.log(`\uD83D\uDD25\uD83C\uDF0A BOND Panel sidecar on http://localhost:${PORT}`);
     console.log(`   Doctrine path: ${DOCTRINE_PATH}`);
     console.log(`   MCP target:    ${MCP_URL}`);
   });
 }).catch(err => {
-  console.error('❌ Bootstrap failed:', err);
+  console.error('\u274C Bootstrap failed:', err);
   process.exit(1);
 });
 
