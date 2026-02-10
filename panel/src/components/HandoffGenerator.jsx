@@ -181,16 +181,16 @@ export default function HandoffGenerator({ onClose }) {
           </div>
         )}
 
-        {/* Bridge controls */}
+        {/* Bridge controls — numbered steps */}
         <div className="handoff-bridge-bar">
           <button
             className={`handoff-bridge-btn ${bridgeSent ? 'sent' : ''}`}
             onClick={handleBridgeSend}
           >
-            {bridgeSent ? '✓ {Handoff} sent' : '⚡ Send {Handoff} to Claude'}
+            {bridgeSent ? '✓ {Handoff} sent' : <><span className="step-number">①</span> ⚡ Send {'{'} Handoff {'}'} to Claude</>}
           </button>
           <button className="handoff-bridge-btn" onClick={handleParseResponse}>
-            📋 Parse Claude Response
+            <span className="step-number">②</span> 📋 Parse Claude Response
           </button>
         </div>
 
@@ -221,9 +221,10 @@ export default function HandoffGenerator({ onClose }) {
           <button
             className="btn-confirm"
             onClick={handleWrite}
-            disabled={writing || !!written}
+            disabled={writing || !!written || (!sections.work && !sections.decisions && !sections.threads && !sections.files)}
+            title={(!sections.work && !sections.decisions && !sections.threads && !sections.files) ? 'Complete steps ① and ② first' : ''}
           >
-            {writing ? 'Writing...' : written ? `✓ ${written}` : `Write Handoff S${sessionNum}`}
+            {writing ? 'Writing...' : written ? `✓ ${written}` : <><span className="step-number">③</span> Write Handoff S{sessionNum}</>}
           </button>
         </div>
       </div>

@@ -724,9 +724,9 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   padding: 20px 24px;
-  width: 640px;
+  width: 820px;
   max-width: 95vw;
-  max-height: 85vh;
+  max-height: 92vh;
   overflow-y: auto;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
@@ -782,6 +782,12 @@ body {
   display: flex;
   gap: 8px;
   margin-bottom: 14px;
+}
+
+.step-number {
+  font-size: 2.8rem;
+  line-height: 1;
+  vertical-align: middle;
 }
 
 .handoff-bridge-btn {
