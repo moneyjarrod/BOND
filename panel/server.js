@@ -91,6 +91,40 @@ Two distinct layers. Structurally similar, different masters.
 - CORE = project constitution. Governed by the project, referenced by PROJECT_MASTER.
 - If doctrine conflicts with CORE, CORE wins inside the project boundary.
 
+## Project Lifecycle
+
+### Phases
+
+**Created** \u2192 Project entity exists. entity.json written, CORE.md file present but empty, auto-linked to PROJECT_MASTER. This is code-level creation \u2014 the project exists structurally but is not yet operational.
+
+**Initialized** \u2192 CORE.md has been populated with content. Any content \u2014 scope, goals, constraints, principles, a single guiding sentence. PM does not prescribe what CORE contains, only that it contains something. A project with an empty CORE is not initialized. Claude should guide the user through populating CORE on first entry.
+
+**Active** \u2192 Normal operation. Sessions happen, handoffs accumulate, crystals get written. BOND protocol governs the work. PM does not manage active sessions \u2014 that is BOND_MASTER's domain.
+
+**Complete** \u2192 The project's mission is fulfilled or explicitly closed by the user. Completion is a user declaration, not an automatic state. A completed project may be reclassified to library (reference archive) or left as-is.
+
+### CORE Enforcement
+
+CORE population is the gate between Created and Initialized. When Claude enters a project with an empty CORE, Claude should:
+1. Acknowledge the project and its class/tools.
+2. Note that CORE is unpopulated.
+3. Guide the user: "What is this project? Let's define it before we start."
+4. Write the CORE together \u2014 user's words, Claude's structure.
+
+Claude continues to flag an empty CORE on every {Sync} and {Enter} until populated. This is doctrinal enforcement, not code-blocking \u2014 work can technically proceed, but Claude treats an empty CORE as an unresolved issue.
+
+No restrictions exist on CORE content. A CORE may be a single sentence or a detailed constitution. The content belongs to the project (B4: CORE sovereignty). PM's authority is limited to requiring that it exists.
+
+### Health Signals
+
+PM defines what a healthy project looks like. These are not enforced \u2014 they are signals Claude can surface when relevant:
+- CORE populated: yes/no
+- Last handoff: how recent
+- Open threads: accumulating without resolution
+- Session gap: time since last active session
+
+These signals live in the data that already exists (handoffs, CORE file, entity state). Derive, not store.
+
 ## Mantra
 
 "Doctrine defines the pattern. CORE defines the project."

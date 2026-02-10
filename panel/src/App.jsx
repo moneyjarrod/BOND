@@ -42,20 +42,35 @@ export default function App() {
   const { modules } = useModules();
   const search = useSearch(activeEntity?.name, linkedEntities);
 
-  // Load active entity state + config from server on mount
-  useEffect(() => {
+  // Load active entity state + config from server on mount + tab focus
+  const refreshState = useCallback(() => {
     fetch('/api/state').then(r => r.json()).then(state => {
       if (state.entity) {
         setActiveEntity({ name: state.entity, type: state.class, display_name: state.display_name });
+      } else {
+        setActiveEntity(null);
       }
       if (state.links && state.links.length > 0) {
         setLinkedEntities(state.links.map(l => ({ name: l.entity, type: l.class, display_name: l.display_name })));
+      } else {
+        setLinkedEntities([]);
       }
     }).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    refreshState();
     fetch('/api/config/bond').then(r => r.json()).then(cfg => {
       setBondConfig(cfg);
     }).catch(() => {});
-  }, []);
+  }, [refreshState]);
+
+  // Re-sync state when tab regains focus
+  useEffect(() => {
+    const onFocus = () => { if (document.visibilityState === 'visible') refreshState(); };
+    document.addEventListener('visibilitychange', onFocus);
+    return () => document.removeEventListener('visibilitychange', onFocus);
+  }, [refreshState]);
 
 
 
