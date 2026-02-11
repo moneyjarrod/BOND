@@ -14,7 +14,7 @@ Write-Host ""
 $BOND_ROOT = "C:\BOND"
 $BOND_PORT = 3000
 
-# ─── Prerequisites ────────────────────────────────
+# --- Prerequisites ------------------------------------------------
 Write-Host "[1/5] Checking prerequisites..." -ForegroundColor Cyan
 Write-Host ""
 
@@ -27,7 +27,7 @@ catch {
     Write-Host "   https://git-scm.com/download/win" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "   After installing Git, close this window and run the install command again." -ForegroundColor Yellow
-    Write-Host ""; Read-Host "Press Enter to exit"; exit 1
+    Write-Host ""; Read-Host "Press Enter to exit"; return
 }
 
 # Check Node
@@ -39,7 +39,7 @@ catch {
     Write-Host "   https://nodejs.org (pick the LTS version)" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "   After installing Node.js, close this window and run the install command again." -ForegroundColor Yellow
-    Write-Host ""; Read-Host "Press Enter to exit"; exit 1
+    Write-Host ""; Read-Host "Press Enter to exit"; return
 }
 
 # Check Python
@@ -51,7 +51,7 @@ catch {
     Write-Host "   https://python.org (check 'Add to PATH' during install)" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "   After installing Python, close this window and run the install command again." -ForegroundColor Yellow
-    Write-Host ""; Read-Host "Press Enter to exit"; exit 1
+    Write-Host ""; Read-Host "Press Enter to exit"; return
 }
 
 # Check numpy
@@ -64,7 +64,7 @@ Write-Host "   [OK] numpy" -ForegroundColor Green
 
 Write-Host ""
 
-# ─── Clone Repository ─────────────────────────────
+# --- Clone Repository ---------------------------------------------
 Write-Host "[2/5] Downloading BOND..." -ForegroundColor Cyan
 Write-Host ""
 
@@ -80,13 +80,13 @@ if (Test-Path "$BOND_ROOT\.git") {
     if (-not (Test-Path "$BOND_ROOT\panel")) {
         Write-Host ""
         Write-Host "   [ERROR] Download failed. Check your internet connection." -ForegroundColor Red
-        Write-Host ""; Read-Host "Press Enter to exit"; exit 1
+        Write-Host ""; Read-Host "Press Enter to exit"; return
     }
 }
 Write-Host "   [OK] BOND downloaded" -ForegroundColor Green
 Write-Host ""
 
-# ─── Install Dependencies ─────────────────────────
+# --- Install Dependencies -----------------------------------------
 Write-Host "[3/5] Installing dependencies..." -ForegroundColor Cyan
 Write-Host ""
 
@@ -100,23 +100,17 @@ if (-not (Test-Path "$BOND_ROOT\data")) { New-Item -ItemType Directory -Path "$B
 Write-Host "   [OK] Dependencies installed" -ForegroundColor Green
 Write-Host ""
 
-# ─── Clear Port ───────────────────────────────────
+# --- Clear Port ---------------------------------------------------
 Write-Host "[4/5] Preparing to start..." -ForegroundColor Cyan
 Write-Host ""
 
-$portListeners = netstat -ano | Select-String ":$BOND_PORT\s" | Select-String "LISTENING"
-foreach ($line in $portListeners) {
-    $parts = $line -split '\s+'
-    $pid = $parts[$parts.Count - 1]
-    if ($pid -and $pid -match '^\d+$') {
-        Write-Host "   Clearing port $BOND_PORT (PID: $pid)..." -ForegroundColor Yellow
-        Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
-    }
-}
+# Kill anything on the target port using cmd (avoids $PID reserved variable)
+cmd /c "for /f `"tokens=5`" %a in ('netstat -ano ^| findstr :$BOND_PORT ^| findstr LISTENING') do taskkill /PID %a /F >nul 2>nul"
+
 Write-Host "   [OK] Port $BOND_PORT clear" -ForegroundColor Green
 Write-Host ""
 
-# ─── Start Server ─────────────────────────────────
+# --- Start Server -------------------------------------------------
 Write-Host "[5/5] Starting BOND..." -ForegroundColor Cyan
 Write-Host ""
 
