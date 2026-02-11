@@ -1,11 +1,12 @@
 # PowerShell Installation Script for BOND
 # Usage: irm https://moneyjarrod.github.io/BOND/install.ps1 | iex
 
-# Don't use Stop — git writes progress to stderr which PowerShell treats as errors
+# Allow scripts to run in this session (needed for npm.ps1 wrapper)
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
 
 Write-Host ""
 Write-Host "  BOND Installer" -ForegroundColor Yellow
-Write-Host "  ════════════════════════════════════" -ForegroundColor DarkGray
+Write-Host "  ====================================" -ForegroundColor DarkGray
 Write-Host ""
 
 $BOND_ROOT = "C:\BOND"
@@ -138,9 +139,9 @@ if (Test-Path "$BOND_ROOT\panel\dist\index.html") {
 Pop-Location
 
 Write-Host ""
-Write-Host "  ════════════════════════════════════" -ForegroundColor DarkGray
+Write-Host "  ====================================" -ForegroundColor DarkGray
 Write-Host "  BOND is running!" -ForegroundColor Green
-Write-Host "  ════════════════════════════════════" -ForegroundColor DarkGray
+Write-Host "  ====================================" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "  Panel:   http://localhost:$BOND_PORT" -ForegroundColor Cyan
 Write-Host "  Stop:    $BOND_ROOT\stop_bond.bat" -ForegroundColor DarkGray
