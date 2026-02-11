@@ -391,7 +391,8 @@ function renderComplete(el) {
       <div class="next-step"><div class="next-step-num">2</div><div>Start BOND with <code>start_bond.bat</code></div></div>
       <div class="next-step"><div class="next-step-num">3</div><div>Open <code>http://localhost:${state.paths.port}</code> to see the Control Panel.</div></div>
       ${c.ahk.selected ? `<div class="next-step"><div class="next-step-num">4</div><div>Run <code>bridge\\BOND_v8.ahk</code> to start the counter + command bridge (requires <a href="https://www.autohotkey.com/" style="color:var(--teal)">AutoHotkey</a>).</div></div>` : ''}
-      <div class="next-step"><div class="next-step-num">${c.ahk.selected ? '5' : '4'}</div><div>${c.skills.selected ? `Add the BOND skill from <code>skills\\bond\\SKILL.md</code> to your Claude project, then type` : 'Type'} <code>{Full Restore}</code> in Claude to initialize. Welcome aboard. 🔥🌊</div></div>
+      ${c.skills.selected ? `<div class="next-step"><div class="next-step-num">${c.ahk.selected ? '5' : '4'}</div><div>Add the BOND skill to Claude: Create a <a href="https://support.anthropic.com/en/articles/9517075-what-are-projects" style="color:var(--teal)">Claude Project</a>, then add <code>skills\\bond\\SKILL.md</code> as a <strong>Project Knowledge</strong> file. This teaches Claude the BOND protocol.</div></div>` : ''}
+      <div class="next-step"><div class="next-step-num">${c.skills.selected ? (c.ahk.selected ? '6' : '5') : (c.ahk.selected ? '5' : '4')}</div><div>Type <code>{Full Restore}</code> in Claude to initialize. Welcome aboard. 🔥🌊</div></div>
     </div>`;
 }
 
