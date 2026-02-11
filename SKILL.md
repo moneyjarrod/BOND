@@ -20,7 +20,9 @@ Lost count: recommend {Sync}.
 {Sync}: 1) Read project SKILL 2) Read OPS/MASTER 3) Read state/active_entity.json — if entity set, read all files at path field; then read entity's entity.json for links array, load linked entities' .md files; if null, skip 4) Read state/config.json for save_confirmation toggle 5) Vine lifecycle: GET /api/seeders — if any armed perspectives returned, run the full vine pass for each:
   a) RESONATE: perspective_check(perspective, text) with substantive content from recent exchanges.
   b) TRACK: Read perspective's seed_tracker.json. Increment `exposures` on ALL active seeds. Seeds that scored above entity's `seed_threshold` in (a) get `hits += 1` and `last_hit` updated.
-  c) AUTO-SEED (novel discovery): Claude reads conversation through the perspective's ROOT lens. Patterns that fit the perspective's worldview but aren't captured = candidates. Check candidates against field — LOW resonance confirms novelty (high = already known). Auto-write .md file + perspective_store into QAIS (pass reason + session for auto-logging) + add tracker entry. No approval gate.
+  c) AUTO-SEED (novel discovery): Claude reads conversation through the perspective's ROOT lens. Patterns that fit the perspective's worldview but aren't captured = candidates. Check candidates against field — LOW resonance confirms novelty (high = already known).
+     RE-GRAFT CHECK: perspective_check now returns `pruned_seeds` array. If candidate name matches a previously pruned seed, apply re-graft gate: count how many LIVING seeds scored above seed_threshold in step (a). If 2+ living seeds co-fired → re-graft allowed (vine grew around it, context changed). If <2 co-fired → blocked (old pattern repeating alone). Log re-graft with reason "re-graft: co-resonated with [seed1, seed2]".
+     If candidate passes (novel + not pruned, or novel + re-graft approved): auto-write .md file + perspective_store into QAIS (pass reason + session for auto-logging) + add tracker entry. No approval gate.
   d) PRUNE (self-sovereign): Claude enters the perspective's ROOT lens and evaluates each seed by identity alignment, not hit count. The tracker is evidence, not verdict. Ask: does this seed grow from who this perspective IS? Dormant seeds that align with roots stay. Active seeds that drift from roots get questioned. See ROOT-self-pruning-authority.md.
      PRUNE EXECUTION (per cut seed):
        i.   Write G-pruned-{seed-name}.md to entity dir with: seed name, ROOT lens reason, tracker stats at time of cut, timestamp.
@@ -28,7 +30,6 @@ Lost count: recommend {Sync}.
        iii. Remove seed entry from seed_tracker.json.
        iv.  Delete the seed .md file from entity dir.
      What remains IS the growth.
-  e) RE-GRAFT GATE: Before auto-seeding, check pruning log. If candidate was previously pruned, it must co-resonate with 2+ LIVING seeds in the same check to pass. Firing alone = old pattern repeating → blocked. Firing with living company = vine grew around it → re-graft.
   If no seeders armed, skip. On first arm, bootstrap seeds via perspective_store. 6) Reset counter.
 {Full Restore}: {Sync} + full depth read.
 {Warm Restore}: Selective session pickup via SLA. Panel runs SPECTRA (warm_restore.py via /api/warm-restore endpoint), writes result to state/warm_restore_output.md. Claude reads pre-computed output. Two layers:
