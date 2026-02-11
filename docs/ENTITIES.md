@@ -13,7 +13,7 @@ BOND organizes knowledge into four entity classes, each with distinct rules and 
 ### Project (PC)
 **Purpose:** Bounded workspace with a CORE immutable boundary.
 **Tools:** Files + ISS + QAIS + Heatmap + Crystal
-**Growth:** Bounded by CORE. Work happens within the boundary CORE defines.
+**Growth:** None — projects are built, not grown. Work happens within the boundary CORE defines.
 **Key feature:** Every project has a `CORE.md` — the project's local constitution. PROJECT_MASTER governs lifecycle. CORE governs content.
 
 ### Perspective (PP)

@@ -253,7 +253,7 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
             <>🔒 {entity.doctrine_count} doctrine</>
           )}
           {entity.type === 'project' && (
-            <>🔒 {entity.doctrine_count} core · 🌱 {entity.growth_count} growth</>
+            <>🔒 {entity.doctrine_count} core · 📄 {entity.files.length} files</>
           )}
           {entity.type === 'perspective' && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
