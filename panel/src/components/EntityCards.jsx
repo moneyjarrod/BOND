@@ -256,8 +256,25 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
             <>🔒 {entity.doctrine_count} core · 🌱 {entity.growth_count} growth</>
           )}
           {entity.type === 'perspective' && (
-            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span>{entity.root_count > 0 ? `🌳 ${entity.root_count} roots · ` : ''}🌿 {entity.seed_count} seeds · 🌱 {entity.growth_count} growth</span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+              <span>
+                {entity.root_count > 0 ? `🌳 ${entity.root_count} roots · ` : ''}
+                🌿 {entity.seed_count} seeds ·
+                {' '}🌱 {entity.growth_count} vine
+                {entity.tracker && entity.tracker.max_exposure > 0 && (
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                    {' · '}{entity.tracker.max_exposure}/{entity.tracker.prune_window} exp
+                    {entity.tracker.at_risk > 0 && (
+                      <span style={{ color: '#e94560' }}> · ✂️ {entity.tracker.at_risk}</span>
+                    )}
+                  </span>
+                )}
+                {entity.pruned_count > 0 && (
+                  <span style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>
+                    {' · '}🪵 {entity.pruned_count} pruned
+                  </span>
+                )}
+              </span>
               <button
                 onClick={(e) => { e.stopPropagation(); handleSeedToggle(); }}
                 disabled={seedingLoading || isEmpty}

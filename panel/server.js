@@ -311,11 +311,6 @@ app.get('/api/doctrine', async (req, res) => {
       const files = await readdir(entityPath);
       const mdFiles = files.filter(f => f.endsWith('.md'));
 
-      // Classify files: bare name = doctrine/seed, G-prefix = growth, ROOT- = root
-      const growth = mdFiles.filter(f => f.match(/^G-|^.*-G\d/));
-      const roots = mdFiles.filter(f => f.startsWith('ROOT-'));
-      const seeds = mdFiles.filter(f => !f.match(/^G-|^.*-G\d/) && !f.startsWith('ROOT-'));
-
       // Read entity.json for classification (B69: Four-Class Architecture)
       let entityConfig = {};
       try {
@@ -331,7 +326,34 @@ app.get('/api/doctrine', async (req, res) => {
         };
       }
 
+      // Classify files: bare name = doctrine/seed, G-prefix = pruning log, ROOT- = root
+      const pruned = mdFiles.filter(f => f.match(/^G-pruned-|^G-/));
+      const roots = mdFiles.filter(f => f.startsWith('ROOT-'));
+      const seeds = mdFiles.filter(f => !f.match(/^G-pruned-|^G-/) && !f.startsWith('ROOT-'));
+
+      // Read seed_tracker.json for perspectives (vine health)
+      let tracker = null;
       const type = entityConfig.class || 'doctrine';
+      if (type === 'perspective') {
+        try {
+          const trackerRaw = await readFile(join(entityPath, 'seed_tracker.json'), 'utf-8');
+          const trackerData = JSON.parse(trackerRaw);
+          const entries = Object.entries(trackerData);
+          const totalExposures = entries.reduce((sum, [, v]) => sum + (v.exposures || 0), 0);
+          const totalHits = entries.reduce((sum, [, v]) => sum + (v.hits || 0), 0);
+          const maxExposure = entries.reduce((max, [, v]) => Math.max(max, v.exposures || 0), 0);
+          const pruneWindow = entityConfig.prune_window || 10;
+          const atRisk = entries.filter(([, v]) => v.exposures >= pruneWindow && v.hits === 0).length;
+          tracker = {
+            seed_count: entries.length,
+            total_exposures: totalExposures,
+            total_hits: totalHits,
+            max_exposure: maxExposure,
+            prune_window: pruneWindow,
+            at_risk: atRisk,
+          };
+        } catch { /* no tracker yet */ }
+      }
 
       // Class tool defaults (B69) — uses module-level CLASS_TOOLS
       const defaults = CLASS_TOOLS[type] || CLASS_TOOLS.library;
@@ -353,7 +375,9 @@ app.get('/api/doctrine', async (req, res) => {
         doctrine_count: (type === 'doctrine' || type === 'project') ? seeds.length : 0,
         seed_count: type === 'perspective' ? seeds.length : 0,
         root_count: type === 'perspective' ? roots.length : 0,
-        growth_count: growth.length,
+        growth_count: type === 'perspective' ? (roots.length + seeds.length) : 0,
+        pruned_count: pruned.length,
+        tracker: tracker,
       });
     }
 
