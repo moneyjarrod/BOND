@@ -367,6 +367,10 @@ function renderReview(el) {
     <div class="review-section">
       <div class="review-label">Generated Script Preview</div>
       <div class="script-preview">${escapeHtml(generateScript())}</div>
+    </div>
+    <div style="margin-top:16px;padding:14px;background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.3);border-radius:var(--radius-md);">
+      <div style="font-size:0.82rem;font-weight:600;color:var(--amber);margin-bottom:6px;">🛡️ Windows SmartScreen</div>
+      <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.7;">Windows may show a security warning when you run the script. This is normal for unsigned scripts.<br><strong style="color:var(--text-primary);">Click "More info" → "Run anyway"</strong> to proceed.</div>
     </div>`;
 }
 
