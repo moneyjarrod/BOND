@@ -13,14 +13,19 @@ BOND organizes knowledge into four entity classes, each with distinct rules and 
 ### Project (PC)
 **Purpose:** Bounded workspace with a CORE immutable boundary.
 **Tools:** Files + ISS + QAIS + Heatmap + Crystal
-**Growth:** Growth files track evolution within the CORE boundary.
-**Key feature:** Every project has a `CORE.md` — the immutable constraint. Work happens within the boundary CORE defines.
+**Growth:** Bounded by CORE. Work happens within the boundary CORE defines.
+**Key feature:** Every project has a `CORE.md` — the project's local constitution. PROJECT_MASTER governs lifecycle. CORE governs content.
 
 ### Perspective (PP)
-**Purpose:** Unbounded growth. Seeds that evolve through resonance.
+**Purpose:** Unbounded growth. A lens that learns from conversation.
 **Tools:** Files + QAIS + Heatmap + Crystal (no ISS)
-**Growth:** Seeds grow into fuller documents over time. No fixed boundary.
-**Slots:** P01 through P10 are base slots. P10 = Wildcard. Create more as needed.
+**Growth:** Vine model. Roots define identity, seeds auto-collect, pruning cuts what doesn't belong.
+**Key features:**
+- **Roots** (ROOT-*.md) — Identity anchors. Planted deliberately. Immutable.
+- **Seeds** — Auto-collected from conversation when seeding is armed. No approval gate.
+- **Pruning** — Judgment-based via ROOT lens. Cut what doesn't grow from identity.
+- **Seeding toggle** — SEED ON/OFF on entity card. Arms/disarms the vine lifecycle.
+- **seed_tracker.json** — Tracks exposures, hits, last_hit per seed.
 
 ### Library (LB)
 **Purpose:** Read-only reference. Knowledge shelf.
@@ -34,18 +39,20 @@ Each entity is a folder in the `doctrine/` directory:
 
 ```
 doctrine/
-├── BOND_MASTER/          ← Doctrine class
-│   ├── entity.json       ← Classification + tool config
-│   ├── BOND_MASTER.md    ← Doctrine files
-│   └── BOND_PROTOCOL.md
-├── MyProject/            ← Project class
+├── BOND_MASTER/              ← Doctrine class
+│   ├── entity.json           ← Classification + tool config
+│   ├── BOND_MASTER.md        ← Doctrine files
+│   └── VINE_GROWTH_MODEL.md
+├── MyProject/                ← Project class
 │   ├── entity.json
-│   ├── CORE.md           ← Immutable boundary
-│   └── G-sprint-1.md     ← Growth file
-├── P01-Thinking/         ← Perspective class
+│   └── CORE.md               ← Project constitution
+├── P11-Plumber/              ← Perspective class
 │   ├── entity.json
-│   └── seed.md           ← Seed that grows
-└── _reference/           ← Library class
+│   ├── ROOT-sacred-flow.md   ← Identity root
+│   ├── pressure-testing.md   ← Auto-collected seed
+│   ├── seed_tracker.json     ← Vine health tracker
+│   └── G-pruned-old-seed.md  ← Pruning journal
+└── _reference/               ← Library class
     ├── entity.json
     └── index.md
 ```
@@ -56,19 +63,26 @@ Every entity folder contains an `entity.json` that defines its class:
 
 ```json
 {
-  "class": "project",
-  "core": "CORE.md",
+  "class": "perspective",
   "tools": {
     "filesystem": true,
-    "iss": true,
     "qais": true,
     "heatmap": true,
     "crystal": true
-  }
+  },
+  "display_name": "P11-The Plumber",
+  "seeding": true,
+  "prune_window": 10,
+  "seed_threshold": 0.06
 }
 ```
 
 **Class boundaries are hard.** A library entity cannot enable QAIS. A doctrine entity cannot enable Crystal. The panel enforces these boundaries — tools outside a class's allowlist are greyed out and cannot be toggled.
+
+Perspective-specific fields:
+- `seeding` — true/false, arms the vine lifecycle during {Sync}
+- `prune_window` — exposures before a seed is eligible for pruning evaluation
+- `seed_threshold` — minimum resonance score to count as a "hit"
 
 ## Tool Boundary Matrix
 
@@ -82,11 +96,24 @@ Every entity folder contains an `entity.json` that defines its class:
 
 ## Enter/Exit
 
-**Enter:** Panel writes to `state/active_entity.json`. Claude reads entity files, applies tool boundaries, acknowledges entity and class.
+**Enter:** Panel writes to `state/active_entity.json`. Claude reads entity files, loads linked entities' .md files, applies tool boundaries, acknowledges entity and class.
 
 **Exit:** Panel clears state file. Claude drops tool boundaries.
 
 **Switch:** Entering a new entity automatically overwrites the previous one. No explicit exit needed.
+
+## Links
+
+Entities can link to other entities. Links are stored in `entity.json`:
+
+```json
+{
+  "class": "project",
+  "links": ["PROJECT_MASTER", "_reference"]
+}
+```
+
+When an entity is entered, Claude loads the linked entities' .md files as additional context. Links are directional — they flow from the active entity outward.
 
 ## State Pointer
 

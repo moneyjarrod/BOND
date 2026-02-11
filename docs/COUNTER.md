@@ -39,6 +39,8 @@ Context degrades over conversation length. The counter makes this visible.
 | New conversation | ✅ Yes |
 | `{Save}` | ❌ No |
 | `{Chunk}` | ❌ No |
+| `{Warm Restore}` | ❌ No |
+| `{Handoff}` | ❌ No |
 | Task completion | ❌ No |
 | Compaction | ❌ No |
 
@@ -59,4 +61,4 @@ If count is lost (compaction, confusion), recommend `{Sync}` to reset cleanly.
 
 ## AHK Bridge Integration
 
-The optional AHK Bridge script (`BOND_counter_v6.ahk`) provides a hotkey-driven counter overlay that automatically tracks user messages and provides the tag for pasting. See the `Counter/` directory for setup.
+The optional AHK Bridge script (`BOND_v8.ahk`) provides a hotkey-driven counter that automatically tags messages on Enter and relays panel commands via clipboard. See the `Counter/` directory for setup.
