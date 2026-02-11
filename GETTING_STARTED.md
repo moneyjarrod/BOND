@@ -82,13 +82,13 @@ This is what makes BOND different.
 
 A **perspective** is a lens. You give it roots — identity statements that define how it sees the world. Then you turn on seeding (`SEED ON` on the card) and just... work.
 
-Every `{Sync}`, BOND checks your conversation against the perspective's roots. If something resonates, a new seed gets planted automatically. Over time, seeds that keep resonating survive. Seeds that don't get pruned. What remains IS the growth.
+Every `{Sync}`, BOND checks your conversation against the perspective's roots. If something resonates, a new seed gets planted automatically. Over time, seeds that keep resonating survive. Seeds that drift from the roots get pruned. What remains IS the growth.
 
 ```
 🌳 Roots  → You plant these. They define the lens.
 🌿 Seeds  → Auto-collected from conversation. Tested by exposure.
 🌱 Vine   → Roots + living seeds. The total growth.
-✂️ Pruned → Dead wood. Cut after enough exposure with no resonance.
+✂️ Pruned → Cut by identity alignment. Doesn't grow from the roots? Goes.
 ```
 
 You don't manage this. You just work. The vine grows or it doesn't.
