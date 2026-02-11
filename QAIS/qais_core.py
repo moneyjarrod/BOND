@@ -125,3 +125,19 @@ class QAISField:
         matches = [k for k in self.stored if k.startswith(prefix)]
         facts = [k.split('|', 2)[2] for k in matches if len(k.split('|', 2)) > 2]
         return {"identity": identity, "role": role, "facts": facts, "count": len(facts)}
+
+    def remove(self, identity, role, fact):
+        """Remove a binding by subtracting its vectors from the field.
+        Deterministic vectors allow exact reversal of store()."""
+        key = f"{identity}|{role}|{fact}"
+        if key not in self.stored:
+            return {"status": "not_found", "key": key}
+        self.stored.discard(key)
+        id_vec = seed_to_vector(identity)
+        fact_vec = seed_to_vector(fact)
+        self.identity_field -= id_vec
+        if role in self.role_fields:
+            self.role_fields[role] -= bind(id_vec, fact_vec)
+        self.count -= 1
+        self.save()
+        return {"status": "removed", "key": key, "count": self.count}

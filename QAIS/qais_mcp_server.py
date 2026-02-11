@@ -396,6 +396,32 @@ class QAISField:
                     return {"identity": identity, "role": role, "fact": fact, "found": True}
         return {"identity": identity, "role": role, "fact": None, "found": False}
 
+    def remove(self, identity, role, fact):
+        """Remove a binding by subtracting its vectors from the field.
+        Deterministic vectors allow exact reversal of store()."""
+        key = f"{identity}|{role}|{fact}"
+        if key not in self.stored:
+            return {"status": "not_found", "key": key}
+        self.stored.discard(key)
+        id_vec = seed_to_vector(identity)
+        fact_vec = seed_to_vector(fact)
+        self.identity_field -= id_vec
+        if role in self.role_fields:
+            self.role_fields[role] -= bind(id_vec, fact_vec)
+        self.count -= 1
+        # Update registries
+        if fact in self.fact_to_identities:
+            self.fact_to_identities[fact].discard(identity)
+            if not self.fact_to_identities[fact]:
+                del self.fact_to_identities[fact]
+                self.fact_vectors.pop(fact, None)
+        if identity in self.identity_to_facts:
+            self.identity_to_facts[identity].discard(fact)
+            if not self.identity_to_facts[identity]:
+                del self.identity_to_facts[identity]
+        self._save()
+        return {"status": "removed", "key": key, "count": self.count}
+
     def passthrough_v5(self, text, candidates, threshold=0.08, top_k=3):
         text_vec = text_to_vector_v5(text)
         keywords = text_to_keywords_v5(text)
@@ -543,6 +569,12 @@ TOOLS = [
          "perspective": {"type": "string", "description": "Perspective entity name (e.g. P11-Plumber)"},
          "text": {"type": "string", "description": "Conversation text to check for resonance"}
      }, "required": ["perspective", "text"]}},
+    {"name": "perspective_remove", "description": "Remove a pruned seed from a perspective's isolated QAIS field. Subtracts vectors for exact reversal. Used by Sync step 5d pruning execution.",
+     "inputSchema": {"type": "object", "properties": {
+         "perspective": {"type": "string", "description": "Perspective entity name (e.g. P11-Plumber)"},
+         "seed_title": {"type": "string", "description": "Seed name/title to remove"},
+         "seed_content": {"type": "string", "description": "Seed content text (must match what was stored)"}
+     }, "required": ["perspective", "seed_title", "seed_content"]}},
 ]
 
 
@@ -599,6 +631,13 @@ def handle_request(request):
                 store_result = pf.store(args["seed_title"], "seed", args["seed_content"])
                 result = {"perspective": args["perspective"], "seed": args["seed_title"],
                          "stored": store_result["status"] in ("stored", "exists"), "field_count": pf.count}
+            elif tool_name == "perspective_remove":
+                pf = get_perspective_field(args["perspective"])
+                # Remove seed: identity=title, role=seed, fact=content (mirrors perspective_store)
+                remove_result = pf.remove(args["seed_title"], "seed", args["seed_content"])
+                result = {"perspective": args["perspective"], "seed": args["seed_title"],
+                         "removed": remove_result["status"] == "removed", "field_count": pf.count,
+                         "detail": remove_result["status"]}
             elif tool_name == "perspective_check":
                 pf = get_perspective_field(args["perspective"])
                 if pf.count == 0:

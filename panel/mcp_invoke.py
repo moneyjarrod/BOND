@@ -212,6 +212,19 @@ def perspective_store(input_str):
     except Exception as e:
         return {"error": str(e)}
 
+def perspective_remove(input_str):
+    """Remove seed from perspective's isolated field. Input: perspective|seed_title|seed_content"""
+    try:
+        parts = input_str.split('|', 2)
+        if len(parts) < 3:
+            return {"error": "Format: perspective|seed_title|seed_content"}
+        perspective, seed_title, seed_content = parts[0].strip(), parts[1].strip(), parts[2].strip()
+        q = _get_perspective_field(perspective)
+        result = q.remove(perspective, seed_title, seed_content)
+        return {"perspective": perspective, "seed": seed_title, "removed": result["status"] == "removed", "field_count": q.count, "detail": result["status"]}
+    except Exception as e:
+        return {"error": str(e)}
+
 TOOLS = {
     "qais": {
         "stats": lambda _: qais_stats(),
@@ -220,6 +233,7 @@ TOOLS = {
         "store": qais_store,
         "get": qais_get,
         "perspective_store": perspective_store,
+        "perspective_remove": perspective_remove,
     },
     "iss": {
         "analyze": iss_analyze,
