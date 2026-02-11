@@ -28,6 +28,7 @@ TOOL_CAPABILITY = {
     'iss_analyze': 'iss', 'iss_compare': 'iss', 'iss_limbic': 'iss', 'iss_status': 'iss',
     'qais_resonate': 'qais', 'qais_exists': 'qais', 'qais_store': 'qais',
     'qais_stats': 'qais', 'qais_get': 'qais', 'qais_passthrough': 'qais',
+    'perspective_store': 'qais', 'perspective_check': 'qais',
     'heatmap_touch': 'heatmap', 'heatmap_hot': 'heatmap',
     'heatmap_chunk': 'heatmap', 'heatmap_clear': 'heatmap',
     'crystal': 'crystal', 'bond_gate': 'crystal',
@@ -50,6 +51,22 @@ def get_active_entity():
     except (FileNotFoundError, json.JSONDecodeError, KeyError):
         return None, None
 
+def has_armed_seeders():
+    """Check if any perspective entities have seeding: true.
+    Used for framework-level seed collection bypass (S98)."""
+    try:
+        for entry in os.listdir(DOCTRINE_PATH):
+            config_path = os.path.join(DOCTRINE_PATH, entry, 'entity.json')
+            if not os.path.isfile(config_path):
+                continue
+            with open(config_path, 'r') as f:
+                config = json.load(f)
+            if config.get('class') == 'perspective' and config.get('seeding'):
+                return True
+    except (OSError, json.JSONDecodeError):
+        pass
+    return False
+
 def validate_tool_call(tool_name):
     entity, entity_class = get_active_entity()
     if not entity or not entity_class:
@@ -59,6 +76,11 @@ def validate_tool_call(tool_name):
         return True, None
     allowed = CLASS_TOOLS.get(entity_class, CLASS_TOOLS['library'])
     if allowed.get(capability, False):
+        return True, None
+    # Framework-level seed bypass (S98):
+    # Seed collection tools allowed through any entity class when armed seeders exist.
+    # The active entity does NOT absorb QAIS — these tools serve the perspectives.
+    if tool_name in ('qais_passthrough', 'perspective_store', 'perspective_check') and has_armed_seeders():
         return True, None
     return False, {
         'blocked': True, 'tool': tool_name, 'capability': capability,

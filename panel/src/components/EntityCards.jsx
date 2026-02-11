@@ -4,7 +4,8 @@
 // Perspective: Unbounded growth, Files + QAIS + Heatmap + Crystal
 // Library: Reference shelf, Files only
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useContext, useEffect } from 'react';
+import { WebSocketContext } from '../context/WebSocketContext';
 
 // Tool definitions with class availability
 const TOOLS = [
@@ -124,6 +125,17 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [saved, setSaved] = useState(false);
+  const [seeding, setSeeding] = useState(entity.seeding || false);
+  const [seedingLoading, setSeedingLoading] = useState(false);
+  const { lastEvent } = useContext(WebSocketContext);
+
+  // Sync seeding state from WebSocket events
+  useEffect(() => {
+    if (!lastEvent) return;
+    if (lastEvent.type === 'seed_toggled' && lastEvent.entity === entity.name) {
+      setSeeding(lastEvent.detail.seeding);
+    }
+  }, [lastEvent, entity.name]);
 
   const handleToggle = useCallback((toolId) => {
     if (onToolToggle) {
@@ -152,6 +164,23 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
     if (e.key === 'Enter') handleEditSave();
     if (e.key === 'Escape') setEditing(false);
   }, [handleEditSave]);
+
+  const handleSeedToggle = useCallback(async () => {
+    if (entity.type !== 'perspective' || seedingLoading) return;
+    setSeedingLoading(true);
+    try {
+      const res = await fetch(`http://localhost:3000/api/doctrine/${entity.name}/seeding`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seeding: !seeding }),
+      });
+      if (res.ok) setSeeding(!seeding);
+    } catch (err) {
+      console.error('Seed toggle failed:', err);
+    } finally {
+      setSeedingLoading(false);
+    }
+  }, [entity.name, entity.type, seeding, seedingLoading]);
 
   const displayName = entity.display_name || entity.name;
   const showFolder = entity.display_name && entity.display_name !== entity.name;
@@ -226,7 +255,26 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
             <>🔒 {entity.doctrine_count} core · 🌱 {entity.growth_count} growth</>
           )}
           {entity.type === 'perspective' && (
-            <>🌿 {entity.seed_count} seeds · 🌱 {entity.growth_count} growth</>
+            <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span>🌿 {entity.seed_count} seeds · 🌱 {entity.growth_count} growth</span>
+              <button
+                onClick={(e) => { e.stopPropagation(); handleSeedToggle(); }}
+                disabled={seedingLoading || isEmpty}
+                title={seeding ? 'Seed collection ON — click to pause' : 'Seed collection OFF — click to arm'}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 3,
+                  padding: '1px 7px', fontSize: '0.65rem', fontFamily: 'var(--font-mono)',
+                  background: seeding ? 'rgba(76,175,80,0.15)' : 'transparent',
+                  color: seeding ? '#4caf50' : 'var(--text-muted)',
+                  border: `1px solid ${seeding ? 'rgba(76,175,80,0.4)' : 'var(--border)'}`,
+                  borderRadius: 'var(--radius-sm)', cursor: isEmpty ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.15s ease', opacity: seedingLoading ? 0.5 : 1,
+                }}
+              >
+                <span style={{ fontSize: '0.6rem' }}>{seeding ? '🟢' : '⏸️'}</span>
+                <span>{seeding ? 'SEED ON' : 'SEED OFF'}</span>
+              </button>
+            </span>
           )}
           {entity.type === 'library' && (
             <>📄 {entity.files.length} files</>

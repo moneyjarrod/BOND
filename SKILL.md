@@ -17,7 +17,7 @@ No reset: {Save}, {Chunk}, {Warm Restore}, {Handoff}, bonfire, task completion, 
 Lost count: recommend {Sync}.
 
 ## SYNC
-{Sync}: 1) Read project SKILL 2) Read OPS/MASTER 3) Read state/active_entity.json — if entity set, read all files at path field; then read entity's entity.json for links array, load linked entities' .md files; if null, skip 4) Reset counter.
+{Sync}: 1) Read project SKILL 2) Read OPS/MASTER 3) Read state/active_entity.json — if entity set, read all files at path field; then read entity's entity.json for links array, load linked entities' .md files; if null, skip 4) Read state/config.json for save_confirmation toggle 5) Seed check: GET /api/seeders — if any armed perspectives returned, run perspective_check(perspective, text) for each armed perspective with substantive content from recent exchanges. Each perspective has its own isolated QAIS field. Score > 0.08 = flag to user for approval. On approve: write .md + perspective_store + log to data/seed_decisions.jsonl. On reject: log only. If no seeders armed, skip. On first arm, bootstrap seeds via perspective_store. 6) Reset counter.
 {Full Restore}: {Sync} + full depth read.
 {Warm Restore}: Selective session pickup via SLA. Panel runs SPECTRA (warm_restore.py via /api/warm-restore endpoint), writes result to state/warm_restore_output.md. Claude reads pre-computed output. Two layers:
   Layer 1 (always): Most recent handoff. Guaranteed context.
@@ -33,12 +33,30 @@ Lost count: recommend {Sync}.
 ## COMMANDS
 {Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (last handoff + archive query with badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot | {Tick} quick status | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Relational} arch re-anchor | {Drift?} self-check
 
+## TOOL WIRING
+Command tools (fire on command, respect class boundaries):
+{Full Restore} → heatmap_hot(top_k=5), qais_passthrough with session context
+{Warm Restore} → read state/warm_restore_output.md (pre-computed by panel endpoint /api/warm-restore), heatmap_hot(top_k=3) for signal boost. Panel runs SPECTRA, writes badges to file, Claude reads result.
+{Crystal} → iss_analyze on chunk text, crystal to QAIS, heatmap_chunk snapshot
+{Chunk} → heatmap_chunk snapshot
+{Tick} → heatmap_hot(top_k=3) for warm concepts
+{Save} → after write, qais_store binding (entity|role=save|fact=what was saved)
+Seed tools (framework-level, bypass class boundaries when seeders armed):
+perspective_store — bootstrap seed content into perspective's isolated .npz field
+perspective_check — check conversation text against perspective's field, returns scored matches
+Discretionary tools (Claude judgment, no command needed):
+iss_analyze — evaluating text quality, comparing drafts, auditing doctrine
+iss_limbic — conversation shifts personal, relational, or emotionally significant
+qais_passthrough — recall triggers ("remember when", "why did we", "back in session")
+heatmap_touch — when actively working on a concept, touch it
+
 ## ENTITIES (B69)
 Doctrine: static IS, Files+ISS, no growth. Project: bounded, Files+QAIS+Heatmap+Crystal+ISS, carries CORE. Perspective: unbounded growth, Files+QAIS+Heatmap+Crystal, no ISS. Library: reference, Files only.
 Pointer: state/active_entity.json. Panel writes Enter, clears Exit. {Sync} follows pointer. Switch overwrites — no drop needed. Class boundaries hard.
 
 ## SAVE
 Both agree before writing. Proof required (screenshot/test/confirmation). Bug to Fix link: Symptom + Fix + Link.
+If state/config.json has save_confirmation:true, present ask_user_input widget before every file write. Three options: Both agree (write), Show change first (diff then re-ask), Don't write (stand down). User can bypass verbally. Toggle off in panel.
 
 ## TRUTH
 L0 SKILL (identity) then L1 OPS/MASTER (state) then L2 Code (SOURCE OF TRUTH). Higher overrides lower. Code > prose.

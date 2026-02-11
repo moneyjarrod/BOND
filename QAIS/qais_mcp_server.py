@@ -18,6 +18,8 @@ Tools:
   - heatmap_touch/hot/chunk/clear: Session heat map
   - bond_gate: Conditional routing gate
   - crystal: Persistent crystallization
+  - perspective_store: Store seed into perspective's isolated field
+  - perspective_check: Check text against perspective's seeds
 """
 
 import json
@@ -231,10 +233,20 @@ def get_crystal():
 # QAIS Field — Resonance Storage
 # ═════════════════════════════════════════════════════
 
-SYNONYMS = {'config': ['configuration', 'configure'], 'configuration': ['config'],
+SYNONYMS = {'meter': ['m', 'meters', 'metre'], 'm': ['meter', 'meters'], 'meters': ['m', 'meter'],
+    'config': ['configuration', 'configure'], 'configuration': ['config'],
     'params': ['parameters', 'param'], 'parameters': ['params'],
     'derive': ['compute', 'calculate', 'derived'], 'compute': ['derive', 'calculate'],
     'store': ['save', 'persist', 'stored'], 'save': ['store', 'persist']}
+UNIT_EXPANSIONS = {'m': 'meter', 'ms': 'millisecond', 's': 'second', 'km': 'kilometer', 'cm': 'centimeter'}
+
+def normalize_number_units(text):
+    result = text
+    for abbrev, full in UNIT_EXPANSIONS.items():
+        pattern = r'(\d+)' + abbrev + r'\b'
+        replacement = r'\1 ' + full
+        result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+    return result
 
 def expand_synonyms(keywords):
     expanded = set(keywords)
@@ -245,6 +257,7 @@ def expand_synonyms(keywords):
     return list(expanded)
 
 def text_to_keywords_v5(text):
+    text = normalize_number_units(text)
     words = re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', text.lower())
     keywords = [w for w in words if len(w) > 2 and w not in STOPWORDS]
     keywords = expand_synonyms(keywords)
@@ -441,6 +454,27 @@ def get_field():
 
 
 # ═════════════════════════════════════════════════════
+# Perspective Isolated Fields (S98)
+# ═════════════════════════════════════════════════════
+# Each perspective gets its own tiny .npz field.
+# Seed content resonates in isolation — no global field noise.
+
+PERSPECTIVE_FIELDS = {}
+PERSPECTIVE_DATA_DIR = os.path.join(
+    os.environ.get('BOND_ROOT', os.path.join(os.path.dirname(__file__), '..')),
+    'data', 'perspectives'
+)
+os.makedirs(PERSPECTIVE_DATA_DIR, exist_ok=True)
+
+def get_perspective_field(perspective):
+    """Get or create an isolated QAISField for a perspective."""
+    if perspective not in PERSPECTIVE_FIELDS:
+        field_path = os.path.join(PERSPECTIVE_DATA_DIR, f"{perspective}.npz")
+        PERSPECTIVE_FIELDS[perspective] = QAISField(field_path)
+    return PERSPECTIVE_FIELDS[perspective]
+
+
+# ═════════════════════════════════════════════════════
 # MCP Tool Definitions
 # ═════════════════════════════════════════════════════
 
@@ -498,6 +532,17 @@ TOOLS = [
          "project": {"type": "string", "description": "Project name (default: BOND)"},
          "context": {"type": "string", "description": "Optional context"}
      }, "required": ["chunk_text", "session_num"]}},
+    {"name": "perspective_store", "description": "Store a seed into a perspective's isolated QAIS field. Each perspective has its own .npz field for tight resonance.",
+     "inputSchema": {"type": "object", "properties": {
+         "perspective": {"type": "string", "description": "Perspective entity name (e.g. P11-Plumber)"},
+         "seed_title": {"type": "string", "description": "Seed name/title"},
+         "seed_content": {"type": "string", "description": "Seed content text"}
+     }, "required": ["perspective", "seed_title", "seed_content"]}},
+    {"name": "perspective_check", "description": "Check conversation text against a perspective's isolated field for seed resonance. Returns scored matches. Used by Sync step 5 seed collection.",
+     "inputSchema": {"type": "object", "properties": {
+         "perspective": {"type": "string", "description": "Perspective entity name (e.g. P11-Plumber)"},
+         "text": {"type": "string", "description": "Conversation text to check for resonance"}
+     }, "required": ["perspective", "text"]}},
 ]
 
 
@@ -549,6 +594,32 @@ def handle_request(request):
             elif tool_name == "crystal":
                 result = get_crystal().crystallize(args["chunk_text"], args["session_num"],
                     args.get("project", "BOND"), args.get("context"))
+            elif tool_name == "perspective_store":
+                pf = get_perspective_field(args["perspective"])
+                store_result = pf.store(args["seed_title"], "seed", args["seed_content"])
+                result = {"perspective": args["perspective"], "seed": args["seed_title"],
+                         "stored": store_result["status"] in ("stored", "exists"), "field_count": pf.count}
+            elif tool_name == "perspective_check":
+                pf = get_perspective_field(args["perspective"])
+                if pf.count == 0:
+                    result = {"perspective": args["perspective"], "matches": [],
+                             "note": "Field empty — no seeds stored yet. Use perspective_store to bootstrap."}
+                else:
+                    text_vec = text_to_vector_v5(args["text"])
+                    matches = []
+                    seen = set()
+                    for key in pf.stored:
+                        parts = key.split('|', 2)
+                        if len(parts) == 3:
+                            title, role, content = parts
+                            if title in seen:
+                                continue
+                            seen.add(title)
+                            seed_vec = text_to_vector_v5(content)
+                            score = float(np.dot(text_vec, seed_vec) / N)
+                            matches.append({"seed": title, "content_preview": content[:80], "score": round(score, 4)})
+                    matches.sort(key=lambda x: -x["score"])
+                    result = {"perspective": args["perspective"], "matches": matches, "field_count": pf.count}
             else:
                 return {"jsonrpc": "2.0", "id": req_id, "error": {
                     "code": -32601, "message": f"Unknown tool: {tool_name}"}}

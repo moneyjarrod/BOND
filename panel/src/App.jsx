@@ -1,7 +1,7 @@
 // BOND Control Panel — App Shell
 // B69: Four-Class Entity Architecture
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useContext } from 'react';
 import Header from './components/Header';
 import CommandBar from './components/CommandBar';
 import SystemStatus from './components/SystemStatus';
@@ -17,6 +17,7 @@ import { useEntities } from './hooks/useDoctrine';
 // useBridge removed S85 (Dead Code Audit) — clipboard is native in App.jsx
 import { useModules } from './hooks/useModules';
 import { useSearch } from './hooks/useSearch';
+import { WebSocketProvider, WebSocketContext } from './context/WebSocketContext';
 import './styles/bond.css';
 
 const TABS = [
@@ -31,6 +32,14 @@ const TABS = [
 // Uses Vite proxy in dev, relative in prod
 
 export default function App() {
+  return (
+    <WebSocketProvider>
+      <AppInner />
+    </WebSocketProvider>
+  );
+}
+
+function AppInner() {
   const [activeTab, setActiveTab] = useState('doctrine');
   const [viewerTarget, setViewerTarget] = useState(null);
   const [activeEntity, setActiveEntity] = useState(null);
@@ -72,7 +81,25 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', onFocus);
   }, [refreshState]);
 
+  // ─── WebSocket live updates ─────────────────────────────
+  const { lastEvent, connected: wsConnected } = useContext(WebSocketContext);
 
+  useEffect(() => {
+    if (!lastEvent) return;
+    const { type } = lastEvent;
+    if (type === 'file_added' || type === 'file_changed' || type === 'link_changed') {
+      refresh();
+    }
+    if (type === 'state_changed') {
+      refreshState();
+    }
+    if (type === 'config_changed' && lastEvent.detail?.config) {
+      setBondConfig(lastEvent.detail.config);
+    }
+    if (type === 'entity_changed' || type === 'tool_toggled') {
+      refresh();
+    }
+  }, [lastEvent, refresh, refreshState]);
 
   // ─── Entity actions ─────────────────────────────────────
 
@@ -270,6 +297,7 @@ export default function App() {
         classCounts={classCounts}
         saveConfirmation={bondConfig.save_confirmation}
         onSaveConfirmToggle={handleSaveConfirmToggle}
+        wsConnected={wsConnected}
       />
 
       <EntityBar activeEntity={activeEntity} linkedEntities={linkedEntities} onExit={handleExit} onUnlink={handleUnlink} />
