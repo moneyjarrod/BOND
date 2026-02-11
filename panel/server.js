@@ -1290,8 +1290,21 @@ ${files || 'No files recorded.'}
     }
 
     await writeFile(filePath, content);
-    console.log(`\u{1F4CB} Handoff written: ${filename}`);
-    res.json({ written: true, filename, path: resolved });
+
+    // Verify write landed (S103: ghost write protection)
+    try {
+      const verify = await readFile(filePath, 'utf-8');
+      if (!verify || verify.length < 10) {
+        console.error(`❌ Handoff verify failed: ${filename} (empty or missing after write)`);
+        return res.status(500).json({ error: 'Write verification failed — file empty after write' });
+      }
+    } catch (verifyErr) {
+      console.error(`❌ Handoff verify failed: ${filename} (${verifyErr.message})`);
+      return res.status(500).json({ error: `Write verification failed — ${verifyErr.message}` });
+    }
+
+    console.log(`\u{1F4CB} Handoff written + verified: ${filename} (${content.length} bytes)`);
+    res.json({ written: true, filename, path: resolved, verified: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

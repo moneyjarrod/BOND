@@ -32,13 +32,14 @@ Lost count: recommend {Sync}.
      What remains IS the growth.
   If no seeders armed, skip. On first arm, bootstrap seeds via perspective_store. 6) Reset counter.
 {Full Restore}: {Sync} + full depth read.
-{Warm Restore}: Selective session pickup via SLA. Panel runs SPECTRA (warm_restore.py via /api/warm-restore endpoint), writes result to state/warm_restore_output.md. Claude reads pre-computed output. Two layers:
+{Warm Restore}: Selective session pickup via SLA. Panel runs SPECTRA (warm_restore.py via /api/warm-restore endpoint), writes result to state/warm_restore_output.md. Claude reads the file and echoes it to the user preserving all badges and formatting — do NOT summarize or paraphrase the output. The file contains pre-computed confidence badges that must appear in Claude's response exactly as written. Two layers:
   Layer 1 (always): Most recent handoff. Guaranteed context.
   Layer 2 (contextual): SLA query against archive (excluding Layer 1). Entity + user message as signal. Query entered via panel prompt.
-  Output: Confidence badge display.
+  Badges in the output file:
     Triangle header: 🔺 GREEN (all HIGH) / YELLOW (mixed) / RED (LOW dominant).
     Per-section badges: 🟢 HIGH / 🟡 MED / 🔴 LOW / ⚪ SIBLING.
     On RED: show cautionary note explaining why confidence is low, suggest narrower query.
+  Claude reads the file, echoes the badged sections, then adds a brief pickup summary and asks what to work on. Do not strip, reformat, or consolidate the badge output.
   No counter reset. Does not replace {Full Restore} — use Full for comprehensive cold boot, Warm for contextual pickup.
   See: doctrine/BOND_MASTER/WARM_RESTORE.md for full architecture.
 {Handoff}: Draft WORK, DECISIONS, THREADS, FILES sections for session handoff.
