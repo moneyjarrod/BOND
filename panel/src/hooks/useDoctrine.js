@@ -33,9 +33,8 @@ export function useEntityFiles(entityName) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
+  const fetchFiles = useCallback(() => {
     if (!entityName) { setFiles([]); return; }
-    let cancelled = false;
     setLoading(true);
     setError(null);
     fetch(`/api/doctrine/${encodeURIComponent(entityName)}`)
@@ -43,13 +42,14 @@ export function useEntityFiles(entityName) {
         if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
         return res.json();
       })
-      .then(data => { if (!cancelled) setFiles(data.files || []); })
-      .catch(err => { if (!cancelled) setError(err.message); })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .then(data => setFiles(data.files || []))
+      .catch(err => setError(err.message))
+      .finally(() => setLoading(false));
   }, [entityName]);
 
-  return { files, loading, error };
+  useEffect(() => { fetchFiles(); }, [fetchFiles]);
+
+  return { files, loading, error, refresh: fetchFiles };
 }
 
 export function useFileContent(entityName, fileName) {
@@ -57,9 +57,8 @@ export function useFileContent(entityName, fileName) {
   const [meta, setMeta] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const fetchContent = useCallback(() => {
     if (!entityName || !fileName) { setContent(null); setMeta(null); return; }
-    let cancelled = false;
     setLoading(true);
     fetch(`/api/doctrine/${encodeURIComponent(entityName)}/${encodeURIComponent(fileName)}`)
       .then(res => {
@@ -67,14 +66,13 @@ export function useFileContent(entityName, fileName) {
         return res.json();
       })
       .then(data => {
-        if (!cancelled) {
-          setContent(data.content);
-          setMeta({ type: data.type, file: data.file, entity: data.entity });
-        }
+        setContent(data.content);
+        setMeta({ type: data.type, file: data.file, entity: data.entity });
       })
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
+      .finally(() => setLoading(false));
   }, [entityName, fileName]);
 
-  return { content, meta, loading };
+  useEffect(() => { fetchContent(); }, [fetchContent]);
+
+  return { content, meta, loading, refresh: fetchContent };
 }

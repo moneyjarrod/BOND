@@ -33,6 +33,7 @@ const BASE_PERSPECTIVES = Array.from({ length: 10 }, (_, i) => {
     files: [],
     tools: { filesystem: true, qais: true, heatmap: true, crystal: true },
     seed_count: 0,
+    root_count: 0,
     growth_count: 0,
     doctrine_count: 0,
     core: null,
@@ -256,7 +257,7 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
           )}
           {entity.type === 'perspective' && (
             <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span>🌿 {entity.seed_count} seeds · 🌱 {entity.growth_count} growth</span>
+              <span>{entity.root_count > 0 ? `🌳 ${entity.root_count} roots · ` : ''}🌿 {entity.seed_count} seeds · 🌱 {entity.growth_count} growth</span>
               <button
                 onClick={(e) => { e.stopPropagation(); handleSeedToggle(); }}
                 disabled={seedingLoading || isEmpty}

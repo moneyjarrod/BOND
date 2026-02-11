@@ -188,6 +188,30 @@ def qais_get(input_str):
     except Exception as e:
         return {"error": str(e)}
 
+# ─── Perspective Tools ─────────────────────────────────────
+
+def _get_perspective_field(perspective):
+    """Load isolated QAISField for a perspective entity."""
+    perspectives_dir = os.path.join(BOND_ROOT, 'data', 'perspectives')
+    os.makedirs(perspectives_dir, exist_ok=True)
+    field_path = os.path.join(perspectives_dir, f"{perspective}.npz")
+    sys.path.insert(0, QAIS_PATH)
+    from qais_core import QAISField
+    return QAISField(field_path=field_path)
+
+def perspective_store(input_str):
+    """Store seed into perspective's isolated field. Input: perspective|seed_title|seed_content"""
+    try:
+        parts = input_str.split('|', 2)
+        if len(parts) < 3:
+            return {"error": "Format: perspective|seed_title|seed_content"}
+        perspective, seed_title, seed_content = parts[0].strip(), parts[1].strip(), parts[2].strip()
+        q = _get_perspective_field(perspective)
+        result = q.store(perspective, seed_title, seed_content)
+        return {"perspective": perspective, "seed": seed_title, "stored": True, "field_count": q.count}
+    except Exception as e:
+        return {"error": str(e)}
+
 TOOLS = {
     "qais": {
         "stats": lambda _: qais_stats(),
@@ -195,6 +219,7 @@ TOOLS = {
         "resonate": qais_resonate,
         "store": qais_store,
         "get": qais_get,
+        "perspective_store": perspective_store,
     },
     "iss": {
         "analyze": iss_analyze,
@@ -212,7 +237,7 @@ TOOLS = {
 
 def main():
     if len(sys.argv) < 3:
-        print(json.dumps({"error": "Usage: mcp_invoke.py <system> <tool> [input]"}))
+        print(json.dumps({"error": "Usage: mcp_invoke.py <s> <tool> [input]"}))
         return
 
     system = sys.argv[1]
