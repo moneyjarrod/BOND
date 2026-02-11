@@ -1,8 +1,10 @@
 # PowerShell Installation Script for BOND
 # Usage: irm https://moneyjarrod.github.io/BOND/install.ps1 | iex
 
+try {
+
 # Allow scripts to run in this session (needed for npm.ps1 wrapper)
-Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass -Force 2>$null
 
 Write-Host ""
 Write-Host "  BOND Installer" -ForegroundColor Yellow
@@ -118,10 +120,8 @@ Write-Host ""
 Write-Host "[5/5] Starting BOND..." -ForegroundColor Cyan
 Write-Host ""
 
-Push-Location "$BOND_ROOT\panel"
-
-# Start sidecar
-Start-Process -WindowStyle Minimized -FilePath "node" -ArgumentList "server.js"
+# Start sidecar using cmd (avoids PowerShell execution policy issues)
+Start-Process cmd -ArgumentList "/c cd /d `"$BOND_ROOT\panel`" && node server.js" -WindowStyle Minimized
 Write-Host "   [OK] Server starting..." -ForegroundColor Green
 
 # Check for production build
@@ -130,13 +130,11 @@ if (Test-Path "$BOND_ROOT\panel\dist\index.html") {
     Start-Sleep -Seconds 3
     Start-Process "http://localhost:$BOND_PORT"
 } else {
-    Start-Process -WindowStyle Minimized -FilePath "npx.cmd" -ArgumentList "vite"
+    Start-Process cmd -ArgumentList "/c cd /d `"$BOND_ROOT\panel`" && npx vite" -WindowStyle Minimized
     Write-Host "   [OK] Dev server starting..." -ForegroundColor Green
-    Start-Sleep -Seconds 4
+    Start-Sleep -Seconds 5
     Start-Process "http://localhost:5173"
 }
-
-Pop-Location
 
 Write-Host ""
 Write-Host "  ====================================" -ForegroundColor DarkGray
@@ -150,3 +148,10 @@ Write-Host ""
 Write-Host "  Next: Add the BOND skill to a Claude Project," -ForegroundColor Yellow
 Write-Host "  configure MCP servers, then type {Sync}" -ForegroundColor Yellow
 Write-Host ""
+
+} catch {
+    Write-Host ""
+    Write-Host "  [ERROR] Something went wrong: $_" -ForegroundColor Red
+    Write-Host "  Please report this at: https://github.com/moneyjarrod/BOND/issues" -ForegroundColor Yellow
+    Write-Host ""
+}
