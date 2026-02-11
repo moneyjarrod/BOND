@@ -73,6 +73,30 @@
   .card-title { font-size: 1.15rem; font-weight: 600; margin-bottom: 4px; }
   .card-desc { font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 20px; }
 
+  .install-hero { display: flex; flex-direction: column; align-items: center; gap: 16px; margin-bottom: 24px; }
+  .install-hero-btn {
+    width: 100%; padding: 18px 24px; background: linear-gradient(135deg, rgba(210,153,34,0.15), rgba(210,153,34,0.05));
+    border: 2px solid rgba(210,153,34,0.5); border-radius: var(--radius-lg); cursor: pointer;
+    transition: all 0.2s ease; text-align: center;
+  }
+  .install-hero-btn:hover { background: rgba(210,153,34,0.2); box-shadow: 0 0 24px var(--amber-glow); border-color: var(--amber); }
+  .install-hero-btn .hero-icon { font-size: 2rem; margin-bottom: 6px; }
+  .install-hero-btn .hero-label { font-family: var(--font-ui); font-size: 1.1rem; font-weight: 700; color: var(--amber); letter-spacing: 0.5px; }
+  .install-hero-btn .hero-desc { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary); margin-top: 4px; }
+
+  .install-divider { display: flex; align-items: center; gap: 12px; width: 100%; margin: 4px 0; }
+  .install-divider-line { flex: 1; height: 1px; background: var(--border); }
+  .install-divider-text { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); }
+
+  .customize-btn {
+    padding: 10px 20px; background: transparent; border: 1px solid var(--border);
+    border-radius: var(--radius-md); cursor: pointer; color: var(--text-secondary);
+    font-family: var(--font-mono); font-size: 0.78rem; transition: all 0.15s ease;
+  }
+  .customize-btn:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-dim); }
+
+  .welcome-req { font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); text-align: center; margin-top: 4px; }
+
   .welcome-features { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
   .welcome-feature { display: flex; align-items: flex-start; gap: 10px; padding: 12px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.8rem; color: var(--text-secondary); }
   .welcome-feature-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
@@ -107,6 +131,10 @@
   .review-path { padding: 8px 12px; background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.78rem; color: var(--teal); word-break: break-all; }
   .script-preview { background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary); line-height: 1.7; max-height: 260px; overflow-y: auto; white-space: pre; margin-top: 12px; }
 
+  .mcp-block { background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--teal); line-height: 1.7; white-space: pre; margin-top: 12px; max-height: 200px; overflow-y: auto; position: relative; }
+  .copy-btn { position: absolute; top: 8px; right: 8px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-secondary); padding: 4px 10px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.65rem; cursor: pointer; }
+  .copy-btn:hover { color: var(--amber); border-color: var(--amber); }
+
   .complete-icon { font-size: 3rem; text-align: center; margin-bottom: 12px; animation: popIn 0.5s ease; }
   .complete-title { text-align: center; font-size: 1.3rem; font-weight: 700; color: var(--green); margin-bottom: 6px; }
   .complete-desc { text-align: center; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px; }
@@ -114,10 +142,6 @@
   .next-step { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.8rem; color: var(--text-secondary); }
   .next-step-num { width: 22px; height: 22px; border-radius: 50%; background: var(--amber-dim); border: 1px solid rgba(210,153,34,0.3); color: var(--amber); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 0.65rem; font-weight: 600; flex-shrink: 0; }
   .next-step code { font-family: var(--font-mono); background: var(--bg-deep); padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; color: var(--teal); }
-
-  .mcp-block { background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--teal); line-height: 1.7; white-space: pre; margin-top: 12px; max-height: 200px; overflow-y: auto; position: relative; }
-  .copy-btn { position: absolute; top: 8px; right: 8px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-secondary); padding: 4px 10px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.65rem; cursor: pointer; }
-  .copy-btn:hover { color: var(--amber); border-color: var(--amber); }
 
   .wizard-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
   .btn { padding: 10px 24px; font-family: var(--font-mono); font-size: 0.82rem; font-weight: 500; border-radius: var(--radius-md); cursor: pointer; transition: all 0.15s ease; border: 1px solid; }
@@ -145,7 +169,7 @@
   <div class="wizard-header">
     <div class="wizard-logo">🔥🌊</div>
     <div class="wizard-title">BOND</div>
-    <div class="wizard-subtitle">Installation Wizard v2.0</div>
+    <div class="wizard-subtitle">Installation Wizard v3.0</div>
   </div>
   <div class="progress-bar" id="progress"></div>
   <div class="wizard-card" id="card"></div>
@@ -153,16 +177,20 @@
 </div>
 
 <script>
-const STEPS = ['Welcome', 'Components', 'Configure', 'Review', 'MCP Config', 'Complete'];
+let mode = 'full';
+
+const STEPS_FULL   = ['Welcome', 'Configure', 'Review', 'MCP Config', 'Complete'];
+const STEPS_CUSTOM = ['Welcome', 'Components', 'Configure', 'Review', 'MCP Config', 'Complete'];
 let step = 0;
+
+function getSteps() { return mode === 'full' ? STEPS_FULL : STEPS_CUSTOM; }
 
 const state = {
   components: {
     panel:    { selected: true,  required: true,  name: 'Control Panel',    desc: 'React dashboard + Express sidecar + tool auth', icon: '🖥️' },
     qais:    { selected: true,  required: false, name: 'QAIS Memory',      desc: 'Resonance storage, heat map, crystal persistence', icon: '🔮', badge: 'recommended' },
     iss:     { selected: true,  required: false, name: 'ISS Analysis',     desc: 'Semantic force measurement + limbic perception', icon: '🧠', badge: 'recommended' },
-    ahk:     { selected: true,  required: false, name: 'AHK Bridge',       desc: 'Clipboard bridge + counter (Windows)', icon: '🔗' },
-    starter: { selected: true,  required: false, name: 'Starter Entities',  desc: 'BOND_MASTER doctrine + reference library template', icon: '📦' },
+    ahk:     { selected: true,  required: false, name: 'AHK Bridge',       desc: 'Counter + clipboard bridge (Windows)', icon: '🔗' },
     sla:     { selected: true,  required: false, name: 'SLA Retrieval',     desc: 'Spectral Lexical Addressing — deterministic text retrieval', icon: '🔍' },
     skills:  { selected: true,  required: false, name: 'Claude Skill',      desc: 'BOND protocol skill file for Claude', icon: '🎯' },
     docs:    { selected: true,  required: false, name: 'Documentation',     desc: 'Commands, entities, counter, search reference', icon: '📖' },
@@ -180,28 +208,32 @@ function render() {
 }
 
 function renderProgress() {
+  const steps = getSteps();
   const el = document.getElementById('progress');
   let html = '';
-  STEPS.forEach((s, i) => {
+  steps.forEach((s, i) => {
     const cls = i < step ? 'done' : i === step ? 'active' : '';
     const icon = i < step ? '✓' : i + 1;
     html += `<div class="step-dot ${cls}">${icon}</div>`;
-    if (i < STEPS.length - 1) html += `<div class="step-line ${i < step ? 'done' : ''}"></div>`;
+    if (i < steps.length - 1) html += `<div class="step-line ${i < step ? 'done' : ''}"></div>`;
   });
   el.innerHTML = html;
 }
 
 function renderFooter() {
+  const steps = getSteps();
   const el = document.getElementById('footer');
-  if (step === 0) {
-    el.innerHTML = `<div></div><button class="btn btn-next" onclick="next()">Get Started →</button>`;
-  } else if (step === STEPS.length - 1) {
+  const stepName = steps[step];
+
+  if (stepName === 'Welcome') {
+    el.innerHTML = '';
+  } else if (stepName === 'Complete') {
     el.innerHTML = `<div></div><button class="btn btn-next" onclick="window.location.reload()">Start Over</button>`;
-  } else if (step === 3) {
+  } else if (stepName === 'Review') {
     el.innerHTML = `
       <button class="btn btn-back" onclick="prev()">← Back</button>
       <div style="display:flex;gap:8px;">
-        <button class="btn btn-download" onclick="downloadScript()">⬇ Download install.bat</button>
+        <button class="btn btn-download" onclick="downloadScript()">⬇ Download install_bond.bat</button>
         <button class="btn btn-next" onclick="next()">Continue →</button>
       </div>`;
   } else {
@@ -212,37 +244,59 @@ function renderFooter() {
 }
 
 function renderCard() {
+  const steps = getSteps();
   const el = document.getElementById('card');
   el.style.animation = 'none'; el.offsetHeight; el.style.animation = 'fadeInUp 0.35s ease';
-  switch(step) {
-    case 0: return renderWelcome(el);
-    case 1: return renderComponents(el);
-    case 2: return renderConfigure(el);
-    case 3: return renderReview(el);
-    case 4: return renderMCPConfig(el);
-    case 5: return renderComplete(el);
+  const stepName = steps[step];
+  switch(stepName) {
+    case 'Welcome':    return renderWelcome(el);
+    case 'Components': return renderComponents(el);
+    case 'Configure':  return renderConfigure(el);
+    case 'Review':     return renderReview(el);
+    case 'MCP Config': return renderMCPConfig(el);
+    case 'Complete':   return renderComplete(el);
   }
 }
 
-// ─── Step 0: Welcome ─────────────────────────────────
 function renderWelcome(el) {
   el.innerHTML = `
     <div class="card-title">Welcome to BOND</div>
-    <div class="card-desc">Persistence and continuity framework for human-AI collaboration.</div>
-    <div class="welcome-features">
-      <div class="welcome-feature"><span class="welcome-feature-icon">🖥️</span><div class="welcome-feature-text"><strong>Control Panel</strong>Dark-themed dashboard for entities, modules, and commands.</div></div>
-      <div class="welcome-feature"><span class="welcome-feature-icon">🔮</span><div class="welcome-feature-text"><strong>QAIS Memory</strong>Resonance-based persistent context across sessions.</div></div>
-      <div class="welcome-feature"><span class="welcome-feature-icon">🧠</span><div class="welcome-feature-text"><strong>ISS Analysis</strong>Semantic force measurement and limbic perception.</div></div>
-      <div class="welcome-feature"><span class="welcome-feature-icon">📜</span><div class="welcome-feature-text"><strong>Entity System</strong>Four-class architecture: Doctrine, Project, Perspective, Library.</div></div>
-      <div class="welcome-feature"><span class="welcome-feature-icon">🔗</span><div class="welcome-feature-text"><strong>Clipboard Bridge</strong>Panel → AHK → Claude. Seamless command relay.</div></div>
-      <div class="welcome-feature"><span class="welcome-feature-icon">🔍</span><div class="welcome-feature-text"><strong>SLA Retrieval</strong>Deterministic spectral text retrieval in the panel.</div></div>
+    <div class="card-desc">A governed runtime for persistent human-AI collaboration.</div>
+
+    <div class="install-hero">
+      <div class="install-hero-btn" onclick="startFull()">
+        <div class="hero-icon">⚡</div>
+        <div class="hero-label">Install Everything</div>
+        <div class="hero-desc">Full install — panel, QAIS, ISS, skill, docs, counter. One script.</div>
+      </div>
+
+      <div class="install-divider">
+        <div class="install-divider-line"></div>
+        <div class="install-divider-text">or</div>
+        <div class="install-divider-line"></div>
+      </div>
+
+      <button class="customize-btn" onclick="startCustom()">Customize Components →</button>
     </div>
-    <div style="font-size:0.75rem;color:var(--text-muted);font-family:var(--font-mono);text-align:center;">
+
+    <div class="welcome-req">
       Requirements: Node.js 18+ · Python 3.8+ · numpy · Git · Windows 10/11 (for AHK bridge)
     </div>`;
 }
 
-// ─── Step 1: Components ──────────────────────────────
+function startFull() {
+  mode = 'full';
+  Object.values(state.components).forEach(c => c.selected = true);
+  step = 1;
+  render();
+}
+
+function startCustom() {
+  mode = 'custom';
+  step = 1;
+  render();
+}
+
 function renderComponents(el) {
   let html = `
     <div class="card-title">Choose Components</div>
@@ -266,16 +320,14 @@ function renderComponents(el) {
 
 function toggleComponent(key) { state.components[key].selected = !state.components[key].selected; renderCard(); }
 
-// ─── Step 2: Configure ──────────────────────────────
 function renderConfigure(el) {
-  const c = state.components;
   el.innerHTML = `
-    <div class="card-title">Configure Paths</div>
+    <div class="card-title">Configure</div>
     <div class="card-desc">Set your installation directory and panel port.</div>
     <div class="path-group">
       <div class="path-label">📂 Install Directory</div>
       <input class="path-input" type="text" value="${escapeHtml(state.paths.install)}" oninput="state.paths.install = this.value" />
-      <div class="path-hint">All BOND components will be installed inside this directory</div>
+      <div class="path-hint">BOND will be cloned here. All components install inside this directory.</div>
     </div>
     <div class="path-group">
       <div class="path-label">🌐 Panel Port</div>
@@ -283,23 +335,18 @@ function renderConfigure(el) {
       <div class="path-hint">Express sidecar port (default: 3000)</div>
     </div>
     <div style="margin-top:16px;padding:12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-md);font-size:0.78rem;color:var(--text-secondary);">
-      <strong style="color:var(--amber)">📋 Directory structure:</strong>
-      <pre style="margin-top:8px;font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted);line-height:1.8;">${escapeHtml(state.paths.install)}\\
-├── panel\\          ← React dashboard + Express server
-├── doctrine\\       ← Entity files (your knowledge domains)
-├── state\\          ← Active entity pointer
-├── data\\           ← QAIS field storage${c.qais.selected ? `
-├── QAIS\\           ← QAIS MCP server` : ''}${c.iss.selected ? `
-├── ISS\\            ← ISS MCP server` : ''}${c.sla.selected ? `
-├── SLA\\            ← Spectral Lexical Addressing` : ''}${c.skills.selected ? `
-├── skills\\         ← Claude skill file` : ''}${c.ahk.selected ? `
-├── bridge\\         ← AHK automation script` : ''}${c.docs.selected ? `
-├── docs\\           ← Reference documentation` : ''}
-└── .env             ← Configuration</pre>
+      <strong style="color:var(--amber)">What happens:</strong>
+      <div style="margin-top:8px;font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted);line-height:1.8;">
+        1. Clones BOND repo into your install directory<br>
+        2. Installs Node.js dependencies<br>
+        3. Kills any process on port ${state.paths.port}<br>
+        4. Starts the panel server<br>
+        5. Opens the panel in your browser<br>
+        <span style="color:var(--green)">Server bootstrap creates doctrine, state, and framework entities automatically.</span>
+      </div>
     </div>`;
 }
 
-// ─── Step 3: Review ──────────────────────────────────
 function renderReview(el) {
   const selected = Object.entries(state.components).filter(([k,v]) => v.selected || v.required);
   el.innerHTML = `
@@ -307,7 +354,7 @@ function renderReview(el) {
     <div class="card-desc">Confirm your selections, then download the install script.</div>
     <div class="review-section">
       <div class="review-label">Components</div>
-      <div class="review-items">${selected.map(([k,v]) => `<span class="review-item"><span class="ri-icon">${v.icon}</span> ${v.name}</span>`).join('')}</div>
+      <div class="review-items">${selected.map(([k,v]) => `<span class="review-item"><span>${v.icon}</span> ${v.name}</span>`).join('')}</div>
     </div>
     <div class="review-section">
       <div class="review-label">Install Path</div>
@@ -323,7 +370,6 @@ function renderReview(el) {
     </div>`;
 }
 
-// ─── Step 4: MCP Config ──────────────────────────────
 function renderMCPConfig(el) {
   const p = state.paths.install.replace(/\\/g, '/');
   const c = state.components;
@@ -345,14 +391,16 @@ function renderMCPConfig(el) {
   }
 
   const configJson = JSON.stringify(mcpConfig, null, 2);
+  const hasServers = c.qais.selected || c.iss.selected;
 
   el.innerHTML = `
     <div class="card-title">MCP Server Configuration</div>
     <div class="card-desc">
-      Add this to your Claude MCP configuration to connect the panel's module cards to the live servers.
-      ${c.qais.selected || c.iss.selected ? '' : '<br><em style="color:var(--text-muted)">No MCP servers selected — skip this step.</em>'}
+      ${hasServers
+        ? 'Add this to your Claude MCP configuration to connect QAIS and ISS.'
+        : '<em style="color:var(--text-muted)">No MCP servers selected — skip this step.</em>'}
     </div>
-    ${c.qais.selected || c.iss.selected ? `
+    ${hasServers ? `
     <div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:8px;">
       Add to your Claude Desktop or Claude.ai MCP settings:
     </div>
@@ -363,9 +411,9 @@ function renderMCPConfig(el) {
       Paths use your install directory. Adjust if needed for your MCP client.
     </div>` : ''}
     <div style="margin-top:16px;padding:12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-md);font-size:0.78rem;color:var(--text-secondary);">
-      <strong style="color:var(--amber);">💡 Note:</strong> The panel's module cards will show server status
-      once MCP servers are running. The panel communicates through the Express sidecar —
-      tool authorization is enforced at the API layer regardless of how Claude connects.
+      <strong style="color:var(--amber);">💡 Note:</strong> The panel works without MCP servers.
+      Module cards will show server status once connected. Tool authorization is enforced
+      at the Express API layer regardless of how Claude connects.
     </div>`;
 }
 
@@ -379,20 +427,24 @@ function copyMCP() {
   });
 }
 
-// ─── Step 5: Complete ────────────────────────────────
 function renderComplete(el) {
   const c = state.components;
   el.innerHTML = `
     <div class="complete-icon">🔥🌊</div>
     <div class="complete-title">BOND is Ready</div>
-    <div class="complete-desc">Run the downloaded install.bat to set up your system.</div>
+    <div class="complete-desc">Run the downloaded script to install and launch.</div>
     <div class="next-steps">
-      <div class="next-step"><div class="next-step-num">1</div><div>Run <code>install.bat</code> — it clones the repo, installs dependencies, and creates your environment.</div></div>
-      <div class="next-step"><div class="next-step-num">2</div><div>Start BOND with <code>start_bond.bat</code></div></div>
-      <div class="next-step"><div class="next-step-num">3</div><div>Open <code>http://localhost:${state.paths.port}</code> to see the Control Panel.</div></div>
-      ${c.ahk.selected ? `<div class="next-step"><div class="next-step-num">4</div><div>Run <code>bridge\\BOND_v8.ahk</code> to start the counter + command bridge (requires <a href="https://www.autohotkey.com/" style="color:var(--teal)">AutoHotkey</a>).</div></div>` : ''}
-      ${c.skills.selected ? `<div class="next-step"><div class="next-step-num">${c.ahk.selected ? '5' : '4'}</div><div>Add the BOND skill to Claude: Create a <a href="https://support.anthropic.com/en/articles/9517075-what-are-projects" style="color:var(--teal)">Claude Project</a>, then add <code>skills\\bond\\SKILL.md</code> as a <strong>Project Knowledge</strong> file. This teaches Claude the BOND protocol.</div></div>` : ''}
-      <div class="next-step"><div class="next-step-num">${c.skills.selected ? (c.ahk.selected ? '6' : '5') : (c.ahk.selected ? '5' : '4')}</div><div>Type <code>{Full Restore}</code> in Claude to initialize. Welcome aboard. 🔥🌊</div></div>
+      <div class="next-step"><div class="next-step-num">1</div><div>Run <code>install_bond.bat</code> — it clones, installs, starts the server, and opens the panel.</div></div>
+      <div class="next-step"><div class="next-step-num">2</div><div>The panel opens at <code>http://localhost:${state.paths.port}</code>. You should see BOND Master and Project Master cards.</div></div>
+      ${c.ahk.selected ? `<div class="next-step"><div class="next-step-num">3</div><div>Optional: Run <code>Counter\\BOND_v8.ahk</code> for the counter + command bridge (requires <a href="https://www.autohotkey.com/" style="color:var(--teal)">AutoHotkey</a>).</div></div>` : ''}
+      <div class="next-step"><div class="next-step-num">${c.ahk.selected ? '4' : '3'}</div><div>Tell Claude <code>{Sync}</code> to initialize. Welcome aboard. 🔥🌊</div></div>
+    </div>
+    <div style="margin-top:16px;padding:12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-md);">
+      <div style="font-size:0.78rem;color:var(--text-secondary);">
+        <strong style="color:var(--amber);">After install:</strong><br>
+        <code style="font-family:var(--font-mono);font-size:0.75rem;color:var(--teal);">start_bond.bat</code> to launch &nbsp;·&nbsp;
+        <code style="font-family:var(--font-mono);font-size:0.75rem;color:var(--teal);">stop_bond.bat</code> to stop
+      </div>
     </div>`;
 }
 
@@ -401,220 +453,151 @@ function generateScript() {
   const p = state.paths.install;
   const c = state.components;
   const port = state.paths.port;
+  const needsPython = c.qais.selected || c.iss.selected;
 
   let s = `@echo off
-:: ═══════════════════════════════════════════════════
-:: BOND Installation Script v2.0
-:: Generated by BOND Wizard
-:: ═══════════════════════════════════════════════════
+chcp 65001 >nul 2>nul
+:: ════════════════════════════════════════════════════
+::  BOND Installation Script v3.0
+::  Generated by BOND Wizard
+:: ════════════════════════════════════════════════════
 echo.
-echo  🔥🌊 BOND Installer
-echo  ═══════════════════════════════════
+echo  BOND Installer
+echo  ════════════════════════════════════
 echo.
 
 set "BOND_ROOT=${p}"
 set "BOND_PORT=${port}"
 
 :: ─── Prerequisites ────────────────────────────────
-echo [1/7] Checking prerequisites...
-where node >nul 2>nul || (
-    echo [MISSING] Node.js — Install from https://nodejs.org
-    pause & exit /b 1
-)
-echo    [OK] Node.js found`;
+echo [1/5] Checking prerequisites...
+echo.
 
-  if (c.qais.selected || c.iss.selected) {
-    s += `
-where python >nul 2>nul || (
-    echo [MISSING] Python — Install from https://python.org
-    pause & exit /b 1
+where git >nul 2>nul || (
+    echo    [MISSING] Git — Install from https://git-scm.com
+    echo.
+    pause
+    exit /b 1
 )
-echo    [OK] Python found
+echo    [OK] Git
+
+where node >nul 2>nul || (
+    echo    [MISSING] Node.js — Install from https://nodejs.org
+    echo.
+    pause
+    exit /b 1
+)
+echo    [OK] Node.js`;
+
+  if (needsPython) {
+    s += `
+
+where python >nul 2>nul || (
+    echo    [MISSING] Python — Install from https://python.org
+    echo.
+    pause
+    exit /b 1
+)
+echo    [OK] Python
+
 python -c "import numpy" >nul 2>nul || (
     echo    Installing numpy...
     pip install numpy
 )
-echo    [OK] numpy available`;
+echo    [OK] numpy`;
   }
 
   s += `
-echo.
 
-:: ─── Create Directory Structure ───────────────────
-echo [2/7] Creating directory structure...
-mkdir "%BOND_ROOT%" 2>nul
-mkdir "%BOND_ROOT%\\panel" 2>nul
-mkdir "%BOND_ROOT%\\doctrine" 2>nul
-mkdir "%BOND_ROOT%\\state" 2>nul
-mkdir "%BOND_ROOT%\\data" 2>nul`;
-
-  if (c.ahk.selected) s += `\nmkdir "%BOND_ROOT%\\bridge" 2>nul`;
-  if (c.skills.selected) s += `\nmkdir "%BOND_ROOT%\\skills\\bond" 2>nul`;
-  if (c.docs.selected) s += `\nmkdir "%BOND_ROOT%\\docs" 2>nul`;
-
-  s += `
-echo    Done.
 echo.
 
 :: ─── Clone Repository ─────────────────────────────
-echo [3/7] Cloning BOND repository...
-cd /d "%BOND_ROOT%"
-git clone https://github.com/moneyjarrod/BOND.git _repo_temp 2>nul
-if not exist "_repo_temp\\panel" (
-    echo    ⚠ Could not clone repo. Check git and network.
-    pause & exit /b 1
-)
-echo    Repository cloned.
+echo [2/5] Cloning BOND repository...
 echo.
 
-:: ─── Install Panel ────────────────────────────────
-echo [4/7] Installing Control Panel...
-xcopy /E /Y /Q "_repo_temp\\panel\\*" "panel\\" >nul
+if exist "%BOND_ROOT%\\.git" (
+    echo    Repository already exists at %BOND_ROOT%
+    echo    Pulling latest changes...
+    cd /d "%BOND_ROOT%"
+    git pull
+) else (
+    git clone https://github.com/moneyjarrod/BOND.git "%BOND_ROOT%"
+    if not exist "%BOND_ROOT%\\panel" (
+        echo.
+        echo    [ERROR] Clone failed. Check your network and git installation.
+        echo.
+        pause
+        exit /b 1
+    )
+)
+echo    [OK] Repository ready
+echo.
+
+:: ─── Install Dependencies ─────────────────────────
+echo [3/5] Installing panel dependencies...
+echo.
+
 cd /d "%BOND_ROOT%\\panel"
 call npm install
-echo    Panel installed.
+echo.
+echo    [OK] Panel installed
+
+:: Initialize data directory (QAIS field storage)
+if not exist "%BOND_ROOT%\\data" mkdir "%BOND_ROOT%\\data"
+echo    [OK] Data directory ready
 echo.
 
-:: ─── Write Configuration ──────────────────────────
-echo [5/7] Writing configuration...
-(
-  echo BOND_ROOT=%BOND_ROOT%
-  echo DOCTRINE_PATH=%BOND_ROOT%\\doctrine
-  echo STATE_PATH=%BOND_ROOT%\\state
-  echo PORT=%BOND_PORT%
-  echo MCP_URL=http://localhost:3002
-) > "%BOND_ROOT%\\panel\\.env"
-
-:: Initialize state
-echo {"entity":null,"class":null,"path":null,"entered":null} > "%BOND_ROOT%\\state\\active_entity.json"
-echo {"save_confirmation":true} > "%BOND_ROOT%\\state\\config.json"
-echo    Configuration written.
+:: ─── Clear Port ───────────────────────────────────
+echo [4/5] Preparing to start...
 echo.
 
-:: ─── Copy Components ──────────────────────────────
-echo [6/7] Installing selected components...`;
+:: Kill anything on the target port
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%BOND_PORT% " ^| findstr "LISTENING"') do (
+    echo    Clearing port %BOND_PORT% (PID: %%a)...
+    taskkill /PID %%a /F >nul 2>nul
+)
+echo    [OK] Port %BOND_PORT% clear
+echo.
 
-  if (c.qais.selected) {
-    s += `
+:: ─── Start Server ─────────────────────────────────
+echo [5/5] Starting BOND...
+echo.
 
-:: QAIS Memory Server
-mkdir "%BOND_ROOT%\\QAIS" 2>nul
-xcopy /E /Y /Q "_repo_temp\\QAIS\\*" "%BOND_ROOT%\\QAIS\\" >nul
-echo    [OK] QAIS Memory server installed`;
-  }
+cd /d "%BOND_ROOT%\\panel"
 
-  if (c.iss.selected) {
-    s += `
+:: Start sidecar (server.js handles all bootstrapping)
+start "BOND Sidecar" /min cmd /c "node server.js"
+echo    [OK] Sidecar starting on http://localhost:%BOND_PORT%
 
-:: ISS Analysis Server
-mkdir "%BOND_ROOT%\\ISS" 2>nul
-xcopy /E /Y /Q "_repo_temp\\ISS\\*" "%BOND_ROOT%\\ISS\\" >nul
-echo    [OK] ISS Analysis server installed`;
-  }
-
-  if (c.sla.selected) {
-    s += `
-
-:: SLA Retrieval
-mkdir "%BOND_ROOT%\\doctrine\\SLA" 2>nul
-if exist "_repo_temp\\SLA" (
-    xcopy /E /Y /Q "_repo_temp\\SLA\\*" "%BOND_ROOT%\\doctrine\\SLA\\" >nul
-    echo    [OK] SLA doctrine entity installed
-)`;
-  }
-
-  if (c.ahk.selected) {
-    s += `
-
-:: AHK Bridge
-if exist "_repo_temp\\Counter\\BOND_v8.ahk" (
-    copy /Y "_repo_temp\\Counter\\BOND_v8.ahk" "%BOND_ROOT%\\bridge\\BOND_v8.ahk" >nul
-    echo    [OK] AHK bridge copied to bridge\\
+:: Check if production build exists
+if exist "%BOND_ROOT%\\panel\\dist\\index.html" (
+    echo    [OK] Serving production build
+    timeout /t 3 /nobreak >nul
+    start http://localhost:%BOND_PORT%
 ) else (
-    echo    ⚠ AHK bridge not found in repo
-)`;
-  }
-
-  if (c.starter.selected) {
-    s += `
-
-:: Starter Entities — BOND_MASTER
-mkdir "%BOND_ROOT%\\doctrine\\BOND_MASTER" 2>nul
-(echo {"class":"doctrine","tools":{"filesystem":true,"iss":true},"display_name":"BOND Master"}) > "%BOND_ROOT%\\doctrine\\BOND_MASTER\\entity.json"
-(
-  echo # BOND Master Doctrine
-  echo.
-  echo Your system's constitutional authority. Add IS statements,
-  echo protocol rules, and audit checklists here.
-  echo.
-  echo ## What BOND IS
-  echo.
-  echo ^<!-- Add your own IS statements. Anything in this entity is law. --^>
-) > "%BOND_ROOT%\\doctrine\\BOND_MASTER\\BOND_MASTER.md"
-
-:: Starter Entities — Reference Library
-mkdir "%BOND_ROOT%\\doctrine\\_reference" 2>nul
-(echo {"class":"library","tools":{"filesystem":true}}) > "%BOND_ROOT%\\doctrine\\_reference\\entity.json"
-(
-  echo # Reference Library
-  echo.
-  echo Drop reference documents here. Read-only knowledge shelf.
-) > "%BOND_ROOT%\\doctrine\\_reference\\index.md"
-echo    [OK] Starter entities created`;
-  }
-
-  if (c.skills.selected) {
-    s += `
-
-:: Claude Skill
-if exist "_repo_temp\\skills\\bond\\SKILL.md" (
-    copy /Y "_repo_temp\\skills\\bond\\SKILL.md" "%BOND_ROOT%\\skills\\bond\\SKILL.md" >nul
-    echo    [OK] Claude skill file copied
-)`;
-  }
-
-  if (c.docs.selected) {
-    s += `
-
-:: Documentation
-if exist "_repo_temp\\docs" (
-    xcopy /E /Y /Q "_repo_temp\\docs\\*" "%BOND_ROOT%\\docs\\" >nul
-    echo    [OK] Documentation copied
-)`;
-  }
-
-  s += `
-
-:: ─── Boot Scripts + Cleanup ───────────────────────
-echo.
-echo [7/7] Finalizing...
-
-:: Copy boot scripts from repo
-copy /Y "_repo_temp\\start_bond.bat" "%BOND_ROOT%\\start_bond.bat" >nul
-copy /Y "_repo_temp\\stop_bond.bat" "%BOND_ROOT%\\stop_bond.bat" >nul
-echo    [OK] Boot scripts installed
-
-:: Cleanup temp
-rmdir /S /Q "%BOND_ROOT%\\_repo_temp"
-echo    [OK] Temp files cleaned
+    :: Dev mode — start Vite
+    start "BOND Panel" /min cmd /c "npx vite"
+    echo    [OK] Dev server starting on http://localhost:5173
+    timeout /t 4 /nobreak >nul
+    start http://localhost:5173
+)
 
 echo.
-echo  ═══════════════════════════════════
-echo  🔥🌊 BOND installation complete!
-echo  ═══════════════════════════════════
+echo  ════════════════════════════════════
+echo  BOND is running!
+echo  ════════════════════════════════════
 echo.
-echo  Start:   %BOND_ROOT%\\start_bond.bat
-echo  Stop:    %BOND_ROOT%\\stop_bond.bat
-echo  Panel:   http://localhost:%BOND_PORT%`;
+echo  Panel:   http://localhost:%BOND_PORT%
+echo  Stop:    %BOND_ROOT%\\stop_bond.bat`;
 
   if (c.ahk.selected) {
-    s += `\necho  Bridge:  %BOND_ROOT%\\bridge\\BOND_v8.ahk`;
+    s += `\necho  Counter: %BOND_ROOT%\\Counter\\BOND_v8.ahk`;
   }
 
   s += `
 echo.
-echo  Next: Add MCP server config to Claude,
-echo  then type {Full Restore} to initialize.
+echo  Next: Configure MCP servers in Claude,
+echo  then type {Sync} to initialize.
 echo.
 pause`;
 
@@ -622,9 +605,13 @@ pause`;
 }
 
 // ─── Helpers ─────────────────────────────────────────
-function next() { if (step < STEPS.length - 1) { step++; render(); } }
+function next() {
+  const steps = getSteps();
+  if (step < steps.length - 1) { step++; render(); }
+}
 function prev() { if (step > 0) { step--; render(); } }
 function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
 function downloadScript() {
   const blob = new Blob([generateScript()], { type: 'text/plain' });
   const a = document.createElement('a');
