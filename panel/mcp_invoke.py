@@ -199,6 +199,21 @@ def _get_perspective_field(perspective):
     from qais_core import QAISField
     return QAISField(field_path=field_path)
 
+def _log_seed_decision(action, perspective, seed, reason=None, session=None, tracker_stats=None):
+    """Append to seed_decisions.jsonl. S100: Automatic logging."""
+    from datetime import datetime
+    try:
+        entry = {"action": action, "perspective": perspective, "seed": seed, "timestamp": datetime.now().isoformat()}
+        if reason: entry["reason"] = reason
+        if session: entry["session"] = session
+        if tracker_stats: entry["tracker_stats"] = tracker_stats
+        log_path = os.path.join(BOND_ROOT, 'data', 'seed_decisions.jsonl')
+        os.makedirs(os.path.dirname(log_path), exist_ok=True)
+        with open(log_path, 'a', encoding='utf-8') as f:
+            f.write(json.dumps(entry) + '\n')
+    except Exception:
+        pass
+
 def perspective_store(input_str):
     """Store seed into perspective's isolated field. Input: perspective|seed_title|seed_content"""
     try:
