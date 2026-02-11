@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BOND — Installation Wizard</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg-deep:     #0d1117;
+    --bg-surface:  #161b22;
+    --bg-elevated: #1c2333;
+    --bg-hover:    #21283b;
+    --border:      #30363d;
+    --border-focus:#58a6ff;
+    --text-primary:   #e6edf3;
+    --text-secondary: #8b949e;
+    --text-muted:     #484f58;
+    --accent:      #e94560;
+    --accent-dim:  #e9456022;
+    --amber:       #d29922;
+    --amber-dim:   #d2992215;
+    --amber-glow:  #d2992240;
+    --teal:        #56d4dd;
+    --teal-dim:    #56d4dd15;
+    --green:       #3fb950;
+    --green-dim:   #3fb95015;
+    --font-mono:   'JetBrains Mono', 'Consolas', monospace;
+    --font-ui:     'Outfit', -apple-system, sans-serif;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+  }
+
+  html, body {
+    height: 100%;
+    font-family: var(--font-ui);
+    background: var(--bg-deep);
+    color: var(--text-primary);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background:
+      radial-gradient(ellipse at 20% 50%, rgba(210,153,34,0.04) 0%, transparent 50%),
+      radial-gradient(ellipse at 80% 50%, rgba(86,212,221,0.03) 0%, transparent 50%),
+      var(--bg-deep);
+  }
+
+  .wizard { width: 100%; max-width: 720px; min-height: 500px; display: flex; flex-direction: column; }
+
+  .wizard-header { text-align: center; margin-bottom: 32px; }
+  .wizard-logo { font-size: 2.4rem; letter-spacing: -2px; margin-bottom: 4px; animation: fadeInDown 0.6s ease; }
+  .wizard-title { font-size: 1.6rem; font-weight: 700; letter-spacing: 2px; color: var(--amber); animation: fadeInDown 0.6s ease 0.1s both; }
+  .wizard-subtitle { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-muted); margin-top: 4px; animation: fadeInDown 0.6s ease 0.2s both; }
+
+  .progress-bar { display: flex; align-items: center; justify-content: center; gap: 0; margin-bottom: 28px; animation: fadeIn 0.5s ease 0.3s both; }
+  .step-dot { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 0.7rem; font-weight: 600; border: 2px solid var(--border); color: var(--text-muted); background: var(--bg-surface); transition: all 0.3s ease; }
+  .step-dot.active { border-color: var(--amber); color: var(--amber); background: var(--amber-dim); box-shadow: 0 0 12px var(--amber-glow); }
+  .step-dot.done { border-color: var(--green); color: var(--green); background: var(--green-dim); }
+  .step-line { width: 48px; height: 2px; background: var(--border); transition: background 0.3s ease; }
+  .step-line.done { background: var(--green); }
+
+  .wizard-card { background: var(--bg-surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 28px 32px; flex: 1; animation: fadeInUp 0.4s ease; }
+  .card-title { font-size: 1.15rem; font-weight: 600; margin-bottom: 4px; }
+  .card-desc { font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 20px; }
+
+  .install-hero { display: flex; flex-direction: column; align-items: center; gap: 16px; margin-bottom: 24px; }
+  .install-hero-btn {
+    width: 100%; padding: 18px 24px; background: linear-gradient(135deg, rgba(210,153,34,0.15), rgba(210,153,34,0.05));
+    border: 2px solid rgba(210,153,34,0.5); border-radius: var(--radius-lg); cursor: pointer;
+    transition: all 0.2s ease; text-align: center;
+  }
+  .install-hero-btn:hover { background: rgba(210,153,34,0.2); box-shadow: 0 0 24px var(--amber-glow); border-color: var(--amber); }
+  .install-hero-btn .hero-icon { font-size: 2rem; margin-bottom: 6px; }
+  .install-hero-btn .hero-label { font-family: var(--font-ui); font-size: 1.1rem; font-weight: 700; color: var(--amber); letter-spacing: 0.5px; }
+  .install-hero-btn .hero-desc { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary); margin-top: 4px; }
+
+  .install-divider { display: flex; align-items: center; gap: 12px; width: 100%; margin: 4px 0; }
+  .install-divider-line { flex: 1; height: 1px; background: var(--border); }
+  .install-divider-text { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); }
+
+  .customize-btn {
+    padding: 10px 20px; background: transparent; border: 1px solid var(--border);
+    border-radius: var(--radius-md); cursor: pointer; color: var(--text-secondary);
+    font-family: var(--font-mono); font-size: 0.78rem; transition: all 0.15s ease;
+  }
+  .customize-btn:hover { border-color: var(--teal); color: var(--teal); background: var(--teal-dim); }
+
+  .welcome-req { font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); text-align: center; margin-top: 4px; }
+
+  .component-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 6px; }
+  .component { display: flex; align-items: center; gap: 12px; padding: 12px 16px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-md); cursor: pointer; transition: all 0.15s ease; user-select: none; }
+  .component:hover { border-color: var(--border-focus); }
+  .component.selected { border-color: var(--amber); background: var(--amber-dim); }
+  .component.required { border-color: rgba(210,153,34,0.3); }
+  .component-check { width: 20px; height: 20px; border-radius: var(--radius-sm); border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 0.7rem; flex-shrink: 0; transition: all 0.15s ease; }
+  .component.selected .component-check { border-color: var(--amber); background: var(--amber); color: var(--bg-deep); }
+  .component.required .component-check { border-color: var(--amber); background: rgba(210,153,34,0.3); color: var(--amber); }
+  .component-info { flex: 1; }
+  .component-name { font-weight: 600; font-size: 0.88rem; }
+  .component-desc { font-size: 0.72rem; color: var(--text-muted); font-family: var(--font-mono); }
+  .component-badge { font-family: var(--font-mono); font-size: 0.6rem; font-weight: 600; padding: 2px 8px; border-radius: var(--radius-sm); text-transform: uppercase; letter-spacing: 0.5px; }
+  .badge-required { background: rgba(210,153,34,0.15); color: var(--amber); border: 1px solid rgba(210,153,34,0.3); }
+  .badge-optional { background: rgba(86,212,221,0.1); color: var(--teal); border: 1px solid rgba(86,212,221,0.2); }
+  .badge-recommended { background: rgba(63,185,80,0.1); color: var(--green); border: 1px solid rgba(63,185,80,0.3); }
+
+  .path-group { margin-bottom: 16px; }
+  .path-label { font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+  .path-input { width: 100%; padding: 10px 14px; background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text-primary); font-family: var(--font-mono); font-size: 0.82rem; outline: none; transition: border-color 0.15s ease; }
+  .path-input:focus { border-color: var(--amber); }
+  .path-hint { font-family: var(--font-mono); font-size: 0.65rem; color: var(--text-muted); margin-top: 4px; }
+
+  .review-section { margin-bottom: 16px; }
+  .review-label { font-family: var(--font-mono); font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .review-items { display: flex; flex-wrap: wrap; gap: 6px; }
+  .review-item { display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.75rem; color: var(--text-secondary); }
+  .review-path { padding: 8px 12px; background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.78rem; color: var(--teal); word-break: break-all; }
+  .script-preview { background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 16px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-secondary); line-height: 1.7; max-height: 260px; overflow-y: auto; white-space: pre; margin-top: 12px; }
+
+  .mcp-block { background: var(--bg-deep); border: 1px solid var(--border); border-radius: var(--radius-md); padding: 14px; font-family: var(--font-mono); font-size: 0.72rem; color: var(--teal); line-height: 1.7; white-space: pre; margin-top: 12px; max-height: 200px; overflow-y: auto; position: relative; }
+  .copy-btn { position: absolute; top: 8px; right: 8px; background: var(--bg-elevated); border: 1px solid var(--border); color: var(--text-secondary); padding: 4px 10px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 0.65rem; cursor: pointer; }
+  .copy-btn:hover { color: var(--amber); border-color: var(--amber); }
+
+  .complete-icon { font-size: 3rem; text-align: center; margin-bottom: 12px; animation: popIn 0.5s ease; }
+  .complete-title { text-align: center; font-size: 1.3rem; font-weight: 700; color: var(--green); margin-bottom: 6px; }
+  .complete-desc { text-align: center; font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 20px; }
+  .next-steps { display: flex; flex-direction: column; gap: 8px; }
+  .next-step { display: flex; align-items: flex-start; gap: 10px; padding: 10px 14px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-md); font-size: 0.8rem; color: var(--text-secondary); }
+  .next-step-num { width: 22px; height: 22px; border-radius: 50%; background: var(--amber-dim); border: 1px solid rgba(210,153,34,0.3); color: var(--amber); display: flex; align-items: center; justify-content: center; font-family: var(--font-mono); font-size: 0.65rem; font-weight: 600; flex-shrink: 0; }
+  .next-step code { font-family: var(--font-mono); background: var(--bg-deep); padding: 1px 6px; border-radius: 3px; font-size: 0.75rem; color: var(--teal); }
+
+  .wizard-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 20px; }
+  .btn { padding: 10px 24px; font-family: var(--font-mono); font-size: 0.82rem; font-weight: 500; border-radius: var(--radius-md); cursor: pointer; transition: all 0.15s ease; border: 1px solid; }
+  .btn-back { background: transparent; color: var(--text-secondary); border-color: var(--border); }
+  .btn-back:hover { background: var(--bg-hover); color: var(--text-primary); }
+  .btn-next { background: var(--amber-dim); color: var(--amber); border-color: rgba(210,153,34,0.5); font-weight: 600; }
+  .btn-next:hover { background: rgba(210,153,34,0.2); box-shadow: 0 0 16px var(--amber-glow); }
+  .btn-download { background: rgba(63,185,80,0.1); color: var(--green); border-color: rgba(63,185,80,0.4); font-weight: 600; }
+  .btn-download:hover { background: rgba(63,185,80,0.2); box-shadow: 0 0 16px rgba(63,185,80,0.2); }
+  .btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  @keyframes fadeInDown { from { opacity: 0; transform: translateY(-12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeInUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes popIn { 0% { opacity: 0; transform: scale(0.5); } 70% { transform: scale(1.1); } 100% { opacity: 1; transform: scale(1); } }
+
+  ::-webkit-scrollbar { width: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg-deep); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<div class="wizard" id="wizard">
+  <div class="wizard-header">
+    <div class="wizard-logo">🔥🌊</div>
+    <div class="wizard-title">BOND</div>
+    <div class="wizard-subtitle">Installation Wizard v3.0</div>
+  </div>
+  <div class="progress-bar" id="progress"></div>
+  <div class="wizard-card" id="card"></div>
+  <div class="wizard-footer" id="footer"></div>
+</div>
+
+<script>
+let mode = 'full';
+
+const STEPS_FULL   = ['Welcome', 'Configure', 'Review', 'MCP Config', 'Complete'];
+const STEPS_CUSTOM = ['Welcome', 'Components', 'Configure', 'Review', 'MCP Config', 'Complete'];
+let step = 0;
+
+function getSteps() { return mode === 'full' ? STEPS_FULL : STEPS_CUSTOM; }
+
+const state = {
+  components: {
+    panel:    { selected: true,  required: true,  name: 'Control Panel',    desc: 'React dashboard + Express sidecar + tool auth', icon: '🖥️' },
+    qais:    { selected: true,  required: false, name: 'QAIS Memory',      desc: 'Resonance storage, heat map, crystal persistence', icon: '🔮', badge: 'recommended' },
+    iss:     { selected: true,  required: false, name: 'ISS Analysis',     desc: 'Semantic force measurement + limbic perception', icon: '🧠', badge: 'recommended' },
+    ahk:     { selected: true,  required: false, name: 'AHK Bridge',       desc: 'Counter + clipboard bridge (Windows)', icon: '🔗' },
+    sla:     { selected: true,  required: false, name: 'SLA Retrieval',     desc: 'Spectral Lexical Addressing — deterministic text retrieval', icon: '🔍' },
+    skills:  { selected: true,  required: false, name: 'Claude Skill',      desc: 'BOND protocol skill file for Claude', icon: '🎯' },
+    docs:    { selected: true,  required: false, name: 'Documentation',     desc: 'Commands, entities, counter, search reference', icon: '📖' },
+  },
+  paths: {
+    install: 'C:\\BOND',
+    port: '3000',
+  },
+};
+
+function render() { renderProgress(); renderCard(); renderFooter(); }
+
+function renderProgress() {
+  const steps = getSteps();
+  const el = document.getElementById('progress');
+  let html = '';
+  steps.forEach((s, i) => {
+    const cls = i < step ? 'done' : i === step ? 'active' : '';
+    const icon = i < step ? '✓' : i + 1;
+    html += `<div class="step-dot ${cls}">${icon}</div>`;
+    if (i < steps.length - 1) html += `<div class="step-line ${i < step ? 'done' : ''}"></div>`;
+  });
+  el.innerHTML = html;
+}
+
+function renderFooter() {
+  const steps = getSteps();
+  const el = document.getElementById('footer');
+  const stepName = steps[step];
+  if (stepName === 'Welcome') { el.innerHTML = ''; }
+  else if (stepName === 'Complete') { el.innerHTML = `<div></div><button class="btn btn-next" onclick="window.location.reload()">Start Over</button>`; }
+  else if (stepName === 'Review') {
+    el.innerHTML = `<button class="btn btn-back" onclick="prev()">← Back</button><div style="display:flex;gap:8px;"><button class="btn btn-download" onclick="downloadScript()">⬇ Download install_bond.bat</button><button class="btn btn-next" onclick="next()">Continue →</button></div>`;
+  } else {
+    el.innerHTML = `<button class="btn btn-back" onclick="prev()">← Back</button><button class="btn btn-next" onclick="next()">Continue →</button>`;
+  }
+}
+
+function renderCard() {
+  const steps = getSteps();
+  const el = document.getElementById('card');
+  el.style.animation = 'none'; el.offsetHeight; el.style.animation = 'fadeInUp 0.35s ease';
+  const stepName = steps[step];
+  switch(stepName) {
+    case 'Welcome':    return renderWelcome(el);
+    case 'Components': return renderComponents(el);
+    case 'Configure':  return renderConfigure(el);
+    case 'Review':     return renderReview(el);
+    case 'MCP Config': return renderMCPConfig(el);
+    case 'Complete':   return renderComplete(el);
+  }
+}
+
+function renderWelcome(el) {
+  el.innerHTML = `
+    <div class="card-title">Welcome to BOND</div>
+    <div class="card-desc">A governed runtime for persistent human-AI collaboration.</div>
+    <div class="install-hero">
+      <div class="install-hero-btn" onclick="startFull()">
+        <div class="hero-icon">⚡</div>
+        <div class="hero-label">Install Everything</div>
+        <div class="hero-desc">Full install — panel, QAIS, ISS, skill, docs, counter. One script.</div>
+      </div>
+      <div class="install-divider">
+        <div class="install-divider-line"></div>
+        <div class="install-divider-text">or</div>
+        <div class="install-divider-line"></div>
+      </div>
+      <button class="customize-btn" onclick="startCustom()">Customize Components →</button>
+    </div>
+    <div class="welcome-req">Requirements: Node.js 18+ · Python 3.8+ · numpy · Git · Windows 10/11 (for AHK bridge)</div>`;
+}
+
+function startFull() { mode = 'full'; Object.values(state.components).forEach(c => c.selected = true); step = 1; render(); }
+function startCustom() { mode = 'custom'; step = 1; render(); }
+
+function renderComponents(el) {
+  let html = `<div class="card-title">Choose Components</div><div class="card-desc">The Control Panel is required. QAIS and ISS are recommended for full functionality.</div><div class="component-list">`;
+  for (const [key, comp] of Object.entries(state.components)) {
+    const cls = comp.required ? 'required selected' : comp.selected ? 'selected' : '';
+    const badgeCls = comp.required ? 'badge-required' : comp.badge === 'recommended' ? 'badge-recommended' : 'badge-optional';
+    const badgeText = comp.required ? 'Required' : comp.badge === 'recommended' ? 'Recommended' : 'Optional';
+    html += `<div class="component ${cls}" onclick="${comp.required ? '' : `toggleComponent('${key}')`}"><div class="component-check">${comp.selected || comp.required ? '✓' : ''}</div><span style="font-size:1.1rem">${comp.icon}</span><div class="component-info"><div class="component-name">${comp.name}</div><div class="component-desc">${comp.desc}</div></div><span class="component-badge ${badgeCls}">${badgeText}</span></div>`;
+  }
+  html += '</div>';
+  el.innerHTML = html;
+}
+
+function toggleComponent(key) { state.components[key].selected = !state.components[key].selected; renderCard(); }
+
+function renderConfigure(el) {
+  el.innerHTML = `
+    <div class="card-title">Configure</div>
+    <div class="card-desc">Set your installation directory and panel port.</div>
+    <div class="path-group">
+      <div class="path-label">📂 Install Directory</div>
+      <input class="path-input" type="text" value="${escapeHtml(state.paths.install)}" oninput="state.paths.install = this.value" />
+      <div class="path-hint">BOND will be cloned here. All components install inside this directory.</div>
+    </div>
+    <div class="path-group">
+      <div class="path-label">🌐 Panel Port</div>
+      <input class="path-input" type="text" value="${state.paths.port}" oninput="state.paths.port = this.value" style="width:120px;" />
+      <div class="path-hint">Express sidecar port (default: 3000)</div>
+    </div>
+    <div style="margin-top:16px;padding:12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-md);font-size:0.78rem;color:var(--text-secondary);">
+      <strong style="color:var(--amber)">What happens:</strong>
+      <div style="margin-top:8px;font-family:var(--font-mono);font-size:0.72rem;color:var(--text-muted);line-height:1.8;">
+        1. Clones BOND repo into your install directory<br>
+        2. Installs Node.js dependencies<br>
+        3. Kills any process on port ${state.paths.port}<br>
+        4. Starts the panel server<br>
+        5. Opens the panel in your browser<br>
+        <span style="color:var(--green)">Server bootstrap creates doctrine, state, and framework entities automatically.</span>
+      </div>
+    </div>`;
+}
+
+function renderReview(el) {
+  const selected = Object.entries(state.components).filter(([k,v]) => v.selected || v.required);
+  el.innerHTML = `
+    <div class="card-title">Review &amp; Download</div>
+    <div class="card-desc">Confirm your selections, then download the install script.</div>
+    <div class="review-section"><div class="review-label">Components</div><div class="review-items">${selected.map(([k,v]) => `<span class="review-item"><span>${v.icon}</span> ${v.name}</span>`).join('')}</div></div>
+    <div class="review-section"><div class="review-label">Install Path</div><div class="review-path">${escapeHtml(state.paths.install)}</div></div>
+    <div class="review-section"><div class="review-label">Port</div><div class="review-path" style="display:inline-block;">${escapeHtml(state.paths.port)}</div></div>
+    <div class="review-section"><div class="review-label">Generated Script Preview</div><div class="script-preview">${escapeHtml(generateScript())}</div></div>
+    <div style="margin-top:16px;padding:14px;background:rgba(210,153,34,0.08);border:1px solid rgba(210,153,34,0.3);border-radius:var(--radius-md);">
+      <div style="font-size:0.82rem;font-weight:600;color:var(--amber);margin-bottom:6px;">🛡️ Windows SmartScreen</div>
+      <div style="font-size:0.78rem;color:var(--text-secondary);line-height:1.7;">Windows may show a security warning when you run the script. This is normal for unsigned scripts.<br><strong style="color:var(--text-primary);">Click "More info" → "Run anyway"</strong> to proceed.</div>
+    </div>`;
+}
+
+function renderMCPConfig(el) {
+  const p = state.paths.install.replace(/\\/g, '/');
+  const c = state.components;
+  let mcpConfig = { mcpServers: {} };
+  if (c.qais.selected) { mcpConfig.mcpServers.qais = { command: "python", args: [`${p}/QAIS/qais_mcp_server.py`], env: { BOND_ROOT: state.paths.install.replace(/\\/g, '\\\\') } }; }
+  if (c.iss.selected) { mcpConfig.mcpServers.iss = { command: "python", args: [`${p}/ISS/iss_mcp_server.py`], env: { BOND_ROOT: state.paths.install.replace(/\\/g, '\\\\') } }; }
+  const configJson = JSON.stringify(mcpConfig, null, 2);
+  const hasServers = c.qais.selected || c.iss.selected;
+  el.innerHTML = `
+    <div class="card-title">MCP Server Configuration</div>
+    <div class="card-desc">${hasServers ? 'Add this to your Claude MCP configuration to connect QAIS and ISS.' : '<em style="color:var(--text-muted)">No MCP servers selected — skip this step.</em>'}</div>
+    ${hasServers ? `<div style="font-size:0.82rem;color:var(--text-secondary);margin-bottom:8px;">Add to your Claude Desktop or Claude.ai MCP settings:</div><div class="mcp-block" id="mcpBlock"><button class="copy-btn" onclick="copyMCP()">Copy</button>${escapeHtml(configJson)}</div><div style="margin-top:12px;font-size:0.75rem;color:var(--text-muted);font-family:var(--font-mono);">Paths use your install directory. Adjust if needed for your MCP client.</div>` : ''}
+    <div style="margin-top:16px;padding:12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-md);font-size:0.78rem;color:var(--text-secondary);"><strong style="color:var(--amber);">💡 Note:</strong> The panel works without MCP servers. Module cards will show server status once connected. Tool authorization is enforced at the Express API layer regardless of how Claude connects.</div>`;
+}
+
+function copyMCP() {
+  const block = document.getElementById('mcpBlock');
+  const text = block.textContent.replace('Copy', '').trim();
+  navigator.clipboard.writeText(text).then(() => { const btn = block.querySelector('.copy-btn'); btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy', 2000); });
+}
+
+function renderComplete(el) {
+  const c = state.components;
+  el.innerHTML = `
+    <div class="complete-icon">🔥🌊</div>
+    <div class="complete-title">BOND is Ready</div>
+    <div class="complete-desc">Run the downloaded script to install and launch.</div>
+    <div class="next-steps">
+      <div class="next-step"><div class="next-step-num">1</div><div>Run <code>install_bond.bat</code> — it clones, installs, starts the server, and opens the panel.</div></div>
+      <div class="next-step"><div class="next-step-num">2</div><div>The panel opens at <code>http://localhost:${state.paths.port}</code>. You should see BOND Master and Project Master cards.</div></div>
+      ${c.ahk.selected ? `<div class="next-step"><div class="next-step-num">3</div><div>Optional: Run <code>Counter\\BOND_v8.ahk</code> for the counter + command bridge (requires <a href="https://www.autohotkey.com/" style="color:var(--teal)">AutoHotkey</a>).</div></div>` : ''}
+      <div class="next-step"><div class="next-step-num">${c.ahk.selected ? '4' : '3'}</div><div>Tell Claude <code>{Sync}</code> to initialize. Welcome aboard. 🔥🌊</div></div>
+    </div>
+    <div style="margin-top:16px;padding:12px;background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-md);"><div style="font-size:0.78rem;color:var(--text-secondary);"><strong style="color:var(--amber);">After install:</strong><br><code style="font-family:var(--font-mono);font-size:0.75rem;color:var(--teal);">start_bond.bat</code> to launch &nbsp;·&nbsp;<code style="font-family:var(--font-mono);font-size:0.75rem;color:var(--teal);">stop_bond.bat</code> to stop</div></div>`;
+}
+
+function generateScript() {
+  const p = state.paths.install;
+  const c = state.components;
+  const port = state.paths.port;
+  const needsPython = c.qais.selected || c.iss.selected;
+  let s = `@echo off
+chcp 65001 >nul 2>nul
+:: BOND Installation Script v3.0 — Generated by BOND Wizard
+echo.
+echo  BOND Installer
+echo  ════════════════════════════════════
+echo.
+set "BOND_ROOT=${p}"
+set "BOND_PORT=${port}"
+echo [1/5] Checking prerequisites...
+echo.
+where git >nul 2>nul || ( echo    [MISSING] Git — Install from https://git-scm.com & echo. & pause & exit /b 1 )
+echo    [OK] Git
+where node >nul 2>nul || ( echo    [MISSING] Node.js — Install from https://nodejs.org & echo. & pause & exit /b 1 )
+echo    [OK] Node.js`;
+  if (needsPython) {
+    s += `
+where python >nul 2>nul || ( echo    [MISSING] Python — Install from https://python.org & echo. & pause & exit /b 1 )
+echo    [OK] Python
+python -c "import numpy" >nul 2>nul || ( echo    Installing numpy... & pip install numpy )
+echo    [OK] numpy`;
+  }
+  s += `
+echo.
+echo [2/5] Cloning BOND repository...
+echo.
+if exist "%BOND_ROOT%\\.git" (
+    echo    Repository exists. Pulling latest...
+    cd /d "%BOND_ROOT%" & git pull
+) else (
+    git clone https://github.com/moneyjarrod/BOND.git "%BOND_ROOT%"
+    if not exist "%BOND_ROOT%\\panel" ( echo. & echo    [ERROR] Clone failed. & echo. & pause & exit /b 1 )
+)
+echo    [OK] Repository ready
+echo.
+echo [3/5] Installing panel dependencies...
+echo.
+cd /d "%BOND_ROOT%\\panel"
+call npm install
+echo.
+echo    [OK] Panel installed
+if not exist "%BOND_ROOT%\\data" mkdir "%BOND_ROOT%\\data"
+echo    [OK] Data directory ready
+echo.
+echo [4/5] Preparing to start...
+echo.
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%BOND_PORT% " ^| findstr "LISTENING"') do (
+    echo    Clearing port %BOND_PORT% (PID: %%a)...
+    taskkill /PID %%a /F >nul 2>nul
+)
+echo    [OK] Port %BOND_PORT% clear
+echo.
+echo [5/5] Starting BOND...
+echo.
+cd /d "%BOND_ROOT%\\panel"
+start "BOND Sidecar" /min cmd /c "node server.js"
+echo    [OK] Sidecar starting on http://localhost:%BOND_PORT%
+if exist "%BOND_ROOT%\\panel\\dist\\index.html" (
+    echo    [OK] Serving production build
+    timeout /t 3 /nobreak >nul
+    start http://localhost:%BOND_PORT%
+) else (
+    start "BOND Panel" /min cmd /c "npx vite"
+    echo    [OK] Dev server starting on http://localhost:5173
+    timeout /t 4 /nobreak >nul
+    start http://localhost:5173
+)
+echo.
+echo  ════════════════════════════════════
+echo  BOND is running!
+echo  ════════════════════════════════════
+echo.
+echo  Panel:   http://localhost:%BOND_PORT%
+echo  Stop:    %BOND_ROOT%\\stop_bond.bat`;
+  if (c.ahk.selected) { s += `\necho  Counter: %BOND_ROOT%\\Counter\\BOND_v8.ahk`; }
+  s += `
+echo.
+echo  Next: Configure MCP servers in Claude,
+echo  then type {Sync} to initialize.
+echo.
+pause`;
+  return s;
+}
+
+function next() { const steps = getSteps(); if (step < steps.length - 1) { step++; render(); } }
+function prev() { if (step > 0) { step--; render(); } }
+function escapeHtml(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function downloadScript() {
+  const blob = new Blob([generateScript()], { type: 'text/plain' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'install_bond.bat'; a.click(); URL.revokeObjectURL(a.href);
+}
+render();
+</script>
+</body>
+</html>
