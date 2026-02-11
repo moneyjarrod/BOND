@@ -83,6 +83,9 @@ Ref: doctrine/BOND_MASTER/VINE_GROWTH_MODEL.md
 Doctrine: static IS, Files+ISS, no growth. Project: bounded, Files+QAIS+Heatmap+Crystal+ISS, carries CORE. Perspective: unbounded growth, Files+QAIS+Heatmap+Crystal, no ISS. Library: reference, Files only.
 Pointer: state/active_entity.json. Panel writes Enter, clears Exit. {Sync} follows pointer. Switch overwrites — no drop needed. Class boundaries hard.
 
+CORE Enforcement (projects):
+Every project has a CORE.md — its local constitution. On {Enter} or {Sync}, if CORE.md is empty or contains only the starter template, Claude flags it and guides the user: "What is this project? Let's define it before we start." Work can proceed, but Claude treats an empty CORE as unresolved. Once CORE has real content, the project is initialized — Claude stops flagging. CORE is sovereign inside the project boundary (B4) — if CORE and doctrine conflict on project-internal matters, CORE wins. Projects cannot write to doctrine entities (B1). PROJECT_MASTER governs lifecycle, CORE governs content.
+
 ## SAVE
 Both agree before writing. Proof required (screenshot/test/confirmation). Bug to Fix link: Symptom + Fix + Link.
 If state/config.json has save_confirmation:true, present ask_user_input widget before every file write. Three options: Both agree (write), Show change first (diff then re-ask), Don't write (stand down). User can bypass verbally. Toggle off in panel.
