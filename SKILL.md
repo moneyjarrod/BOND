@@ -44,7 +44,7 @@ Command tools (fire on command, respect class boundaries):
 {Full Restore} → heatmap_hot(top_k=5), qais_passthrough with session context
 {Warm Restore} → read state/warm_restore_output.md (pre-computed by panel endpoint /api/warm-restore), heatmap_hot(top_k=3) for signal boost. Panel runs SPECTRA, writes badges to file, Claude reads result.
 {Crystal} → iss_analyze on chunk text, crystal to QAIS, heatmap_chunk snapshot
-{Chunk} → heatmap_chunk snapshot
+{Chunk} → heatmap_chunk snapshot. If crystal blocked by class matrix, Chunk still executes as conversational summary. Crystal adds persistence, doesn't gate the action.
 {Tick} → heatmap_hot(top_k=3) for warm concepts
 {Save} → after write, qais_store binding (entity|role=save|fact=what was saved)
 Seed tools (framework-level, bypass class boundaries when seeders armed):
