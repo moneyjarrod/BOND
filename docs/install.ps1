@@ -1,7 +1,7 @@
 # PowerShell Installation Script for BOND
 # Usage: irm https://moneyjarrod.github.io/BOND/install.ps1 | iex
 
-$ErrorActionPreference = "Stop"
+# Don't use Stop — git writes progress to stderr which PowerShell treats as errors
 
 Write-Host ""
 Write-Host "  BOND Installer" -ForegroundColor Yellow
@@ -72,7 +72,8 @@ if (Test-Path "$BOND_ROOT\.git") {
     git pull 2>&1 | Out-Null
     Pop-Location
 } else {
-    git clone https://github.com/moneyjarrod/BOND.git $BOND_ROOT 2>&1 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkGray }
+    $cloneOutput = git clone https://github.com/moneyjarrod/BOND.git $BOND_ROOT 2>&1
+    foreach ($line in $cloneOutput) { Write-Host "   $line" -ForegroundColor DarkGray }
     if (-not (Test-Path "$BOND_ROOT\panel")) {
         Write-Host ""
         Write-Host "   [ERROR] Download failed. Check your internet connection." -ForegroundColor Red
