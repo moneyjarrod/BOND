@@ -20,19 +20,21 @@ BOND gives Claude persistent memory, structured context, runtime tool governance
 
 ## Get Started
 
-### [⚡ Launch the Install Wizard →](https://moneyjarrod.github.io/BOND/)
+### [⚡ Install BOND →](https://moneyjarrod.github.io/BOND/)
 
-The wizard walks you through everything — pick full or custom install, set your path, download the script, and go.
+One command. Paste it into PowerShell, press Enter, BOND installs and opens.
 
-**Requirements:** Node.js 18+ · Python 3.8+ · numpy · Git · Windows 10/11 (for AHK bridge)
+**Or from the command line directly:**
+```powershell
+irm https://moneyjarrod.github.io/BOND/install.ps1 | iex
+```
 
-**Manual install** (if you prefer):
-1. `git clone https://github.com/moneyjarrod/BOND.git`
-2. Run `install_bond.bat` — checks prerequisites, installs dependencies
-3. Run `start_bond.bat` — launches panel + sidecar
-4. Add the BOND skill (`skills/bond/SKILL.md`) as Project Knowledge in a Claude Project
-5. Add the MCP config to your Claude setup (see `.env.example` for server paths)
-6. Type `{Sync}` in Claude to initialize
+**Requirements:** Node.js 18+ · Python 3.8+ · Git · Windows 10/11
+
+**After install:**
+1. Add the BOND skill (`skills/bond/SKILL.md`) as Project Knowledge in a Claude Project
+2. Configure MCP servers in Claude (see `.env.example` for paths)
+3. Type `{Sync}` in Claude to initialize
 
 ## Architecture
 
