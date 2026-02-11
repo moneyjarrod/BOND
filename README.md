@@ -57,7 +57,7 @@ BOND is a protocol, not just software. The rules matter more than the implementa
 
 ## Built By
 
-J-Dub and Claude. 90 sessions. No team.
+J-Dub and Claude. 100+ sessions. No team.
 
 ## License
 
