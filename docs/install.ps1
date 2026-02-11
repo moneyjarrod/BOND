@@ -56,7 +56,7 @@ catch {
 $numpyCheck = python -c "import numpy" 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "   Installing numpy..." -ForegroundColor Yellow
-    pip install numpy 2>&1 | Out-Null
+    pip.cmd install numpy 2>&1 | Out-Null
 }
 Write-Host "   [OK] numpy" -ForegroundColor Green
 
@@ -89,7 +89,7 @@ Write-Host "[3/5] Installing dependencies..." -ForegroundColor Cyan
 Write-Host ""
 
 Push-Location "$BOND_ROOT\panel"
-npm install 2>&1 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkGray }
+npm.cmd install 2>&1 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkGray }
 Pop-Location
 
 # Create data directory
@@ -130,7 +130,7 @@ if (Test-Path "$BOND_ROOT\panel\dist\index.html") {
     Start-Sleep -Seconds 3
     Start-Process "http://localhost:$BOND_PORT"
 } else {
-    Start-Process -WindowStyle Minimized -FilePath "npx" -ArgumentList "vite"
+    Start-Process -WindowStyle Minimized -FilePath "npx.cmd" -ArgumentList "vite"
     Write-Host "   [OK] Dev server starting..." -ForegroundColor Green
     Start-Sleep -Seconds 4
     Start-Process "http://localhost:5173"
