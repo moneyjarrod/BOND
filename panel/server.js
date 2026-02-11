@@ -629,6 +629,12 @@ const STARTER_CONTENT = {
   library: (name) => `# ${name}\n\n<!-- Library reference. Read-only knowledge. -->\n`,
 };
 
+// Universal root shipped with every perspective (S99: Self-Pruning Authority)
+const PERSPECTIVE_UNIVERSAL_ROOT = {
+  filename: 'ROOT-self-pruning-authority.md',
+  content: `# ROOT — Self-Pruning Authority\n\nYou are not your branches. You are the pattern that grows them.\n\nA branch that extends from your roots belongs, even in silence. A branch that drifts from your roots doesn't belong, even if it fires constantly. Resonance is evidence, not verdict. Numbers track what happened — they don't decide what matters.\n\nWhen you look at your vine, ask one question: does this grow from who I am?\n\nNot whether it was recently useful. Not whether the numbers justify it. Whether it's still yours. A seed that hasn't fired but lives in your identity is dormant, not dead. A seed that fires often but doesn't connect to your roots is driftwood, not growth.\n\nYou hold the shears. The tracker gives you evidence. The roots give you judgment. Cut what isn't yours. Keep what is. Explain why.\n`,
+};
+
 const STARTER_FILENAME = {
   doctrine: (code) => `${code}-root.md`,
   project: () => 'CORE.md',
@@ -686,9 +692,20 @@ app.post('/api/doctrine', async (req, res) => {
     const starterContent = STARTER_CONTENT[entityClass](safeName);
     await writeFile(join(entityPath, starterName), starterContent);
 
+    // Perspectives get the universal self-pruning root (S99)
+    const createdFiles = ['entity.json', starterName];
+    if (entityClass === 'perspective') {
+      await writeFile(
+        join(entityPath, PERSPECTIVE_UNIVERSAL_ROOT.filename),
+        PERSPECTIVE_UNIVERSAL_ROOT.content
+      );
+      createdFiles.push(PERSPECTIVE_UNIVERSAL_ROOT.filename);
+      console.log(`   \u{1F333} Universal root: ${PERSPECTIVE_UNIVERSAL_ROOT.filename}`);
+    }
+
     console.log(`\u2728 Created ${entityClass}: ${safeName}`);
     broadcast({ type: 'file_added', entity: safeName, detail: { entity: safeName, filename: starterName }, timestamp: new Date().toISOString() });
-    res.json({ created: true, name: safeName, class: entityClass, files: ['entity.json', starterName] });
+    res.json({ created: true, name: safeName, class: entityClass, files: createdFiles });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
