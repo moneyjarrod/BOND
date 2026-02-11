@@ -1375,7 +1375,23 @@ try {
     }, 500);
   });
 } catch (err) {
-  console.warn('fs.watch warning:', err.message);
+  console.warn('fs.watch (doctrine) warning:', err.message);
+}
+
+// Watch state directory for external entity enter/exit (e.g. Claude writes active_entity.json)
+let stateDebounce = null;
+try {
+  watch(STATE_PATH, { recursive: false }, (eventType, filename) => {
+    if (filename === 'active_entity.json') {
+      clearTimeout(stateDebounce);
+      stateDebounce = setTimeout(() => {
+        console.log('📡 State file changed externally — broadcasting');
+        broadcast({ type: 'state_changed', detail: { source: 'file_watch' }, timestamp: new Date().toISOString() });
+      }, 300);
+    }
+  });
+} catch (err) {
+  console.warn('fs.watch (state) warning:', err.message);
 }
 
 wss.on('connection', () => {
