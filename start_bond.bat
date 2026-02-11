@@ -27,7 +27,7 @@ echo    Close this window anytime — servers
 echo    run in their own windows (minimized).
 echo ========================================
 echo.
-echo Optional: Run bridge\BOND_v8.ahk
+echo Optional: Run Counter\BOND_v8.ahk
 echo for counter + command bridge.
 echo.
 pause

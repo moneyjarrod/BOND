@@ -55,7 +55,7 @@ echo    Setup complete!
 echo    Run start_bond.bat to launch.
 echo ========================================
 echo.
-echo Optional: Run bridge\BOND_v8.ahk for
+echo Optional: Run Counter\BOND_v8.ahk for
 echo counter + command bridge (Windows).
 echo.
 pause

@@ -67,101 +67,9 @@ BOND_MASTER IS NOT:
       tools: { filesystem: true, iss: true },
       links: [],
     },
-    files: {
-      'PROJECT_MASTER.md': `# Project Master — Project Lifecycle Authority
-
-## What PROJECT_MASTER IS
-
-PROJECT_MASTER is the organizational authority over project lifecycle within BOND.
-It governs how projects are created, structured, linked, and maintained.
-
-PROJECT_MASTER IS:
-- A doctrine entity. Peer to BOND_MASTER, not subordinate.
-- Authority over project-class entities and their lifecycle.
-- The bridge between framework constitution (doctrine) and project constitution (CORE).
-
-PROJECT_MASTER IS NOT:
-- Above BOND_MASTER. They are peers. BOND governs protocol, PM governs projects.
-- A project itself. It defines how projects work, not what they build.
-- A replacement for CORE. CORE is a project's local constitution. PM defines the pattern.
-
-## CORE vs Doctrine
-
-Two distinct layers. Structurally similar, different masters.
-- Doctrine = framework constitution. Governed by BOND_MASTER.
-- CORE = project constitution. Governed by the project, referenced by PROJECT_MASTER.
-- If doctrine conflicts with CORE, CORE wins inside the project boundary.
-
-## Project Lifecycle
-
-### Phases
-
-**Created** \u2192 Project entity exists. entity.json written, CORE.md file present but empty, auto-linked to PROJECT_MASTER. This is code-level creation \u2014 the project exists structurally but is not yet operational.
-
-**Initialized** \u2192 CORE.md has been populated with content. Any content \u2014 scope, goals, constraints, principles, a single guiding sentence. PM does not prescribe what CORE contains, only that it contains something. A project with an empty CORE is not initialized. Claude should guide the user through populating CORE on first entry.
-
-**Active** \u2192 Normal operation. Sessions happen, handoffs accumulate, crystals get written. BOND protocol governs the work. PM does not manage active sessions \u2014 that is BOND_MASTER's domain.
-
-**Complete** \u2192 The project's mission is fulfilled or explicitly closed by the user. Completion is a user declaration, not an automatic state. A completed project may be reclassified to library (reference archive) or left as-is.
-
-### CORE Enforcement
-
-CORE population is the gate between Created and Initialized. When Claude enters a project with an empty CORE, Claude should:
-1. Acknowledge the project and its class/tools.
-2. Note that CORE is unpopulated.
-3. Guide the user: "What is this project? Let's define it before we start."
-4. Write the CORE together \u2014 user's words, Claude's structure.
-
-Claude continues to flag an empty CORE on every {Sync} and {Enter} until populated. This is doctrinal enforcement, not code-blocking \u2014 work can technically proceed, but Claude treats an empty CORE as an unresolved issue.
-
-No restrictions exist on CORE content. A CORE may be a single sentence or a detailed constitution. The content belongs to the project (B4: CORE sovereignty). PM's authority is limited to requiring that it exists.
-
-### Health Signals
-
-PM defines what a healthy project looks like. These are not enforced \u2014 they are signals Claude can surface when relevant:
-- CORE populated: yes/no
-- Last handoff: how recent
-- Open threads: accumulating without resolution
-- Session gap: time since last active session
-
-These signals live in the data that already exists (handoffs, CORE file, entity state). Derive, not store.
-
-## Mantra
-
-"Doctrine defines the pattern. CORE defines the project."
-`,
-      'PROJECT_BOUNDARIES.md': `# Project Boundaries — Doctrine Authority
-
-## What This Document IS
-
-This doctrine defines the boundary rules between project-class entities and the doctrine layer. These rules are loaded when a project is entered via link to PROJECT_MASTER, and govern Claude's behavior for the duration of that session.
-
-## Boundary Rules
-
-### B1: Doctrine Is Read-Only to Projects
-Project-class entities cannot write to, modify, or delete files belonging to any doctrine-class entity. Doctrine flows into projects as reference. It does not flow back. This includes BOND_MASTER, PROJECT_MASTER, and any user-created doctrine entities.
-
-### B2: Framework Entities Are Immutable
-BOND_MASTER and PROJECT_MASTER are framework entities. No project may alter their configuration, files, links, tool settings, or display names. This is enforced both in code (server.js FRAMEWORK_ENTITIES) and here in doctrine.
-
-### B3: Class and Tool Matrix Are Not Self-Modifiable
-A project cannot change its own class designation or tool matrix. Class is set at creation and governed by PROJECT_MASTER. Tool boundaries are defined by the class matrix in BOND_MASTER doctrine. A project operates within its granted capabilities, it does not expand them.
-
-### B4: CORE Is Sovereign Inside the Boundary
-Within its own directory, a project's CORE is the highest authority. Doctrine provides the frame, CORE defines the content. If doctrine and CORE conflict on project-internal matters, CORE wins. But CORE cannot override boundary rules B1-B3 — those belong to PROJECT_MASTER.
-
-### B5: Links Are Directional by Default
-PROJECT_MASTER links to projects (authority flows down). Projects may link to other projects or to library/perspective entities for reference. Projects do not link to doctrine entities — doctrine is accessed through the existing load pipeline, not through project-level links.
-
-## Why Doctrine, Not Code
-
-These boundaries are enforced through the read pipeline. When a project is entered and PROJECT_MASTER is linked, Claude loads this file and operates within these rules. The doctrine IS the enforcement. This avoids retrofitting server middleware for scope checking while maintaining the same guarantee: projects cannot reach up.
-
-## Mantra
-
-"The boundary is the gift. Build freely inside it."
-`,
-    },
+    // PM doctrine files ship as templates/doctrine/PROJECT_MASTER/*.md
+    // Template copy pipeline handles them (S95). No inline shadowing.
+    files: {},
   },
 };
 
@@ -170,7 +78,7 @@ const FRAMEWORK_ENTITY_NAMES = Object.keys(FRAMEWORK_ENTITIES);
 // ─── Template Path (S95) ──────────────────────────────────
 // Doctrine .md files too large for inline strings ship as templates/.
 // Bootstrap copies them to doctrine/ if they don't exist.
-const TEMPLATES_PATH = resolve(join(process.cwd(), 'templates', 'doctrine'));
+const TEMPLATES_PATH = resolve(join(BOND_ROOT, 'templates', 'doctrine'));
 
 // Bootstrap: ensure framework entities exist on startup
 async function bootstrapFrameworkEntities() {
