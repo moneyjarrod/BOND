@@ -47,9 +47,14 @@ global commandsTyped := 0
 global bridgeActive := true
 global lastClipboard := ""
 
+; ─── STATUS FILE ───────────────────────────────────────
+; Panel reads this to reflect AHK state in the UI
+global StatusFile := A_ScriptDir . "\..\state\ahk_status.json"
+
 ; ─── INIT ─────────────────────────────────────────────
 InitCounter()
 UpdateTray()
+WriteStatus()
 OnClipboardChange(ClipboardBridge)
 
 ; ═══════════════════════════════════════════════════════
@@ -86,6 +91,7 @@ SaveCounter() {
     try FileDelete(CounterFile)
     try FileAppend(String(TurnN), CounterFile)
     UpdateTray()
+    WriteStatus()
 }
 
 ResetCounter() {
@@ -113,6 +119,7 @@ ToggleBond() {
     global BondActive
     BondActive := !BondActive
     UpdateTray()
+    WriteStatus()
     ToolTip("BOND " . (BondActive ? "ON" : "OFF"))
     SetTimer(() => ToolTip(), -2000)
 }
@@ -157,18 +164,34 @@ InjectTagAndSend() {
 }
 
 ; ═══════════════════════════════════════════════════════
+;   STATUS FILE (panel reads this)
+; ═══════════════════════════════════════════════════════
+
+WriteStatus() {
+    global StatusFile, BondActive, bridgeActive, TurnN, LIMIT, commandsTyped
+    json := '{'
+    json .= '"bond_active":' . (BondActive ? 'true' : 'false') . ','
+    json .= '"bridge_active":' . (bridgeActive ? 'true' : 'false') . ','
+    json .= '"turn":' . TurnN . ','
+    json .= '"limit":' . LIMIT . ','
+    json .= '"commands_typed":' . commandsTyped
+    json .= '}'
+    try {
+        if FileExist(StatusFile)
+            FileDelete(StatusFile)
+        FileAppend(json, StatusFile)
+    }
+}
+
+; ═══════════════════════════════════════════════════════
 ;   CLIPBOARD BRIDGE
 ; ═══════════════════════════════════════════════════════
 
 ClipboardBridge(dataType) {
-    global BRIDGE_PREFIX, commandsTyped, bridgeActive, lastClipboard
+    global BRIDGE_PREFIX, commandsTyped, bridgeActive, lastClipboard, BondActive
 
     ; Only handle text
     if (dataType != 1)
-        return
-
-    ; Check if bridge is active
-    if (!bridgeActive)
         return
 
     clip := A_Clipboard
@@ -184,6 +207,30 @@ ClipboardBridge(dataType) {
     ; Extract command (strip prefix)
     command := SubStr(clip, StrLen(BRIDGE_PREFIX) + 1)
     command := Trim(command)
+    
+    ; ─── Panel control commands (fire even when paused) ───
+    if (command == "__BRIDGE_TOGGLE__") {
+        ToggleBridge()
+        A_Clipboard := ""
+        lastClipboard := ""
+        return
+    }
+    if (command == "__BOND_TOGGLE__") {
+        ToggleBond()
+        A_Clipboard := ""
+        lastClipboard := ""
+        return
+    }
+    if (command == "__STATUS__") {
+        WriteStatus()
+        A_Clipboard := ""
+        lastClipboard := ""
+        return
+    }
+    
+    ; Check if bridge is active (after panel commands)
+    if (!bridgeActive)
+        return
     
     if (!command)
         return
@@ -277,6 +324,7 @@ ToggleBridge() {
     global bridgeActive
     bridgeActive := !bridgeActive
     UpdateTray()
+    WriteStatus()
     ToolTip("Bridge " . (bridgeActive ? "ON" : "OFF"))
     SetTimer(() => ToolTip(), -1500)
 }

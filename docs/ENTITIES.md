@@ -128,6 +128,42 @@ Entities can link to other entities. Links are stored in `entity.json`:
 
 When an entity is entered, Claude loads the linked entities' .md files as additional context. Links are directional — they flow from the active entity outward.
 
+### Class Linking Matrix
+
+Not all classes can link to each other. The linking matrix defines which class pairings are valid. The server enforces this — attempting a forbidden link returns a 403 error.
+
+| Source Class | Can Link To |
+|---|---|
+| Doctrine | Doctrine, Project, Library |
+| Project | Doctrine, Project, Perspective, Library |
+| Perspective | Project, Perspective, Library |
+| Library | Doctrine, Library |
+
+**Key restriction:** Doctrine and Perspective cannot link directly. Their tool matrices are incompatible — doctrine uses ISS (semantic force analysis), perspectives use QAIS (resonance memory). Connecting them would create a joint where tools from one context bleed into another. If cross-class insight is needed, the operator bridges it manually (read files for reference without entering the entity).
+
+The panel's link picker only shows entities with compatible classes, so you won't see forbidden targets in the dropdown.
+
+## Hooks
+
+Hooks are personal workflow rules stored as library-class entities. They augment BOND_MASTER doctrine without overriding it — think of them as your custom checklist that runs alongside the framework.
+
+A hook entity is just a library folder with `.md` files:
+
+```
+doctrine/
+└── MY_HOOKS/
+    ├── entity.json          ← class: library
+    ├── BUILD_HOOKS.md        ← Pre/post build rules
+    ├── AUDIT_HOOKS.md        ← Extra audit checks
+    └── WORKFLOW_HOOKS.md     ← General behavioral rules
+```
+
+Link your hooks entity to BOND_MASTER or a project, and Claude loads them on {Enter} or {Sync} alongside the other entity files.
+
+BOND ships with a template hook at `templates/hooks/EFFICIENCY_HOOKS.md` — platform-aware rules for reducing wasted tool calls. Copy it into your hooks entity and customize as needed.
+
+Hooks are library class (files only), so they don't interfere with tool boundaries. They're read as context, not executed as code.
+
 ## State Pointer
 
 The active entity is tracked in `state/active_entity.json`:

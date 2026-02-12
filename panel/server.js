@@ -1411,6 +1411,19 @@ app.get('/api/sync-health', async (req, res) => {
 // ─── Bridge ───────────────────────────────────────────────
 // Clipboard-only. Panel writes "BOND:{cmd}" -> AHK OnClipboardChange.
 
+// ─── AHK Status API (S114) ────────────────────────────────
+const AHK_STATUS_FILE = join(STATE_PATH, 'ahk_status.json');
+
+app.get('/api/ahk-status', async (req, res) => {
+  try {
+    const raw = await readFile(AHK_STATUS_FILE, 'utf-8');
+    const status = JSON.parse(raw);
+    res.json({ ...status, running: true });
+  } catch {
+    res.json({ running: false, bond_active: false, bridge_active: false, turn: 0, limit: 10, commands_typed: 0 });
+  }
+});
+
 // ─── Version Check (S111) ─────────────────────────────────
 const GITHUB_VERSION_URL = 'https://raw.githubusercontent.com/moneyjarrod/BOND/main/panel/package.json';
 let versionCache = { local: null, remote: null, updateAvailable: false, lastCheck: null, error: null };
@@ -1442,6 +1455,19 @@ async function checkForUpdate() {
 
 app.get('/api/version', (req, res) => {
   res.json(versionCache);
+});
+
+// ─── AHK Status API (S114) ───────────────────────────────
+const AHK_STATUS_FILE = join(STATE_PATH, 'ahk_status.json');
+
+app.get('/api/ahk-status', async (req, res) => {
+  try {
+    const raw = await readFile(AHK_STATUS_FILE, 'utf-8');
+    const status = JSON.parse(raw);
+    res.json({ ...status, running: true });
+  } catch {
+    res.json({ running: false, bond_active: false, bridge_active: false, turn: 0, limit: 10, commands_typed: 0 });
+  }
 });
 
 // ─── Production static serving ────────────────────────────
@@ -1494,6 +1520,25 @@ try {
   });
 } catch (err) {
   console.warn('fs.watch (state) warning:', err.message);
+}
+
+// Watch ahk_status.json for bridge state changes
+let ahkDebounce = null;
+try {
+  watch(STATE_PATH, { recursive: false }, (eventType, filename) => {
+    if (filename === 'ahk_status.json') {
+      clearTimeout(ahkDebounce);
+      ahkDebounce = setTimeout(async () => {
+        try {
+          const raw = await readFile(AHK_STATUS_FILE, 'utf-8');
+          const status = JSON.parse(raw);
+          broadcast({ type: 'ahk_status_changed', detail: { ...status, running: true }, timestamp: new Date().toISOString() });
+        } catch {}
+      }, 300);
+    }
+  });
+} catch (err) {
+  console.warn('fs.watch (ahk_status) warning:', err.message);
 }
 
 wss.on('connection', () => {
