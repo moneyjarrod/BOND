@@ -589,6 +589,11 @@ app.post('/api/doctrine', async (req, res) => {
       config.core = 'CORE.md';
       config.links = ['PROJECT_MASTER'];
     }
+    if (entityClass === 'perspective') {
+      config.seeding = false;
+      config.seed_threshold = 0.04;
+      config.prune_window = 10;
+    }
     await writeFile(
       join(entityPath, 'entity.json'),
       JSON.stringify(config, null, 2) + '\n'

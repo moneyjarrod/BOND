@@ -89,6 +89,13 @@ Each perspective maintains `seed_tracker.json` in its folder:
 - Identity alignment decides life/death — not hit count alone
 - ROOT-self-pruning-authority.md governs the pruning lens
 
+**Default tuning (set on perspective creation):**
+- `seed_threshold: 0.04` — wide net, lets the entity catch patterns we wouldn't expect
+- `prune_window: 10` — seeds get 10 Sync exposures before pruning eligibility
+- `seeding: false` — armed manually via panel toggle (SEED ON/OFF)
+- Each entity can override these in its own entity.json
+- At 50+ seed decisions, genetic tuning becomes viable — the entity defines its own fitness function
+
 **Stale seed bed:** High exposures, nothing new landing = mature vine.
 Not a problem state. Dormant, not dead. Seeding stays armed.
 
