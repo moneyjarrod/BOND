@@ -55,10 +55,12 @@ Claude checks each obligation against what was actually done during the session 
 Session Start → {Full Restore} or {Sync}
                 (or {Warm Restore} for targeted pickup)
 Work naturally → counter tracks context age
-Every ~10 messages → {Sync} to refresh
+Every ~10 messages → {Sync} to refresh (this is critical — see below)
 Before big changes → {Save} with proof
 Session end → {Handoff} to preserve
 ```
+
+> **⚠️ Why every 10 messages?** Claude's grounding in doctrine, entity files, and truth hierarchy actively degrades over conversation length. Without sync, Claude drifts — losing entity awareness, skipping obligations, and making decisions from stale context. The counter isn't a suggestion, it's the immune system. **[Full explanation →](COUNTER.md)**
 
 ## Warm Restore vs Full Restore
 

@@ -62,7 +62,7 @@ BOND is a protocol, not just software. The rules matter more than the implementa
 - **Armed = Obligated.** If a subsystem is armed, its governing command must service it. No silent skips.
 - **Both agree.** No unilateral writes. Proof required.
 - **Code > Prose.** When they conflict, code wins.
-- **Counter is king.** The counter is the heartbeat. If it dies, sync.
+- **Counter is king.** The counter is the heartbeat. Claude's grounding degrades over conversation length — the counter tracks freshness and tells you when to sync. Ignore it and BOND drifts. **[Read why →](docs/COUNTER.md)**
 
 ## Built By
 
