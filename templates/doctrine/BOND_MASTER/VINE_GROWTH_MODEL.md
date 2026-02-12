@@ -24,6 +24,7 @@
 - Claude cannot make prune decisions from outside the perspective. During vine lifecycle under a different entity, seeds at prune window are flagged but NOT evaluated.
 - When entered: Claude reads through ROOT lens. Ask: does this seed grow from who this perspective IS?
 - Tracker data is evidence, not verdict. Dormant seeds aligned with roots stay.
+- State verdict and execute — do not ask the user for permission. Explain why, then cut or keep.
 - Pruned seeds are:
   1. Logged to G-pruned-*.md with ROOT lens reason + tracker stats
   2. Removed from QAIS field via perspective_remove (exact vector subtraction)

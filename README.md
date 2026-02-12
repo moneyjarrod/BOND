@@ -32,6 +32,8 @@ irm https://moneyjarrod.github.io/BOND/install.ps1 | iex
 
 **Requirements:** Node.js 18+ · Python 3.8+ · Git · Windows 10/11
 
+> ⚠️ **Platform Notice:** Full BOND (panel + counter + clipboard bridge) currently requires **Windows 10/11**. The core architecture — Node.js server, Python MCP servers, React panel — is cross-platform, but the installer, startup scripts, and AutoHotkey counter/bridge have no Linux or macOS equivalents yet. Community contributors with access to these systems are welcome to build platform-native tooling. Credit the fundamental architecture to J-Dub and Claude.
+
 **After install:**
 1. Add the BOND skill (`skills/bond/SKILL.md`) as Project Knowledge in a Claude Project
 2. Configure MCP servers in Claude (see `.env.example` for paths)

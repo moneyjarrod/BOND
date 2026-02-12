@@ -4,6 +4,10 @@
 
 BOND is a governed runtime for persistent human-AI collaboration. It gives Claude structured memory, entity-based context management, and a visual control panel — so your work carries forward across sessions instead of starting from scratch every time.
 
+## Platform
+
+> ⚠️ **Windows 10/11 required.** Full BOND — panel, counter, clipboard bridge, installer — currently runs on Windows only. The core engine (Node.js server, Python MCP servers, React frontend) is cross-platform, but the startup scripts and AutoHotkey counter/bridge have no Linux or macOS equivalents yet. If you're on Linux or Mac and want to build platform-native tooling around the architecture, contributions are welcome — credit J-Dub and Claude for the fundamental architecture.
+
 ## After Install
 
 If you ran the installer, you should have:
