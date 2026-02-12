@@ -6,15 +6,7 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
-      '/api/doctrine': 'http://localhost:3000',
-      '/api/config': 'http://localhost:3000',
-      '/api/mcp': 'http://localhost:3000',
-      '/api/modules': 'http://localhost:3000',
-      '/api/state': 'http://localhost:3000',
-      '/api/bindings': 'http://localhost:3000',
-      '/api/handoff': 'http://localhost:3000',
-      '/api/warm-restore': 'http://localhost:3000',
-      '/api/version': 'http://localhost:3000'
+      '/api': 'http://localhost:3000'
     }
   }
 });

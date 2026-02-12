@@ -20,8 +20,9 @@
 - Logged to seed_decisions.jsonl for record.
 
 ### Pruning — The Only Deliberate Act
-- Judgment-based, not mechanical. Claude reads through ROOT lens.
-- Ask: does this seed grow from who this perspective IS?
+- Judgment-based, not mechanical. Requires {Enter} — the perspective must be the active entity.
+- Claude cannot make prune decisions from outside the perspective. During vine lifecycle under a different entity, seeds at prune window are flagged but NOT evaluated.
+- When entered: Claude reads through ROOT lens. Ask: does this seed grow from who this perspective IS?
 - Tracker data is evidence, not verdict. Dormant seeds aligned with roots stay.
 - Pruned seeds are:
   1. Logged to G-pruned-*.md with ROOT lens reason + tracker stats
@@ -61,9 +62,8 @@ the same resonance check to pass the gate.
 - **Dead branch log preserved**: Low cost, high value. Enables re-graft.
 - **G- prefix repurposed**: Pruning journal, not growth badge.
 - **Auto-seed on {Sync}**: Threshold hit → file + QAIS injection, no user prompt.
-- **Judgment over mechanics**: ROOT lens identity alignment, not hit count thresholds.
 
-## Seed Tracker
+## Seed Tracker (S99 Design)
 
 Each perspective maintains `seed_tracker.json` in its folder:
 ```json
@@ -78,16 +78,17 @@ Each perspective maintains `seed_tracker.json` in its folder:
 ```
 
 **Sync lifecycle (one pass):**
-1. RESONATE: perspective_check against conversation content
-2. TRACK: Increment exposures on ALL seeds, hits on resonating seeds
-3. AUTO-SEED: Novel patterns through ROOT lens → low field resonance confirms → write file + QAIS + tracker
-4. RE-GRAFT CHECK: Returning candidates need 2+ living co-resonance
-5. PRUNE: ROOT lens identity alignment judgment → 4-step execution chain
+1. Run resonance check (perspective_check) — ~600-900 tokens
+2. Auto-seed: new hits above threshold → file + QAIS injection + tracker entry
+3. Increment exposures on ALL active seeds
+4. Re-graft gate: check pruning log for returning candidates, require 2+ living co-resonance
+5. Prune eligible: seeds past `prune_window` exposures are FLAGGED. Prune evaluation requires {Enter} — perspective must be active entity. From outside, report and move on.
 
 **Entity sovereignty:** The perspective holds its own shears.
-- `prune_window` lives in entity.json — reference for evaluation context
-- Identity alignment decides life/death — not hit count alone
-- ROOT-self-pruning-authority.md governs the pruning lens
+- `prune_window` lives in entity.json — how many exposures before eligible
+- ROOT lens identity alignment decides life/death — not the user, not Claude-from-outside
+- Claude cannot judge through a perspective's ROOT lens without entering it
+- User is gardener (can review log, re-graft manually) not shears
 
 **Default tuning (set on perspective creation):**
 - `seed_threshold: 0.04` — wide net, lets the entity catch patterns we wouldn't expect
@@ -98,6 +99,7 @@ Each perspective maintains `seed_tracker.json` in its folder:
 
 **Stale seed bed:** High exposures, nothing new landing = mature vine.
 Not a problem state. Dormant, not dead. Seeding stays armed.
+Optional: panel visual status (active/stable/dormant) — deferred.
 
 **Cost:** ~1,200 tokens total per Sync for full vine lifecycle.
 Toggle: SEED ON/OFF on entity card disarms completely.

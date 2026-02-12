@@ -1457,19 +1457,6 @@ app.get('/api/version', (req, res) => {
   res.json(versionCache);
 });
 
-// ─── AHK Status API (S114) ───────────────────────────────
-const AHK_STATUS_FILE = join(STATE_PATH, 'ahk_status.json');
-
-app.get('/api/ahk-status', async (req, res) => {
-  try {
-    const raw = await readFile(AHK_STATUS_FILE, 'utf-8');
-    const status = JSON.parse(raw);
-    res.json({ ...status, running: true });
-  } catch {
-    res.json({ running: false, bond_active: false, bridge_active: false, turn: 0, limit: 10, commands_typed: 0 });
-  }
-});
-
 // ─── Production static serving ────────────────────────────
 const DIST_PATH = join(process.cwd(), 'dist');
 if (existsSync(DIST_PATH)) {
