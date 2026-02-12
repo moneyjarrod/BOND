@@ -197,9 +197,9 @@ export default function DoctrineBanner({ entities, allEntities, activeEntity, li
             {showLinkPicker && (
               <div style={{
                 position: 'absolute',
-                bottom: '100%',
+                top: '100%',
                 left: 0,
-                marginBottom: 6,
+                marginTop: 6,
                 background: '#1e2030',
                 border: '1px solid rgba(210,153,34,0.5)',
                 borderRadius: 'var(--radius-md)',

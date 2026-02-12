@@ -5,6 +5,11 @@ All notable changes to BOND will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.1.1] - 2026-02-12
+
+### Fixed
+- **Link dropdown clipping** — link picker now opens downward instead of upward, fixing entities being hidden above the viewport edge.
+
 ## [1.1.0] - 2026-02-12
 
 ### Added
