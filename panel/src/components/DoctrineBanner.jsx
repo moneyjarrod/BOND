@@ -37,9 +37,14 @@ export default function DoctrineBanner({ entities, allEntities, activeEntity, li
   const displayName = master.display_name || 'BOND Master';
   const fileCount = master.files?.length || 0;
 
-  // Linkable entities: everything except BOND_MASTER and already-linked
-  const linkedNames = new Set(linkedEntities.map(l => l.name));
-  const linkable = (allEntities || entities).filter(e => e.name !== MASTER_ENTITY && !linkedNames.has(e.name));
+  // Linkable entities: fetched from server with class matrix filtering (S113)
+  const [linkable, setLinkable] = useState([]);
+  useEffect(() => {
+    if (!isActive) { setLinkable([]); return; }
+    fetch('/api/state/linkable').then(r => r.json()).then(data => {
+      setLinkable((data.linkable || []).map(l => ({ name: l.entity, type: l.class, display_name: l.display_name })));
+    }).catch(() => setLinkable([]));
+  }, [isActive, linkedEntities]);
 
   const handleAudit = useCallback(async () => {
     if (!isActive) {

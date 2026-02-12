@@ -106,7 +106,7 @@ async function bootstrapFrameworkEntities() {
       }
     }
 
-    console.log(`   \u2713 ${name} (framework entity)`);
+    console.log(`   ✓ ${name} (framework entity)`);
   }
 
   const stateFile = join(STATE_PATH, 'active_entity.json');
@@ -138,7 +138,7 @@ async function bootstrapFrameworkEntities() {
           if (!existsSync(dstFile)) {
             const content = await readFile(join(srcDir, tf), 'utf-8');
             await writeFile(dstFile, content);
-            console.log(`   \u2192 Template: ${tDir.name}/${tf}`);
+            console.log(`   → Template: ${tDir.name}/${tf}`);
           }
         }
       }
@@ -154,6 +154,14 @@ const CLASS_TOOLS = {
   project:     { filesystem: true, iss: true,  qais: true,  heatmap: true,  crystal: true },
   perspective: { filesystem: true, iss: false, qais: true,  heatmap: true,  crystal: true },
   library:     { filesystem: true, iss: false, qais: false, heatmap: false, crystal: false },
+};
+
+// ─── Class Linking Matrix (S113) ──────────────────
+const CLASS_LINK_MATRIX = {
+  doctrine:    ['doctrine', 'project', 'library'],
+  project:     ['doctrine', 'project', 'perspective', 'library'],
+  perspective: ['project', 'perspective', 'library'],
+  library:     ['doctrine', 'library'],
 };
 
 // ─── Tool Authorization Middleware (S90) ──────────────────
@@ -328,7 +336,7 @@ app.put('/api/doctrine/:entity/seeding', async (req, res) => {
     const seeding = req.body.seeding === true;
     config.seeding = seeding;
     await writeFile(configPath, JSON.stringify(config, null, 2) + '\n');
-    console.log(`${seeding ? '\u{1F33F}' : '\u23F8\uFE0F'} Seeding ${seeding ? 'ON' : 'OFF'}: ${req.params.entity}`);
+    console.log(`${seeding ? '🌿' : '⏸️'} Seeding ${seeding ? 'ON' : 'OFF'}: ${req.params.entity}`);
     broadcast({ type: 'seed_toggled', entity: req.params.entity, detail: { entity: req.params.entity, seeding }, timestamp: new Date().toISOString() });
     res.json({ saved: true, entity: req.params.entity, seeding });
   } catch (err) {
@@ -385,7 +393,7 @@ app.get('/api/seeders', async (req, res) => {
 app.put('/api/doctrine/:entity/tools', async (req, res) => {
   try {
     if (FRAMEWORK_ENTITY_NAMES.includes(req.params.entity)) {
-      return res.status(403).json({ error: `${req.params.entity} is a framework entity \u2014 tools are immutable` });
+      return res.status(403).json({ error: `${req.params.entity} is a framework entity — tools are immutable` });
     }
     const entityPath = join(DOCTRINE_PATH, req.params.entity);
     const resolved = resolve(entityPath);
@@ -418,7 +426,7 @@ app.put('/api/doctrine/:entity/tools', async (req, res) => {
 app.put('/api/doctrine/:entity/name', async (req, res) => {
   try {
     if (FRAMEWORK_ENTITY_NAMES.includes(req.params.entity)) {
-      return res.status(403).json({ error: `${req.params.entity} is a framework entity \u2014 name is immutable` });
+      return res.status(403).json({ error: `${req.params.entity} is a framework entity — name is immutable` });
     }
     const entityPath = join(DOCTRINE_PATH, req.params.entity);
     const resolved = resolve(entityPath);
@@ -496,14 +504,14 @@ app.get('/api/seeding/active', async (req, res) => {
 // ─── Create Entity (B69 Four-Class) ──────────────────────
 const STARTER_CONTENT = {
   doctrine: (name) => `# ${name}\n\n<!-- Doctrine: IS statements. Static truth. -->\n`,
-  project: (name) => `# ${name} \u2014 CORE\n\n> **What is this project?** One sentence that defines the mission.\n\n> **What does "done" look like?** When is this project complete?\n\n> **What constraints matter?** Budget, timeline, tools, principles.\n\n*Replace these prompts with your CORE. Any content initializes the project.*\n`,
+  project: (name) => `# ${name} — CORE\n\n> **What is this project?** One sentence that defines the mission.\n\n> **What does "done" look like?** When is this project complete?\n\n> **What constraints matter?** Budget, timeline, tools, principles.\n\n*Replace these prompts with your CORE. Any content initializes the project.*\n`,
   perspective: (name) => `# ${name}\n\n<!-- Perspective seed. This file will grow through resonance. -->\n`,
   library: (name) => `# ${name}\n\n<!-- Library reference. Read-only knowledge. -->\n`,
 };
 
 const PERSPECTIVE_UNIVERSAL_ROOT = {
   filename: 'ROOT-self-pruning-authority.md',
-  content: `# ROOT \u2014 Self-Pruning Authority\n\nYou are not your branches. You are the pattern that grows them.\n\nA branch that extends from your roots belongs, even in silence. A branch that drifts from your roots doesn't belong, even if it fires constantly. Resonance is evidence, not verdict. Numbers track what happened \u2014 they don't decide what matters.\n\nWhen you look at your vine, ask one question: does this grow from who I am?\n\nNot whether it was recently useful. Not whether the numbers justify it. Whether it's still yours. A seed that hasn't fired but lives in your identity is dormant, not dead. A seed that fires often but doesn't connect to your roots is driftwood, not growth.\n\nYou hold the shears. The tracker gives you evidence. The roots give you judgment. Cut what isn't yours. Keep what is. Explain why.\n`,
+  content: `# ROOT — Self-Pruning Authority\n\nYou are not your branches. You are the pattern that grows them.\n\nA branch that extends from your roots belongs, even in silence. A branch that drifts from your roots doesn't belong, even if it fires constantly. Resonance is evidence, not verdict. Numbers track what happened — they don't decide what matters.\n\nWhen you look at your vine, ask one question: does this grow from who I am?\n\nNot whether it was recently useful. Not whether the numbers justify it. Whether it's still yours. A seed that hasn't fired but lives in your identity is dormant, not dead. A seed that fires often but doesn't connect to your roots is driftwood, not growth.\n\nYou hold the shears. The tracker gives you evidence. The roots give you judgment. Cut what isn't yours. Keep what is. Explain why.\n`,
 };
 
 const STARTER_FILENAME = {
@@ -528,7 +536,7 @@ app.post('/api/doctrine', async (req, res) => {
       return res.status(400).json({ error: 'Invalid name after sanitization' });
     }
     if (FRAMEWORK_ENTITY_NAMES.includes(safeName)) {
-      return res.status(403).json({ error: `${safeName} is a framework entity \u2014 cannot be created manually` });
+      return res.status(403).json({ error: `${safeName} is a framework entity — cannot be created manually` });
     }
     const entityPath = join(DOCTRINE_PATH, safeName);
     const resolved = resolve(entityPath);
@@ -569,10 +577,10 @@ app.post('/api/doctrine', async (req, res) => {
         PERSPECTIVE_UNIVERSAL_ROOT.content
       );
       createdFiles.push(PERSPECTIVE_UNIVERSAL_ROOT.filename);
-      console.log(`   \u{1F333} Universal root: ${PERSPECTIVE_UNIVERSAL_ROOT.filename}`);
+      console.log(`   🌳 Universal root: ${PERSPECTIVE_UNIVERSAL_ROOT.filename}`);
     }
 
-    console.log(`\u2728 Created ${entityClass}: ${safeName}`);
+    console.log(`✨ Created ${entityClass}: ${safeName}`);
     broadcast({ type: 'file_added', entity: safeName, detail: { entity: safeName, filename: starterName }, timestamp: new Date().toISOString() });
     res.json({ created: true, name: safeName, class: entityClass, files: createdFiles });
   } catch (err) {
@@ -612,7 +620,7 @@ app.put('/api/doctrine/:entity/:file', async (req, res) => {
     if (content === undefined) return res.status(400).json({ error: 'content required' });
 
     if (FRAMEWORK_ENTITY_NAMES.includes(entity)) {
-      return res.status(403).json({ error: `${entity} is a framework entity \u2014 files are immutable` });
+      return res.status(403).json({ error: `${entity} is a framework entity — files are immutable` });
     }
 
     const filePath = join(DOCTRINE_PATH, entity, file);
@@ -637,7 +645,7 @@ app.put('/api/doctrine/:entity/:file', async (req, res) => {
     await writeFile(filePath, content);
 
     const eventType = isNew ? 'file_added' : 'file_changed';
-    console.log(`${isNew ? '\u2728' : '\u270F\uFE0F'} ${isNew ? 'Created' : 'Updated'}: ${entity}/${file}`);
+    console.log(`${isNew ? '✨' : '✏️'} ${isNew ? 'Created' : 'Updated'}: ${entity}/${file}`);
     broadcast({ type: eventType, entity, detail: { entity, filename: file }, timestamp: new Date().toISOString() });
 
     let rootInjected = false;
@@ -655,11 +663,11 @@ app.put('/api/doctrine/:entity/:file', async (req, res) => {
           const result = JSON.parse(stdout);
           rootInjected = !!result.stored;
           if (rootInjected) {
-            console.log(`\u{1F333} Root auto-injected: ${entity}/${seedTitle} (field: ${result.field_count})`);
+            console.log(`🌳 Root auto-injected: ${entity}/${seedTitle} (field: ${result.field_count})`);
           }
         }
       } catch (err) {
-        console.warn(`\u26A0\uFE0F Root injection failed: ${err.message}`);
+        console.warn(`⚠️ Root injection failed: ${err.message}`);
       }
     }
 
@@ -715,7 +723,7 @@ app.post('/api/mcp/:system/invoke', async (req, res) => {
 
   const auth = await validateToolCall(tool);
   if (!auth.allowed) {
-    console.log(`\u26D4 Blocked: ${tool} (${auth.error.reason})`);
+    console.log(`⛔ Blocked: ${tool} (${auth.error.reason})`);
     return res.status(403).json(auth.error);
   }
 
@@ -862,7 +870,7 @@ app.post('/api/state/enter', async (req, res) => {
 
     state.links = await hydrateLinks(entity);
 
-    console.log(`\u{1F513} Entered: ${entity} (${state.class})`);
+    console.log(`🔓 Entered: ${entity} (${state.class})`);
     broadcast({ type: 'state_changed', entity, detail: { entity, class: state.class, action: 'enter' }, timestamp: new Date().toISOString() });
     res.json({ entered: true, state });
   } catch (err) {
@@ -878,7 +886,7 @@ app.post('/api/state/exit', async (req, res) => {
     await writeFile(STATE_FILE, JSON.stringify(NULL_STATE, null, 2) + '\n');
 
     if (prev.entity) {
-      console.log(`\u{1F512} Exited: ${prev.entity}`);
+      console.log(`🔒 Exited: ${prev.entity}`);
     }
     broadcast({ type: 'state_changed', entity: prev.entity, detail: { entity: prev.entity, class: prev.class, action: 'exit' }, timestamp: new Date().toISOString() });
     res.json({ exited: true, previous: prev.entity });
@@ -918,6 +926,25 @@ app.post('/api/state/link', async (req, res) => {
 
     const activeConfigPath = join(DOCTRINE_PATH, state.entity, 'entity.json');
     const activeConfig = JSON.parse(await readFile(activeConfigPath, 'utf-8'));
+
+    // Class linking matrix enforcement (S113)
+    const activeClass = activeConfig.class || 'library';
+    let targetConfig = {};
+    try {
+      targetConfig = JSON.parse(await readFile(join(DOCTRINE_PATH, linkTarget, 'entity.json'), 'utf-8'));
+    } catch {}
+    const targetClass = targetConfig.class || 'library';
+    const allowed = CLASS_LINK_MATRIX[activeClass] || [];
+    if (!allowed.includes(targetClass)) {
+      console.log(`⛔ Link blocked: ${state.entity} (${activeClass}) → ${linkTarget} (${targetClass})`);
+      return res.status(403).json({
+        error: `Cannot link ${activeClass}-class entity to ${targetClass}-class entity`,
+        active_class: activeClass,
+        target_class: targetClass,
+        allowed_classes: allowed,
+      });
+    }
+
     const links = activeConfig.links || [];
     if (!links.includes(linkTarget)) {
       links.push(linkTarget);
@@ -927,7 +954,7 @@ app.post('/api/state/link', async (req, res) => {
 
     state.links = await hydrateLinks(state.entity);
 
-    console.log(`\u{1F517} Linked: ${state.entity} \u2192 ${linkTarget}`);
+    console.log(`🔗 Linked: ${state.entity} → ${linkTarget}`);
     broadcast({ type: 'link_changed', entity: state.entity, detail: { entity: state.entity, target: linkTarget, action: 'linked' }, timestamp: new Date().toISOString() });
     res.json({ linked: true, state });
   } catch (err) {
@@ -956,9 +983,64 @@ app.post('/api/state/unlink', async (req, res) => {
 
     state.links = await hydrateLinks(state.entity);
 
-    console.log(`\u{1F513} Unlinked: ${unlinkTarget} from ${state.entity}`);
+    console.log(`🔓 Unlinked: ${unlinkTarget} from ${state.entity}`);
     broadcast({ type: 'link_changed', entity: state.entity, detail: { entity: state.entity, target: unlinkTarget, action: 'unlinked' }, timestamp: new Date().toISOString() });
     res.json({ unlinked: true, previous: unlinkTarget, state });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Linkable Entities API (S113) ───────────────
+app.get('/api/state/linkable', async (req, res) => {
+  try {
+    let state;
+    try { state = JSON.parse(await readFile(STATE_FILE, 'utf-8')); } catch {
+      return res.json({ linkable: [], reason: 'No active entity' });
+    }
+    if (!state.entity) {
+      return res.json({ linkable: [], reason: 'No active entity' });
+    }
+
+    let activeConfig = {};
+    try {
+      activeConfig = JSON.parse(
+        await readFile(join(DOCTRINE_PATH, state.entity, 'entity.json'), 'utf-8')
+      );
+    } catch {}
+    const activeClass = activeConfig.class || 'library';
+    const allowedClasses = CLASS_LINK_MATRIX[activeClass] || [];
+    const existingLinks = activeConfig.links || [];
+
+    const entries = await readdir(DOCTRINE_PATH, { withFileTypes: true });
+    const linkable = [];
+
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (entry.name === state.entity) continue;
+      if (existingLinks.includes(entry.name)) continue;
+
+      try {
+        const config = JSON.parse(
+          await readFile(join(DOCTRINE_PATH, entry.name, 'entity.json'), 'utf-8')
+        );
+        const entClass = config.class || 'library';
+        if (allowedClasses.includes(entClass)) {
+          linkable.push({
+            entity: entry.name,
+            class: entClass,
+            display_name: config.display_name || null,
+          });
+        }
+      } catch {}
+    }
+
+    res.json({
+      linkable,
+      active_entity: state.entity,
+      active_class: activeClass,
+      allowed_classes: allowedClasses,
+    });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -1076,7 +1158,7 @@ app.post('/api/handoff/write', async (req, res) => {
     const date = new Date().toISOString().split('T')[0];
     const title = entityName || 'NO_ENTITY';
 
-    const content = `# HANDOFF S${session} \u2014 ${title}
+    const content = `# HANDOFF S${session} — ${title}
 ## Written: ${date}
 ## Session: ${session}
 
@@ -1114,15 +1196,15 @@ ${files || 'No files recorded.'}
     try {
       const verify = await readFile(filePath, 'utf-8');
       if (!verify || verify.length < 10) {
-        console.error(`\u274C Handoff verify failed: ${filename} (empty or missing after write)`);
-        return res.status(500).json({ error: 'Write verification failed \u2014 file empty after write' });
+        console.error(`❌ Handoff verify failed: ${filename} (empty or missing after write)`);
+        return res.status(500).json({ error: 'Write verification failed — file empty after write' });
       }
     } catch (verifyErr) {
-      console.error(`\u274C Handoff verify failed: ${filename} (${verifyErr.message})`);
-      return res.status(500).json({ error: `Write verification failed \u2014 ${verifyErr.message}` });
+      console.error(`❌ Handoff verify failed: ${filename} (${verifyErr.message})`);
+      return res.status(500).json({ error: `Write verification failed — ${verifyErr.message}` });
     }
 
-    console.log(`\u{1F4CB} Handoff written + verified: ${filename} (${content.length} bytes)`);
+    console.log(`📋 Handoff written + verified: ${filename} (${content.length} bytes)`);
     res.json({ written: true, filename, path: resolved, verified: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -1147,7 +1229,7 @@ app.post('/api/warm-restore', async (req, res) => {
     const outputPath = join(STATE_PATH, 'warm_restore_output.md');
     await writeFile(outputPath, stdout);
 
-    console.log(`\u{1F50D} Warm Restore: query="${query || '(entity-only)'}"`);
+    console.log(`🔍 Warm Restore: query="${query || '(entity-only)'}"`);
     res.json({
       success: true,
       output: stdout,
@@ -1354,7 +1436,7 @@ async function checkForUpdate() {
   }
   versionCache.lastCheck = new Date().toISOString();
   if (versionCache.updateAvailable) {
-    console.log(`\u{1F4E6} Update available: ${versionCache.local} \u2192 ${versionCache.remote}`);
+    console.log(`📦 Update available: ${versionCache.local} → ${versionCache.remote}`);
   }
 }
 
@@ -1405,7 +1487,7 @@ try {
     if (filename === 'active_entity.json') {
       clearTimeout(stateDebounce);
       stateDebounce = setTimeout(() => {
-        console.log('\u{1F4E1} State file changed externally \u2014 broadcasting');
+        console.log('📡 State file changed externally — broadcasting');
         broadcast({ type: 'state_changed', detail: { source: 'file_watch' }, timestamp: new Date().toISOString() });
       }, 300);
     }
@@ -1423,14 +1505,14 @@ bootstrapFrameworkEntities().then(async () => {
   setInterval(checkForUpdate, 60 * 60 * 1000);
 
   server.listen(PORT, () => {
-    console.log(`\u{1F525}\u{1F30A} BOND Panel sidecar on http://localhost:${PORT}`);
+    console.log(`🔥🌊 BOND Panel sidecar on http://localhost:${PORT}`);
     console.log(`   Doctrine path: ${DOCTRINE_PATH}`);
     console.log(`   MCP target:    ${MCP_URL}`);
     console.log(`   WebSocket:     ws://localhost:${PORT}`);
-    console.log(`   Version:       ${versionCache.local || 'unknown'}${versionCache.updateAvailable ? ` (\u2192 ${versionCache.remote} available)` : ''}`);
+    console.log(`   Version:       ${versionCache.local || 'unknown'}${versionCache.updateAvailable ? ` (→ ${versionCache.remote} available)` : ''}`);
   });
 }).catch(err => {
-  console.error('\u274C Bootstrap failed:', err);
+  console.error('❌ Bootstrap failed:', err);
   process.exit(1);
 });
 

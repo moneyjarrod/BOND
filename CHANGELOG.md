@@ -5,6 +5,26 @@ All notable changes to BOND will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.4.0] - 2026-02-12
+
+### Added
+- **Doctrine files synced** — BOND_ENTITIES.md, BOND_AUDIT.md, BOND_PROTOCOL.md now present in GitHub repo (were described in 1.3.0 CHANGELOG but files not yet copied).
+- **Server CLASS_LINK_MATRIX** — `/api/state/link` enforcement and `/api/state/linkable` endpoint now in GitHub server.js.
+- **Banner server-side filtering** — DoctrineBanner.jsx and ProjectMasterBanner.jsx updated with server-side linkable fetch.
+
+## [1.3.0] - 2026-02-12
+
+### Added
+- **Class Linking Matrix** — Entity links now filtered by class compatibility. Doctrine↔perspective links forbidden (incompatible tool boundaries). Enforced at three levels: UI dropdown, server 403, protocol refusal.
+- **Linkable API** — `GET /api/state/linkable` returns only class-compatible, unlinkable entities for the active entity. Panel fetches server-side instead of client-side filtering.
+- **Optimal Audit Flow** — BOND_AUDIT.md now defines dependency-ordered layers (Foundation → Structural → Protocol → Readiness) with joint checks at layer boundaries.
+- **Hook Recognition** — BOND_PROTOCOL.md documents library-class positional hooks (BUILD_HOOKS, AUDIT_HOOKS, WORKFLOW_HOOKS) that fire at declared workflow positions.
+- **Cross-Class Consultation** — BOND_ENTITIES.md documents operator-bridge pattern for carrying information between incompatible entity classes.
+- **New doctrine templates** — BOND_ENTITIES.md, BOND_AUDIT.md, BOND_PROTOCOL.md added to templates/doctrine/BOND_MASTER/.
+
+### Changed
+- **Banner link pickers** — DoctrineBanner.jsx and ProjectMasterBanner.jsx now fetch linkable entities from server on entity activation instead of client-side filtering.
+
 ## [1.2.0] - 2026-02-12
 
 ### Added
