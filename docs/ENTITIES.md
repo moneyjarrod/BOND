@@ -102,6 +102,19 @@ Perspective-specific fields:
 
 **Switch:** Entering a new entity automatically overwrites the previous one. No explicit exit needed.
 
+## Entity Voice Rule
+
+If Claude speaks *as* an entity — using its stance, ROOTs, or perspective lens — that entity MUST be the active entity on disc (`state/active_entity.json`). No ghost entries. No invisible consultations.
+
+Protocol:
+1. {Enter ENTITY} — write to active_entity.json, panel reflects it
+2. Speak as that entity
+3. {Exit} or {Enter OTHER} when done — panel updates accordingly
+
+Reading an entity's files for reference (without adopting its voice) does NOT require entry. The rule triggers when Claude adopts the entity's stance and speaks from it.
+
+**The panel should always reflect who is actually talking.**
+
 ## Links
 
 Entities can link to other entities. Links are stored in `entity.json`:
