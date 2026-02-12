@@ -55,7 +55,19 @@ echo    Setup complete!
 echo    Run start_bond.bat to launch.
 echo ========================================
 echo.
-echo Optional: Run Counter\BOND_v8.ahk for
-echo counter + command bridge (Windows).
+echo ========================================
+echo    IMPORTANT: Counter + Command Bridge
+echo ========================================
+echo.
+echo The BOND counter tracks context freshness
+echo and the clipboard bridge connects the panel
+echo to Claude. Without it, panel commands won't
+echo reach Claude and context will degrade.
+echo.
+echo Requires: AutoHotkey v1.1+ (https://www.autohotkey.com)
+echo Script:   Counter\BOND_v8.ahk
+echo.
+echo If AutoHotkey is installed, the counter will
+echo launch automatically with start_bond.bat.
 echo.
 pause

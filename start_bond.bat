@@ -20,14 +20,26 @@ if exist "%~dp0panel\dist\index.html" (
     start http://localhost:5173
 )
 
+:: Launch Counter + Clipboard Bridge (if AHK installed)
+set "AHK_SCRIPT=%~dp0Counter\BOND_v8.ahk"
+if exist "%AHK_SCRIPT%" (
+    where autohotkey >nul 2>nul && (
+        start "" "%AHK_SCRIPT%"
+        echo [OK] Counter + clipboard bridge launched
+    ) || (
+        echo [WARN] AutoHotkey not found — counter won't run.
+        echo        Install from https://www.autohotkey.com
+        echo        Then run Counter\BOND_v8.ahk manually.
+    )
+) else (
+    echo [WARN] Counter script not found at Counter\BOND_v8.ahk
+)
+
 echo.
 echo ========================================
 echo    BOND is running.
 echo    Close this window anytime — servers
 echo    run in their own windows (minimized).
 echo ========================================
-echo.
-echo Optional: Run Counter\BOND_v8.ahk
-echo for counter + command bridge.
 echo.
 pause
