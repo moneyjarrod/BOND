@@ -11,7 +11,7 @@
 | `{Save}` | Write proven work. Both must agree. | No reset |
 | `{Crystal}` | QAIS crystallization — store session concepts. | No reset |
 | `{Chunk}` | Session snapshot. | No reset |
-| `{Tick}` | Quick status check. Where are we? | No reset |
+| `{Tick}` | Obligation audit. Server generates obligations from state, Claude verifies each was serviced. Gaps surface structurally. | No reset |
 
 ## Entity Commands
 
@@ -37,6 +37,17 @@
 5. Reset counter
 
 `{Full Restore}` = `{Sync}` + full depth read of all referenced files.
+
+## Tick Procedure
+
+`{Tick}` reads `/api/sync-obligations` or `/api/sync-health` from the panel server. The server derives obligations from current state:
+
+- **Active entity** — all .md files must be loaded
+- **Linked entities** — linked entity files must be loaded
+- **Armed perspectives** — vine lifecycle (perspective_check, tracker update, prune evaluation, auto-seed scan) must run
+- **Config flags** — save_confirmation ON means ask_user_input widget required before writes
+
+Claude checks each obligation against what was actually done during the session and reports status. Gaps are surfaced as structural misses, not self-reported.
 
 ## Command Flow
 

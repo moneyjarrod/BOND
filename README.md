@@ -16,6 +16,7 @@ BOND gives Claude persistent memory, structured context, runtime tool governance
 - **Four-Class Entity Architecture** — Doctrine, Project, Perspective, Library — each with scoped tool permissions enforced at runtime
 - **SLA** — Spectral Lexical Addressing for deterministic paragraph-level text retrieval
 - **Save Protocol** — Both operators must agree before any file is written, with a toggleable confirmation widget
+- **Obligation Engine** — Server derives what must happen from state. Armed subsystems create non-optional obligations. {Tick} audits completion structurally, not by self-report
 - **Clipboard Bridge** — Panel → AHK → Claude, seamless command relay
 
 ## Get Started
@@ -58,6 +59,7 @@ Entities are contexts, not databases. Each entity has a class that determines wh
 BOND is a protocol, not just software. The rules matter more than the implementation:
 
 - **Derive, not store.** Redundant state is debt.
+- **Armed = Obligated.** If a subsystem is armed, its governing command must service it. No silent skips.
 - **Both agree.** No unilateral writes. Proof required.
 - **Code > Prose.** When they conflict, code wins.
 - **Counter is king.** The counter is the heartbeat. If it dies, sync.
