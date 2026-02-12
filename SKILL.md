@@ -44,7 +44,7 @@ Lost count: recommend {Sync}.
   No counter reset.
 
 ## COMMANDS
-{Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (last handoff + archive query with badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot | {Tick} quick status | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Relational} arch re-anchor | {Drift?} self-check
+{Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (last handoff + archive query with badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot | {Tick} quick status + obligation audit (GET /api/sync-health) | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Relational} arch re-anchor | {Drift?} self-check
 
 ## TOOL WIRING
 Command tools (fire on command, respect class boundaries):
@@ -52,7 +52,7 @@ Command tools (fire on command, respect class boundaries):
 {Warm Restore} → read state/warm_restore_output.md (pre-computed by panel endpoint /api/warm-restore), heatmap_hot(top_k=3) for signal boost. Panel runs SPECTRA, writes badges to file, Claude reads result.
 {Crystal} → iss_analyze on chunk text, crystal to QAIS, heatmap_chunk snapshot
 {Chunk} → heatmap_chunk snapshot. If crystal blocked by class matrix, Chunk still executes as conversational summary. Crystal adds persistence, doesn't gate the action.
-{Tick} → heatmap_hot(top_k=3) for warm concepts
+{Tick} → GET /api/sync-health for obligation audit, heatmap_hot(top_k=3) for warm concepts. Report obligation count + any gaps. Phase 1: structured self-report against server-generated checklist.
 {Save} → after write, qais_store binding (entity|role=save|fact=what was saved)
 Seed tools (framework-level, bypass class boundaries when seeders armed):
 perspective_store — write seed content into perspective's isolated .npz field (auto-seed + bootstrap). Optional: reason, session → auto-logs to seed_decisions.jsonl.

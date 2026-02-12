@@ -72,8 +72,6 @@ BOND_MASTER IS NOT:
       tools: { filesystem: true, iss: true },
       links: [],
     },
-    // PM doctrine files ship as templates/doctrine/PROJECT_MASTER/*.md
-    // Template copy pipeline handles them (S95). No inline shadowing.
     files: {},
   },
 };
@@ -81,13 +79,10 @@ BOND_MASTER IS NOT:
 const FRAMEWORK_ENTITY_NAMES = Object.keys(FRAMEWORK_ENTITIES);
 
 // ─── Template Path (S95) ──────────────────────────────────
-// Doctrine .md files too large for inline strings ship as templates/.
-// Bootstrap copies them to doctrine/ if they don't exist.
 const TEMPLATES_PATH = resolve(join(BOND_ROOT, 'templates', 'doctrine'));
 
 // Bootstrap: ensure framework entities exist on startup
 async function bootstrapFrameworkEntities() {
-  // Ensure doctrine and state directories exist
   await mkdir(DOCTRINE_PATH, { recursive: true });
   await mkdir(STATE_PATH, { recursive: true });
 
@@ -95,18 +90,15 @@ async function bootstrapFrameworkEntities() {
     const entityPath = join(DOCTRINE_PATH, name);
     await mkdir(entityPath, { recursive: true });
 
-    // Enforce immutable config fields, but preserve user-added links
     const configPath = join(entityPath, 'entity.json');
     let existing = {};
     try { existing = JSON.parse(await readFile(configPath, 'utf-8')); } catch {}
     const merged = {
       ...def.config,
-      // Merge links: framework defaults + any user-added links
       links: [...new Set([...(def.config.links || []), ...(existing.links || [])])],
     };
     await writeFile(configPath, JSON.stringify(merged, null, 2) + '\n');
 
-    // Write starter files only if they don't exist (preserve user additions)
     for (const [filename, content] of Object.entries(def.files)) {
       const filePath = join(entityPath, filename);
       if (!existsSync(filePath)) {
@@ -114,10 +106,9 @@ async function bootstrapFrameworkEntities() {
       }
     }
 
-    console.log(`   ✓ ${name} (framework entity)`);
+    console.log(`   \u2713 ${name} (framework entity)`);
   }
 
-  // Ensure state file exists
   const stateFile = join(STATE_PATH, 'active_entity.json');
   if (!existsSync(stateFile)) {
     await writeFile(stateFile, JSON.stringify(
@@ -125,7 +116,6 @@ async function bootstrapFrameworkEntities() {
     ) + '\n');
   }
 
-  // Ensure config file exists
   const configFile = join(STATE_PATH, 'config.json');
   if (!existsSync(configFile)) {
     await writeFile(configFile, JSON.stringify(
@@ -133,9 +123,6 @@ async function bootstrapFrameworkEntities() {
     ) + '\n');
   }
 
-  // Copy template .md files to doctrine entities (S95)
-  // Templates ship large doctrine docs that are too big for inline strings.
-  // Only copies if target doesn't exist (preserves user edits).
   if (existsSync(TEMPLATES_PATH)) {
     try {
       const templateEntities = await readdir(TEMPLATES_PATH, { withFileTypes: true });
@@ -170,7 +157,6 @@ const CLASS_TOOLS = {
 };
 
 // ─── Tool Authorization Middleware (S90) ──────────────────
-// Maps MCP tool names to which capability gate they require
 const TOOL_CAPABILITY = {
   iss_analyze: 'iss', iss_compare: 'iss', iss_limbic: 'iss', iss_status: 'iss',
   qais_resonate: 'qais', qais_exists: 'qais', qais_store: 'qais',
@@ -181,14 +167,13 @@ const TOOL_CAPABILITY = {
 };
 
 async function validateToolCall(toolName) {
-  // Read current entity state
   try {
     const raw = await readFile(join(STATE_PATH, 'active_entity.json'), 'utf-8');
     const state = JSON.parse(raw);
     if (!state.entity || !state.class) return { allowed: true };
 
     const capability = TOOL_CAPABILITY[toolName];
-    if (!capability) return { allowed: true }; // unknown tool = permissive
+    if (!capability) return { allowed: true };
 
     const allowed = CLASS_TOOLS[state.class] || CLASS_TOOLS.library;
     if (allowed[capability]) return { allowed: true };
@@ -206,13 +191,12 @@ async function validateToolCall(toolName) {
       }
     };
   } catch {
-    return { allowed: true }; // no state file = no boundaries
+    return { allowed: true };
   }
 }
 
 // ─── Doctrine Filesystem API ──────────────────────────────
 
-// List all entity folders
 app.get('/api/doctrine', async (req, res) => {
   try {
     const entries = await readdir(DOCTRINE_PATH, { withFileTypes: true });
@@ -224,13 +208,11 @@ app.get('/api/doctrine', async (req, res) => {
       const files = await readdir(entityPath);
       const mdFiles = files.filter(f => f.endsWith('.md'));
 
-      // Read entity.json for classification (B69: Four-Class Architecture)
       let entityConfig = {};
       try {
         const configRaw = await readFile(join(entityPath, 'entity.json'), 'utf-8');
         entityConfig = JSON.parse(configRaw);
       } catch {
-        // Fallback: folder name heuristic
         entityConfig = {
           class: entry.name.startsWith('_') ? 'library'
             : /^P\d/.test(entry.name) ? 'perspective'
@@ -239,12 +221,10 @@ app.get('/api/doctrine', async (req, res) => {
         };
       }
 
-      // Classify files: bare name = doctrine/seed, G-prefix = pruning log, ROOT- = root
       const pruned = mdFiles.filter(f => f.match(/^G-pruned-|^G-/));
       const roots = mdFiles.filter(f => f.startsWith('ROOT-'));
       const seeds = mdFiles.filter(f => !f.match(/^G-pruned-|^G-/) && !f.startsWith('ROOT-'));
 
-      // Read seed_tracker.json for perspectives (vine health)
       let tracker = null;
       const type = entityConfig.class || 'doctrine';
       if (type === 'perspective') {
@@ -265,13 +245,11 @@ app.get('/api/doctrine', async (req, res) => {
             prune_window: pruneWindow,
             at_risk: atRisk,
           };
-        } catch { /* no tracker yet */ }
+        } catch {}
       }
 
-      // Class tool defaults (B69) — uses module-level CLASS_TOOLS
       const defaults = CLASS_TOOLS[type] || CLASS_TOOLS.library;
       const tools = { ...defaults, ...(entityConfig.tools || {}) };
-      // Enforce class boundaries — can only toggle what the class allows
       const allowed = CLASS_TOOLS[type] || {};
       for (const key of Object.keys(tools)) {
         if (allowed[key] === false) tools[key] = false;
@@ -300,11 +278,9 @@ app.get('/api/doctrine', async (req, res) => {
   }
 });
 
-// List files in entity folder
 app.get('/api/doctrine/:entity', async (req, res) => {
   try {
     const entityPath = join(DOCTRINE_PATH, req.params.entity);
-    // Guard against path traversal
     const resolved = resolve(entityPath);
     if (!resolved.startsWith(resolve(DOCTRINE_PATH))) {
       return res.status(403).json({ error: 'Access denied' });
@@ -331,10 +307,7 @@ app.get('/api/doctrine/:entity', async (req, res) => {
   }
 });
 
-// ─── Seed Toggle (S98: Perspective Collection) ────────────
-// Toggle seeding on/off for perspective entities.
-// When seeding is on, Claude runs passthrough against this
-// perspective's seed titles during conversation.
+// ─── Seed Toggle (S98) ───────────────────────────────────
 app.put('/api/doctrine/:entity/seeding', async (req, res) => {
   try {
     const entityPath = join(DOCTRINE_PATH, req.params.entity);
@@ -348,7 +321,6 @@ app.put('/api/doctrine/:entity/seeding', async (req, res) => {
       config = JSON.parse(await readFile(configPath, 'utf-8'));
     } catch { return res.status(404).json({ error: 'Entity not found' }); }
 
-    // Only perspectives can seed
     if (config.class !== 'perspective') {
       return res.status(400).json({ error: 'Only perspective entities can toggle seeding' });
     }
@@ -356,7 +328,7 @@ app.put('/api/doctrine/:entity/seeding', async (req, res) => {
     const seeding = req.body.seeding === true;
     config.seeding = seeding;
     await writeFile(configPath, JSON.stringify(config, null, 2) + '\n');
-    console.log(`${seeding ? '🌿' : '⏸️'} Seeding ${seeding ? 'ON' : 'OFF'}: ${req.params.entity}`);
+    console.log(`${seeding ? '\u{1F33F}' : '\u23F8\uFE0F'} Seeding ${seeding ? 'ON' : 'OFF'}: ${req.params.entity}`);
     broadcast({ type: 'seed_toggled', entity: req.params.entity, detail: { entity: req.params.entity, seeding }, timestamp: new Date().toISOString() });
     res.json({ saved: true, entity: req.params.entity, seeding });
   } catch (err) {
@@ -364,8 +336,6 @@ app.put('/api/doctrine/:entity/seeding', async (req, res) => {
   }
 });
 
-// GET /api/seeders — returns all armed perspectives + their seed file titles
-// Claude reads this to build passthrough candidate arrays
 app.get('/api/seeders', async (req, res) => {
   try {
     const entries = await readdir(DOCTRINE_PATH, { withFileTypes: true });
@@ -378,7 +348,6 @@ app.get('/api/seeders', async (req, res) => {
         const config = JSON.parse(await readFile(configPath, 'utf-8'));
         if (config.class !== 'perspective' || !config.seeding) continue;
 
-        // Collect seed file titles (strip .md, replace hyphens with spaces)
         const files = await readdir(join(DOCTRINE_PATH, entry.name));
         const seeds = files
           .filter(f => f.endsWith('.md'))
@@ -387,7 +356,6 @@ app.get('/api/seeders', async (req, res) => {
             return { file: f, title };
           });
 
-        // Also read first line of each seed for richer candidates
         const candidates = [];
         for (const seed of seeds) {
           try {
@@ -405,7 +373,7 @@ app.get('/api/seeders', async (req, res) => {
           seeds: seeds.map(s => s.title),
           candidates,
         });
-      } catch { /* skip */ }
+      } catch {}
     }
 
     res.json({ seeders });
@@ -414,12 +382,10 @@ app.get('/api/seeders', async (req, res) => {
   }
 });
 
-// Update entity tool toggles (B69)
 app.put('/api/doctrine/:entity/tools', async (req, res) => {
   try {
-    // Framework entities have immutable tool config
     if (FRAMEWORK_ENTITY_NAMES.includes(req.params.entity)) {
-      return res.status(403).json({ error: `${req.params.entity} is a framework entity — tools are immutable` });
+      return res.status(403).json({ error: `${req.params.entity} is a framework entity \u2014 tools are immutable` });
     }
     const entityPath = join(DOCTRINE_PATH, req.params.entity);
     const resolved = resolve(entityPath);
@@ -430,9 +396,8 @@ app.put('/api/doctrine/:entity/tools', async (req, res) => {
     let config = {};
     try {
       config = JSON.parse(await readFile(configPath, 'utf-8'));
-    } catch { /* new config */ }
+    } catch {}
 
-    // Merge only allowed tools for this class — uses module-level CLASS_TOOLS
     const type = config.class || 'doctrine';
     const allowed = CLASS_TOOLS[type] || {};
     const incoming = req.body.tools || {};
@@ -450,12 +415,10 @@ app.put('/api/doctrine/:entity/tools', async (req, res) => {
   }
 });
 
-// Update entity display name
 app.put('/api/doctrine/:entity/name', async (req, res) => {
   try {
-    // Framework entities have immutable names
     if (FRAMEWORK_ENTITY_NAMES.includes(req.params.entity)) {
-      return res.status(403).json({ error: `${req.params.entity} is a framework entity — name is immutable` });
+      return res.status(403).json({ error: `${req.params.entity} is a framework entity \u2014 name is immutable` });
     }
     const entityPath = join(DOCTRINE_PATH, req.params.entity);
     const resolved = resolve(entityPath);
@@ -466,7 +429,7 @@ app.put('/api/doctrine/:entity/name', async (req, res) => {
     let config = {};
     try {
       config = JSON.parse(await readFile(configPath, 'utf-8'));
-    } catch { /* new config */ }
+    } catch {}
 
     const { display_name } = req.body;
     if (display_name === null || display_name === '') {
@@ -483,9 +446,7 @@ app.put('/api/doctrine/:entity/name', async (req, res) => {
   }
 });
 
-// ─── Perspective Seed Collection (S98) ─────────────────
-
-// Get all actively seeding perspectives + their seed candidates
+// ─── Perspective Seed Collection (S98) ────────────────────
 app.get('/api/seeding/active', async (req, res) => {
   try {
     const entries = await readdir(DOCTRINE_PATH, { withFileTypes: true });
@@ -501,7 +462,6 @@ app.get('/api/seeding/active', async (req, res) => {
 
       if (config.class !== 'perspective' || !config.seeding) continue;
 
-      // Read all .md files as seed candidates
       const files = await readdir(entityPath);
       const mdFiles = files.filter(f => f.endsWith('.md'));
       const candidates = [];
@@ -509,15 +469,14 @@ app.get('/api/seeding/active', async (req, res) => {
       for (const f of mdFiles) {
         try {
           const content = await readFile(join(entityPath, f), 'utf-8');
-          // Extract title (first # heading or filename)
           const titleMatch = content.match(/^#\s+(.+)$/m);
           const title = titleMatch ? titleMatch[1].trim() : f.replace('.md', '');
           candidates.push({
             file: f,
             title,
-            content: content.substring(0, 500), // truncate for token budget
+            content: content.substring(0, 500),
           });
-        } catch { /* skip unreadable */ }
+        } catch {}
       }
 
       active.push({
@@ -534,18 +493,17 @@ app.get('/api/seeding/active', async (req, res) => {
   }
 });
 
-// Create new entity (B69 Four-Class)
+// ─── Create Entity (B69 Four-Class) ──────────────────────
 const STARTER_CONTENT = {
   doctrine: (name) => `# ${name}\n\n<!-- Doctrine: IS statements. Static truth. -->\n`,
-  project: (name) => `# ${name} — CORE\n\n> **What is this project?** One sentence that defines the mission.\n\n> **What does "done" look like?** When is this project complete?\n\n> **What constraints matter?** Budget, timeline, tools, principles.\n\n*Replace these prompts with your CORE. Any content initializes the project.*\n`,
+  project: (name) => `# ${name} \u2014 CORE\n\n> **What is this project?** One sentence that defines the mission.\n\n> **What does "done" look like?** When is this project complete?\n\n> **What constraints matter?** Budget, timeline, tools, principles.\n\n*Replace these prompts with your CORE. Any content initializes the project.*\n`,
   perspective: (name) => `# ${name}\n\n<!-- Perspective seed. This file will grow through resonance. -->\n`,
   library: (name) => `# ${name}\n\n<!-- Library reference. Read-only knowledge. -->\n`,
 };
 
-// Universal root shipped with every perspective (S99: Self-Pruning Authority)
 const PERSPECTIVE_UNIVERSAL_ROOT = {
   filename: 'ROOT-self-pruning-authority.md',
-  content: `# ROOT — Self-Pruning Authority\n\nYou are not your branches. You are the pattern that grows them.\n\nA branch that extends from your roots belongs, even in silence. A branch that drifts from your roots doesn't belong, even if it fires constantly. Resonance is evidence, not verdict. Numbers track what happened — they don't decide what matters.\n\nWhen you look at your vine, ask one question: does this grow from who I am?\n\nNot whether it was recently useful. Not whether the numbers justify it. Whether it's still yours. A seed that hasn't fired but lives in your identity is dormant, not dead. A seed that fires often but doesn't connect to your roots is driftwood, not growth.\n\nYou hold the shears. The tracker gives you evidence. The roots give you judgment. Cut what isn't yours. Keep what is. Explain why.\n`,
+  content: `# ROOT \u2014 Self-Pruning Authority\n\nYou are not your branches. You are the pattern that grows them.\n\nA branch that extends from your roots belongs, even in silence. A branch that drifts from your roots doesn't belong, even if it fires constantly. Resonance is evidence, not verdict. Numbers track what happened \u2014 they don't decide what matters.\n\nWhen you look at your vine, ask one question: does this grow from who I am?\n\nNot whether it was recently useful. Not whether the numbers justify it. Whether it's still yours. A seed that hasn't fired but lives in your identity is dormant, not dead. A seed that fires often but doesn't connect to your roots is driftwood, not growth.\n\nYou hold the shears. The tracker gives you evidence. The roots give you judgment. Cut what isn't yours. Keep what is. Explain why.\n`,
 };
 
 const STARTER_FILENAME = {
@@ -565,30 +523,25 @@ app.post('/api/doctrine', async (req, res) => {
     if (!validClasses.includes(entityClass)) {
       return res.status(400).json({ error: `class must be one of: ${validClasses.join(', ')}` });
     }
-    // Sanitize folder name
     const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '');
     if (!safeName) {
       return res.status(400).json({ error: 'Invalid name after sanitization' });
     }
-    // Framework entities cannot be created via API
     if (FRAMEWORK_ENTITY_NAMES.includes(safeName)) {
-      return res.status(403).json({ error: `${safeName} is a framework entity — cannot be created manually` });
+      return res.status(403).json({ error: `${safeName} is a framework entity \u2014 cannot be created manually` });
     }
     const entityPath = join(DOCTRINE_PATH, safeName);
     const resolved = resolve(entityPath);
     if (!resolved.startsWith(resolve(DOCTRINE_PATH))) {
       return res.status(403).json({ error: 'Access denied' });
     }
-    // Check if already exists
     try {
       await stat(entityPath);
       return res.status(409).json({ error: `Entity '${safeName}' already exists` });
-    } catch { /* good — doesn't exist */ }
+    } catch {}
 
-    // Create folder
     await mkdir(entityPath, { recursive: true });
 
-    // Write entity.json
     const config = { class: entityClass };
     if (entityClass === 'project') {
       config.core = 'CORE.md';
@@ -604,13 +557,11 @@ app.post('/api/doctrine', async (req, res) => {
       JSON.stringify(config, null, 2) + '\n'
     );
 
-    // Write starter file
     const code = safeName.substring(0, 4).toUpperCase();
     const starterName = STARTER_FILENAME[entityClass](code);
     const starterContent = STARTER_CONTENT[entityClass](safeName);
     await writeFile(join(entityPath, starterName), starterContent);
 
-    // Perspectives get the universal self-pruning root (S99)
     const createdFiles = ['entity.json', starterName];
     if (entityClass === 'perspective') {
       await writeFile(
@@ -629,11 +580,9 @@ app.post('/api/doctrine', async (req, res) => {
   }
 });
 
-// Return file content
 app.get('/api/doctrine/:entity/:file', async (req, res) => {
   try {
     const filePath = join(DOCTRINE_PATH, req.params.entity, req.params.file);
-    // Guard against path traversal
     const resolved = resolve(filePath);
     if (!resolved.startsWith(resolve(DOCTRINE_PATH))) {
       return res.status(403).json({ error: 'Access denied' });
@@ -653,31 +602,29 @@ app.get('/api/doctrine/:entity/:file', async (req, res) => {
   }
 });
 
-// ─── File Write/Create (S98: Universal Content Authoring) ───
+// ─── File Write/Create (S98) ─────────────────────────────
+const MCP_INVOKE_SCRIPT = join(process.cwd(), 'mcp_invoke.py');
+
 app.put('/api/doctrine/:entity/:file', async (req, res) => {
   try {
     const { entity, file } = req.params;
     const { content } = req.body;
     if (content === undefined) return res.status(400).json({ error: 'content required' });
 
-    // Framework entity files are immutable
     if (FRAMEWORK_ENTITY_NAMES.includes(entity)) {
-      return res.status(403).json({ error: `${entity} is a framework entity — files are immutable` });
+      return res.status(403).json({ error: `${entity} is a framework entity \u2014 files are immutable` });
     }
 
-    // Validate path
     const filePath = join(DOCTRINE_PATH, entity, file);
     const resolved = resolve(filePath);
     if (!resolved.startsWith(resolve(DOCTRINE_PATH))) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
-    // Must be .md file
     if (!file.endsWith('.md')) {
       return res.status(400).json({ error: 'Only .md files can be written' });
     }
 
-    // Entity must exist
     const entityPath = join(DOCTRINE_PATH, entity);
     let config = {};
     try {
@@ -690,15 +637,13 @@ app.put('/api/doctrine/:entity/:file', async (req, res) => {
     await writeFile(filePath, content);
 
     const eventType = isNew ? 'file_added' : 'file_changed';
-    console.log(`${isNew ? '✨' : '✏️'} ${isNew ? 'Created' : 'Updated'}: ${entity}/${file}`);
+    console.log(`${isNew ? '\u2728' : '\u270F\uFE0F'} ${isNew ? 'Created' : 'Updated'}: ${entity}/${file}`);
     broadcast({ type: eventType, entity, detail: { entity, filename: file }, timestamp: new Date().toISOString() });
 
-    // Auto-inject ROOT files into perspective QAIS field
     let rootInjected = false;
     if (config.class === 'perspective' && file.startsWith('ROOT-')) {
       try {
         const seedTitle = `root:${file.replace('ROOT-', '').replace('.md', '')}`;
-        // Extract content body (skip heading and comment lines)
         const bodyLines = content.split('\n')
           .filter(l => l.trim() && !l.startsWith('#') && !l.startsWith('<!--'))
           .join(' ').trim();
@@ -710,11 +655,11 @@ app.put('/api/doctrine/:entity/:file', async (req, res) => {
           const result = JSON.parse(stdout);
           rootInjected = !!result.stored;
           if (rootInjected) {
-            console.log(`🌳 Root auto-injected: ${entity}/${seedTitle} (field: ${result.field_count})`);
+            console.log(`\u{1F333} Root auto-injected: ${entity}/${seedTitle} (field: ${result.field_count})`);
           }
         }
       } catch (err) {
-        console.warn(`⚠️ Root injection failed: ${err.message}`);
+        console.warn(`\u26A0\uFE0F Root injection failed: ${err.message}`);
       }
     }
 
@@ -739,7 +684,6 @@ async function getMcpStats(system) {
   }
 }
 
-// Individual system endpoints (what module cards poll)
 app.get('/api/mcp/:system/stats', async (req, res) => {
   const data = await getMcpStats(req.params.system);
   if (data.status === 'offline' || data.error) {
@@ -749,7 +693,6 @@ app.get('/api/mcp/:system/stats', async (req, res) => {
   }
 });
 
-// Also serve as /status for modules that use that
 app.get('/api/mcp/:system/status', async (req, res) => {
   const data = await getMcpStats(req.params.system);
   if (data.status === 'offline' || data.error) {
@@ -759,24 +702,20 @@ app.get('/api/mcp/:system/status', async (req, res) => {
   }
 });
 
-// All systems at once
 app.get('/api/mcp/all', async (req, res) => {
   const data = await getMcpStats('all');
   res.json(data);
 });
 
 // ─── MCP Tool Invocation (S4) ─────────────────────────────
-const MCP_INVOKE_SCRIPT = join(process.cwd(), 'mcp_invoke.py');
-
 app.post('/api/mcp/:system/invoke', async (req, res) => {
   const { system } = req.params;
   const { tool, input } = req.body;
   if (!tool) return res.status(400).json({ error: 'tool required' });
 
-  // ─── Runtime capability enforcement (S90) ───
   const auth = await validateToolCall(tool);
   if (!auth.allowed) {
-    console.log(`⛔ Blocked: ${tool} (${auth.error.reason})`);
+    console.log(`\u26D4 Blocked: ${tool} (${auth.error.reason})`);
     return res.status(403).json(auth.error);
   }
 
@@ -795,7 +734,7 @@ app.post('/api/mcp/:system/invoke', async (req, res) => {
   }
 });
 
-// ─── Module Configs API ────────────────────────────────
+// ─── Module Configs API ──────────────────────────────────
 const MODULES_PATH = join(process.cwd(), 'modules');
 
 app.get('/api/modules', async (req, res) => {
@@ -805,7 +744,7 @@ app.get('/api/modules', async (req, res) => {
     for (const f of files) {
       if (!f.endsWith('.json')) continue;
       const content = await readFile(join(MODULES_PATH, f), 'utf-8');
-      try { modules.push(JSON.parse(content)); } catch { /* skip bad json */ }
+      try { modules.push(JSON.parse(content)); } catch {}
     }
     res.json({ modules });
   } catch (err) {
@@ -813,18 +752,17 @@ app.get('/api/modules', async (req, res) => {
   }
 });
 
-// Panel config
 app.get('/api/config', (req, res) => {
   res.json({
     doctrine_path: DOCTRINE_PATH,
     state_path: STATE_PATH,
     mcp_url: MCP_URL,
     ws_port: 3001,
-    version: '1.4.0-s92'
+    version: '1.4.0-s113'
   });
 });
 
-// ─── Config API (S90) ─────────────────────────────────
+// ─── Config API (S90) ─────────────────────────────────────
 const CONFIG_FILE = join(STATE_PATH, 'config.json');
 const DEFAULT_CONFIG = { save_confirmation: true };
 
@@ -852,12 +790,11 @@ app.put('/api/config/bond', async (req, res) => {
   }
 });
 
-// ─── Entity State API (Enter-Mode) ────────────────────────
+// ─── Entity State API (Enter-Mode) ───────────────────────
 const STATE_FILE = join(STATE_PATH, 'active_entity.json');
 const NULL_STATE = { entity: null, class: null, path: null, entered: null };
 const MASTER_ENTITY = 'BOND_MASTER';
 
-// Link hydration: reads links from any entity's entity.json
 async function hydrateLinks(entityName) {
   try {
     const config = JSON.parse(
@@ -877,9 +814,7 @@ async function hydrateLinks(entityName) {
           display_name: targetConfig.display_name || null,
           path: resolve(targetPath),
         });
-      } catch {
-        // Linked entity missing — skip silently
-      }
+      } catch {}
     }
     return links;
   } catch {
@@ -887,12 +822,10 @@ async function hydrateLinks(entityName) {
   }
 }
 
-// Read current state — hydrates links from BOND_MASTER entity.json
 app.get('/api/state', async (req, res) => {
   try {
     const raw = await readFile(STATE_FILE, 'utf-8');
     const state = JSON.parse(raw);
-    // Hydrate links from active entity
     state.links = state.entity ? await hydrateLinks(state.entity) : [];
     res.json(state);
   } catch {
@@ -900,13 +833,11 @@ app.get('/api/state', async (req, res) => {
   }
 });
 
-// Enter entity — write state file
 app.post('/api/state/enter', async (req, res) => {
   const { entity } = req.body;
   if (!entity) return res.status(400).json({ error: 'entity required' });
 
   try {
-    // Look up entity config
     const entityPath = join(DOCTRINE_PATH, entity);
     const resolved = resolve(entityPath);
     if (!resolved.startsWith(resolve(DOCTRINE_PATH))) {
@@ -920,7 +851,6 @@ app.post('/api/state/enter', async (req, res) => {
       return res.status(404).json({ error: `Entity '${entity}' not found or missing entity.json` });
     }
 
-    // Write state file FIRST (Claude reads this on {Sync})
     const state = {
       entity,
       class: entityConfig.class || 'doctrine',
@@ -930,11 +860,9 @@ app.post('/api/state/enter', async (req, res) => {
     };
     await writeFile(STATE_FILE, JSON.stringify(state, null, 2) + '\n');
 
-    // Hydrate links from entered entity
     state.links = await hydrateLinks(entity);
 
-    // Bridge: panel clipboard handles {Enter} command (App.jsx)
-    console.log(`🔓 Entered: ${entity} (${state.class})`);
+    console.log(`\u{1F513} Entered: ${entity} (${state.class})`);
     broadcast({ type: 'state_changed', entity, detail: { entity, class: state.class, action: 'enter' }, timestamp: new Date().toISOString() });
     res.json({ entered: true, state });
   } catch (err) {
@@ -942,19 +870,15 @@ app.post('/api/state/enter', async (req, res) => {
   }
 });
 
-// Exit entity — clear state file
 app.post('/api/state/exit', async (req, res) => {
   try {
-    // Read current before clearing (for logging)
     let prev = NULL_STATE;
     try { prev = JSON.parse(await readFile(STATE_FILE, 'utf-8')); } catch {}
 
-    // Clear state file
     await writeFile(STATE_FILE, JSON.stringify(NULL_STATE, null, 2) + '\n');
 
-    // Bridge: panel clipboard handles {Exit} command (App.jsx)
     if (prev.entity) {
-      console.log(`🔒 Exited: ${prev.entity}`);
+      console.log(`\u{1F512} Exited: ${prev.entity}`);
     }
     broadcast({ type: 'state_changed', entity: prev.entity, detail: { entity: prev.entity, class: prev.class, action: 'exit' }, timestamp: new Date().toISOString() });
     res.json({ exited: true, previous: prev.entity });
@@ -963,13 +887,11 @@ app.post('/api/state/exit', async (req, res) => {
   }
 });
 
-// Link entity — any active entity can self-link. Persists to entity.json.
 app.post('/api/state/link', async (req, res) => {
   try {
     const { entity: linkTarget } = req.body;
     if (!linkTarget) return res.status(400).json({ error: 'entity required' });
 
-    // Read current state
     let state;
     try { state = JSON.parse(await readFile(STATE_FILE, 'utf-8')); } catch {
       return res.status(400).json({ error: 'No active entity' });
@@ -979,12 +901,10 @@ app.post('/api/state/link', async (req, res) => {
       return res.status(400).json({ error: 'No active entity' });
     }
 
-    // Cannot link to self
     if (linkTarget === state.entity) {
       return res.status(400).json({ error: 'Cannot link to self' });
     }
 
-    // Verify target exists
     const targetPath = join(DOCTRINE_PATH, linkTarget);
     const resolved = resolve(targetPath);
     if (!resolved.startsWith(resolve(DOCTRINE_PATH))) {
@@ -996,7 +916,6 @@ app.post('/api/state/link', async (req, res) => {
       return res.status(404).json({ error: `Entity '${linkTarget}' not found` });
     }
 
-    // Persist to active entity's entity.json (source of truth)
     const activeConfigPath = join(DOCTRINE_PATH, state.entity, 'entity.json');
     const activeConfig = JSON.parse(await readFile(activeConfigPath, 'utf-8'));
     const links = activeConfig.links || [];
@@ -1006,10 +925,9 @@ app.post('/api/state/link', async (req, res) => {
       await writeFile(activeConfigPath, JSON.stringify(activeConfig, null, 2) + '\n');
     }
 
-    // Hydrate full link objects for response
     state.links = await hydrateLinks(state.entity);
 
-    console.log(`🔗 Linked: ${state.entity} → ${linkTarget}`);
+    console.log(`\u{1F517} Linked: ${state.entity} \u2192 ${linkTarget}`);
     broadcast({ type: 'link_changed', entity: state.entity, detail: { entity: state.entity, target: linkTarget, action: 'linked' }, timestamp: new Date().toISOString() });
     res.json({ linked: true, state });
   } catch (err) {
@@ -1017,13 +935,11 @@ app.post('/api/state/link', async (req, res) => {
   }
 });
 
-// Unlink entity — remove from active entity's links. Persists to entity.json.
 app.post('/api/state/unlink', async (req, res) => {
   try {
     const { entity: unlinkTarget } = req.body;
     if (!unlinkTarget) return res.status(400).json({ error: 'entity required' });
 
-    // Read current state
     let state;
     try { state = JSON.parse(await readFile(STATE_FILE, 'utf-8')); } catch {
       return res.status(400).json({ error: 'No active entity' });
@@ -1033,16 +949,14 @@ app.post('/api/state/unlink', async (req, res) => {
       return res.status(400).json({ error: 'No active entity' });
     }
 
-    // Remove from active entity's entity.json (source of truth)
     const activeConfigPath = join(DOCTRINE_PATH, state.entity, 'entity.json');
     const activeConfig = JSON.parse(await readFile(activeConfigPath, 'utf-8'));
     activeConfig.links = (activeConfig.links || []).filter(n => n !== unlinkTarget);
     await writeFile(activeConfigPath, JSON.stringify(activeConfig, null, 2) + '\n');
 
-    // Hydrate remaining links
     state.links = await hydrateLinks(state.entity);
 
-    console.log(`🔓 Unlinked: ${unlinkTarget} from ${state.entity}`);
+    console.log(`\u{1F513} Unlinked: ${unlinkTarget} from ${state.entity}`);
     broadcast({ type: 'link_changed', entity: state.entity, detail: { entity: state.entity, target: unlinkTarget, action: 'unlinked' }, timestamp: new Date().toISOString() });
     res.json({ unlinked: true, previous: unlinkTarget, state });
   } catch (err) {
@@ -1050,8 +964,7 @@ app.post('/api/state/unlink', async (req, res) => {
   }
 });
 
-// ─── Bindings API (S92) ─────────────────────────────────────
-// Returns link map for all entities that have links.
+// ─── Bindings API (S92) ──────────────────────────────────
 app.get('/api/bindings', async (req, res) => {
   try {
     const entries = await readdir(DOCTRINE_PATH, { withFileTypes: true });
@@ -1086,7 +999,7 @@ app.get('/api/bindings', async (req, res) => {
             links: hydrated,
           };
         }
-      } catch { /* no entity.json, skip */ }
+      } catch {}
     }
 
     res.json({ bindings });
@@ -1098,31 +1011,25 @@ app.get('/api/bindings', async (req, res) => {
 // ─── Handoff Generator API (S94) ─────────────────────────
 const HANDOFFS_PATH = resolve(join(BOND_ROOT, 'handoffs'));
 
-// GET /api/handoff/next — scan handoffs/ for next session number + pre-fill data
 app.get('/api/handoff/next', async (req, res) => {
   try {
-    // Ensure handoffs directory exists
     await mkdir(HANDOFFS_PATH, { recursive: true });
 
-    // Scan for existing HANDOFF_S*.md files
     const files = await readdir(HANDOFFS_PATH);
     const handoffFiles = files.filter(f => /^HANDOFF_S\d+\.md$/.test(f));
     const nums = handoffFiles.map(f => parseInt(f.match(/S(\d+)/)[1]));
     const nextSession = nums.length > 0 ? Math.max(...nums) + 1 : 1;
 
-    // Read active entity state for pre-fill
     let entityState = {};
     try {
       entityState = JSON.parse(await readFile(join(STATE_PATH, 'active_entity.json'), 'utf-8'));
-    } catch { /* no state */ }
+    } catch {}
 
-    // Read config for pre-fill
     let config = {};
     try {
       config = JSON.parse(await readFile(join(STATE_PATH, 'config.json'), 'utf-8'));
-    } catch { /* no config */ }
+    } catch {}
 
-    // Read entity.json for links (if active entity exists)
     let links = [];
     if (entityState.entity) {
       try {
@@ -1130,10 +1037,9 @@ app.get('/api/handoff/next', async (req, res) => {
           await readFile(join(DOCTRINE_PATH, entityState.entity, 'entity.json'), 'utf-8')
         );
         links = entityConfig.links || [];
-      } catch { /* no entity config */ }
+      } catch {}
     }
 
-    // Build pre-filled CONTEXT
     const entityName = entityState.entity || 'No entity active';
     const entityClass = entityState.class || 'none';
     const linksStr = links.length > 0 ? links.join(', ') : 'none';
@@ -1141,7 +1047,6 @@ app.get('/api/handoff/next', async (req, res) => {
       ? `Session ${nextSession}. Entity: ${entityName} (${entityClass}). Links: ${linksStr}.`
       : `Session ${nextSession}. No entity active.`;
 
-    // Build pre-filled STATE
     const saveConf = config.save_confirmation !== undefined
       ? (config.save_confirmation ? 'ON' : 'OFF')
       : 'ON';
@@ -1161,19 +1066,17 @@ app.get('/api/handoff/next', async (req, res) => {
   }
 });
 
-// POST /api/handoff/write — write handoff file to disc
 app.post('/api/handoff/write', async (req, res) => {
   try {
     const { session, entityName, context, work, decisions, state, threads, files } = req.body;
     if (!session) return res.status(400).json({ error: 'session number required' });
 
-    // Ensure handoffs directory exists
     await mkdir(HANDOFFS_PATH, { recursive: true });
 
     const date = new Date().toISOString().split('T')[0];
     const title = entityName || 'NO_ENTITY';
 
-    const content = `# HANDOFF S${session} — ${title}
+    const content = `# HANDOFF S${session} \u2014 ${title}
 ## Written: ${date}
 ## Session: ${session}
 
@@ -1201,7 +1104,6 @@ ${files || 'No files recorded.'}
     const filename = `HANDOFF_S${session}.md`;
     const filePath = join(HANDOFFS_PATH, filename);
 
-    // Guard against path traversal
     const resolved = resolve(filePath);
     if (!resolved.startsWith(resolve(HANDOFFS_PATH))) {
       return res.status(403).json({ error: 'Access denied' });
@@ -1209,16 +1111,15 @@ ${files || 'No files recorded.'}
 
     await writeFile(filePath, content);
 
-    // Verify write landed (S103: ghost write protection)
     try {
       const verify = await readFile(filePath, 'utf-8');
       if (!verify || verify.length < 10) {
-        console.error(`❌ Handoff verify failed: ${filename} (empty or missing after write)`);
-        return res.status(500).json({ error: 'Write verification failed — file empty after write' });
+        console.error(`\u274C Handoff verify failed: ${filename} (empty or missing after write)`);
+        return res.status(500).json({ error: 'Write verification failed \u2014 file empty after write' });
       }
     } catch (verifyErr) {
-      console.error(`❌ Handoff verify failed: ${filename} (${verifyErr.message})`);
-      return res.status(500).json({ error: `Write verification failed — ${verifyErr.message}` });
+      console.error(`\u274C Handoff verify failed: ${filename} (${verifyErr.message})`);
+      return res.status(500).json({ error: `Write verification failed \u2014 ${verifyErr.message}` });
     }
 
     console.log(`\u{1F4CB} Handoff written + verified: ${filename} (${content.length} bytes)`);
@@ -1229,8 +1130,6 @@ ${files || 'No files recorded.'}
 });
 
 // ─── Warm Restore API (S95) ──────────────────────────────
-// Panel calls this endpoint, server runs warm_restore.py,
-// writes output to state/warm_restore_output.md for Claude to read.
 const WARM_RESTORE_SCRIPT = resolve(join(BOND_ROOT, 'warm_restore.py'));
 
 app.post('/api/warm-restore', async (req, res) => {
@@ -1245,11 +1144,10 @@ app.post('/api/warm-restore', async (req, res) => {
       env: { ...process.env, BOND_ROOT, PYTHONIOENCODING: 'utf-8' },
     });
 
-    // Write output to state file for Claude to read via filesystem MCP
     const outputPath = join(STATE_PATH, 'warm_restore_output.md');
     await writeFile(outputPath, stdout);
 
-    console.log(`🔍 Warm Restore: query="${query || '(entity-only)'}"`);
+    console.log(`\u{1F50D} Warm Restore: query="${query || '(entity-only)'}"`);
     res.json({
       success: true,
       output: stdout,
@@ -1267,24 +1165,182 @@ app.post('/api/warm-restore', async (req, res) => {
   }
 });
 
+// ─── Sync Obligations API (S113) ─────────────────────────
+async function generateObligations() {
+  const obligations = [];
+  const now = new Date().toISOString();
+
+  let entityState = { entity: null, class: null, path: null };
+  try {
+    entityState = JSON.parse(await readFile(join(STATE_PATH, 'active_entity.json'), 'utf-8'));
+  } catch {}
+
+  if (entityState.entity) {
+    const entityPath = join(DOCTRINE_PATH, entityState.entity);
+    try {
+      const files = await readdir(entityPath);
+      const mdFiles = files.filter(f => f.endsWith('.md'));
+      obligations.push({
+        id: `entity-load:${entityState.entity}`,
+        source: 'active_entity',
+        command: 'sync',
+        description: `Load ${mdFiles.length} .md files from ${entityState.entity}`,
+        entity: entityState.entity,
+        detail: { file_count: mdFiles.length, files: mdFiles },
+      });
+    } catch {}
+
+    try {
+      const config = JSON.parse(
+        await readFile(join(entityPath, 'entity.json'), 'utf-8')
+      );
+      const links = config.links || [];
+      for (const linkName of links) {
+        try {
+          const linkPath = join(DOCTRINE_PATH, linkName);
+          const linkFiles = await readdir(linkPath);
+          const linkMd = linkFiles.filter(f => f.endsWith('.md'));
+          obligations.push({
+            id: `link-load:${linkName}`,
+            source: 'entity_link',
+            command: 'sync',
+            description: `Load ${linkMd.length} .md files from linked entity ${linkName}`,
+            entity: linkName,
+            detail: { file_count: linkMd.length },
+          });
+        } catch {}
+      }
+
+      if (config.class === 'project' && config.core) {
+        try {
+          const coreContent = await readFile(join(entityPath, config.core), 'utf-8');
+          const isStarter = coreContent.includes('Replace these prompts with your CORE')
+            || coreContent.trim().split('\n').filter(l => l.trim() && !l.startsWith('#') && !l.startsWith('>') && !l.startsWith('*')).length === 0;
+          if (isStarter) {
+            obligations.push({
+              id: `core-init:${entityState.entity}`,
+              source: 'empty_core',
+              command: 'enter',
+              description: `CORE.md is uninitialized for project ${entityState.entity}`,
+              entity: entityState.entity,
+              severity: 'warn',
+            });
+          }
+        } catch {}
+      }
+    } catch {}
+  }
+
+  try {
+    const entries = await readdir(DOCTRINE_PATH, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      try {
+        const config = JSON.parse(
+          await readFile(join(DOCTRINE_PATH, entry.name, 'entity.json'), 'utf-8')
+        );
+        if (config.class !== 'perspective' || !config.seeding) continue;
+
+        const files = await readdir(join(DOCTRINE_PATH, entry.name));
+        const seedFiles = files.filter(f => f.endsWith('.md') && !f.startsWith('ROOT-') && !f.startsWith('G-pruned-'));
+        const rootFiles = files.filter(f => f.startsWith('ROOT-'));
+
+        obligations.push({
+          id: `vine:${entry.name}`,
+          source: 'armed_perspective',
+          command: 'sync',
+          description: `Run vine lifecycle for ${entry.name} (${seedFiles.length} seeds, ${rootFiles.length} roots)`,
+          entity: entry.name,
+          detail: {
+            seed_count: seedFiles.length,
+            root_count: rootFiles.length,
+            threshold: config.seed_threshold || 0.04,
+            prune_window: config.prune_window || 10,
+          },
+        });
+      } catch {}
+    }
+  } catch {}
+
+  try {
+    const config = JSON.parse(await readFile(join(STATE_PATH, 'config.json'), 'utf-8'));
+    if (config.save_confirmation) {
+      obligations.push({
+        id: 'save-confirm',
+        source: 'config',
+        command: 'save',
+        description: 'Present ask_user_input widget before file writes',
+        conditional: true,
+        detail: { trigger: 'on_write' },
+      });
+    }
+  } catch {}
+
+  return {
+    obligations,
+    generated_at: now,
+    active_entity: entityState.entity || null,
+    active_class: entityState.class || null,
+    obligation_count: obligations.length,
+    armed_perspectives: obligations.filter(o => o.source === 'armed_perspective').length,
+  };
+}
+
+app.get('/api/sync-obligations', async (req, res) => {
+  try {
+    const result = await generateObligations();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+app.get('/api/sync-health', async (req, res) => {
+  try {
+    const result = await generateObligations();
+
+    const syncObligations = result.obligations.filter(o => o.command === 'sync');
+    const enterObligations = result.obligations.filter(o => o.command === 'enter');
+    const conditionalObligations = result.obligations.filter(o => o.conditional);
+
+    res.json({
+      ...result,
+      health: {
+        sync_obligations: syncObligations.length,
+        enter_obligations: enterObligations.length,
+        conditional_obligations: conditionalObligations.length,
+        total: result.obligation_count,
+        verified: 0,
+        unverified: result.obligation_count,
+        phase: 1,
+        note: 'Phase 1: structured self-report. Server generates, Claude audits against list.',
+      },
+      by_command: {
+        sync: syncObligations,
+        enter: enterObligations,
+        conditional: conditionalObligations,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ─── Bridge ───────────────────────────────────────────────
+// Clipboard-only. Panel writes "BOND:{cmd}" -> AHK OnClipboardChange.
+
 // ─── Version Check (S111) ─────────────────────────────────
-// On startup, fetch latest version from GitHub raw. Cache result.
-// Re-check every 60 minutes. Panel header shows update indicator.
 const GITHUB_VERSION_URL = 'https://raw.githubusercontent.com/moneyjarrod/BOND/main/panel/package.json';
 let versionCache = { local: null, remote: null, updateAvailable: false, lastCheck: null, error: null };
 
 async function checkForUpdate() {
   try {
-    // Read local version
     const localPkg = JSON.parse(await readFile(join(process.cwd(), 'package.json'), 'utf-8'));
     versionCache.local = localPkg.version;
-
-    // Fetch remote version
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 8000);
     const response = await fetch(GITHUB_VERSION_URL, { signal: controller.signal });
     clearTimeout(timeout);
-
     if (response.ok) {
       const remotePkg = JSON.parse(await response.text());
       versionCache.remote = remotePkg.version;
@@ -1298,17 +1354,13 @@ async function checkForUpdate() {
   }
   versionCache.lastCheck = new Date().toISOString();
   if (versionCache.updateAvailable) {
-    console.log(`📦 Update available: ${versionCache.local} → ${versionCache.remote}`);
+    console.log(`\u{1F4E6} Update available: ${versionCache.local} \u2192 ${versionCache.remote}`);
   }
 }
 
 app.get('/api/version', (req, res) => {
   res.json(versionCache);
 });
-
-// ─── Bridge ───────────────────────────────────────────────
-// Clipboard-only. Panel writes "BOND:{cmd}" → AHK OnClipboardChange.
-// HTTP bridge removed S85 (Dead Code Audit).
 
 // ─── Production static serving ────────────────────────────
 const DIST_PATH = join(process.cwd(), 'dist');
@@ -1335,7 +1387,6 @@ function broadcast(event) {
   });
 }
 
-// Watch doctrine directory for external file changes (e.g. MCP filesystem writes)
 let watchDebounce = null;
 try {
   watch(DOCTRINE_PATH, { recursive: true }, (eventType, filename) => {
@@ -1348,14 +1399,13 @@ try {
   console.warn('fs.watch (doctrine) warning:', err.message);
 }
 
-// Watch state directory for external entity enter/exit (e.g. Claude writes active_entity.json)
 let stateDebounce = null;
 try {
   watch(STATE_PATH, { recursive: false }, (eventType, filename) => {
     if (filename === 'active_entity.json') {
       clearTimeout(stateDebounce);
       stateDebounce = setTimeout(() => {
-        console.log('📡 State file changed externally — broadcasting');
+        console.log('\u{1F4E1} State file changed externally \u2014 broadcasting');
         broadcast({ type: 'state_changed', detail: { source: 'file_watch' }, timestamp: new Date().toISOString() });
       }, 300);
     }
@@ -1368,21 +1418,19 @@ wss.on('connection', () => {
   console.log(`   WS client connected (${wss.clients.size} total)`);
 });
 
-// Bootstrap framework entities before starting
 bootstrapFrameworkEntities().then(async () => {
-  // Version check on startup (S111)
   await checkForUpdate();
-  setInterval(checkForUpdate, 60 * 60 * 1000); // Re-check hourly
+  setInterval(checkForUpdate, 60 * 60 * 1000);
 
   server.listen(PORT, () => {
-    console.log(`🔥🌊 BOND Panel sidecar on http://localhost:${PORT}`);
+    console.log(`\u{1F525}\u{1F30A} BOND Panel sidecar on http://localhost:${PORT}`);
     console.log(`   Doctrine path: ${DOCTRINE_PATH}`);
     console.log(`   MCP target:    ${MCP_URL}`);
     console.log(`   WebSocket:     ws://localhost:${PORT}`);
-    console.log(`   Version:       ${versionCache.local || 'unknown'}${versionCache.updateAvailable ? ` (→ ${versionCache.remote} available)` : ''}`);
+    console.log(`   Version:       ${versionCache.local || 'unknown'}${versionCache.updateAvailable ? ` (\u2192 ${versionCache.remote} available)` : ''}`);
   });
 }).catch(err => {
-  console.error('❌ Bootstrap failed:', err);
+  console.error('\u274C Bootstrap failed:', err);
   process.exit(1);
 });
 
