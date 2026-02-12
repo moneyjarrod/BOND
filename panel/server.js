@@ -1257,6 +1257,45 @@ app.post('/api/warm-restore', async (req, res) => {
   }
 });
 
+// ─── Version Check (S111) ─────────────────────────────────
+// On startup, fetch latest version from GitHub raw. Cache result.
+// Re-check every 60 minutes. Panel header shows update indicator.
+const GITHUB_VERSION_URL = 'https://raw.githubusercontent.com/moneyjarrod/BOND/main/panel/package.json';
+let versionCache = { local: null, remote: null, updateAvailable: false, lastCheck: null, error: null };
+
+async function checkForUpdate() {
+  try {
+    // Read local version
+    const localPkg = JSON.parse(await readFile(join(process.cwd(), 'package.json'), 'utf-8'));
+    versionCache.local = localPkg.version;
+
+    // Fetch remote version
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
+    const response = await fetch(GITHUB_VERSION_URL, { signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (response.ok) {
+      const remotePkg = JSON.parse(await response.text());
+      versionCache.remote = remotePkg.version;
+      versionCache.updateAvailable = remotePkg.version !== localPkg.version;
+      versionCache.error = null;
+    } else {
+      versionCache.error = `GitHub returned ${response.status}`;
+    }
+  } catch (err) {
+    versionCache.error = err.name === 'AbortError' ? 'Timeout' : err.message;
+  }
+  versionCache.lastCheck = new Date().toISOString();
+  if (versionCache.updateAvailable) {
+    console.log(`📦 Update available: ${versionCache.local} → ${versionCache.remote}`);
+  }
+}
+
+app.get('/api/version', (req, res) => {
+  res.json(versionCache);
+});
+
 // ─── Bridge ───────────────────────────────────────────────
 // Clipboard-only. Panel writes "BOND:{cmd}" → AHK OnClipboardChange.
 // HTTP bridge removed S85 (Dead Code Audit).
@@ -1320,12 +1359,17 @@ wss.on('connection', () => {
 });
 
 // Bootstrap framework entities before starting
-bootstrapFrameworkEntities().then(() => {
+bootstrapFrameworkEntities().then(async () => {
+  // Version check on startup (S111)
+  await checkForUpdate();
+  setInterval(checkForUpdate, 60 * 60 * 1000); // Re-check hourly
+
   server.listen(PORT, () => {
     console.log(`🔥🌊 BOND Panel sidecar on http://localhost:${PORT}`);
     console.log(`   Doctrine path: ${DOCTRINE_PATH}`);
     console.log(`   MCP target:    ${MCP_URL}`);
     console.log(`   WebSocket:     ws://localhost:${PORT}`);
+    console.log(`   Version:       ${versionCache.local || 'unknown'}${versionCache.updateAvailable ? ` (→ ${versionCache.remote} available)` : ''}`);
   });
 }).catch(err => {
   console.error('❌ Bootstrap failed:', err);

@@ -7,6 +7,8 @@ const CLASS_COLORS = {
   library:     { bg: 'rgba(139,148,158,0.15)', border: 'rgba(139,148,158,0.3)', color: '#8b949e', label: 'LB' },
 };
 
+import { useState, useEffect } from 'react';
+
 export default function Header({
   activeEntity = null,
   modules = [],
@@ -14,6 +16,14 @@ export default function Header({
   saveConfirmation = true,
   onSaveConfirmToggle,
 }) {
+  const [version, setVersion] = useState(null);
+
+  useEffect(() => {
+    fetch('/api/version')
+      .then(r => r.json())
+      .then(setVersion)
+      .catch(() => {});
+  }, []);
   const activeCount = modules.filter(m => m.status === 'active').length;
   const qais = modules.find(m => m.id === 'qais');
   const iss = modules.find(m => m.id === 'iss');
@@ -39,8 +49,35 @@ export default function Header({
             textTransform: 'uppercase',
             lineHeight: 1,
             marginTop: -1,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
           }}>
             BOND-Claude Van Damme
+            {version?.local && (
+              <a
+                href={version.updateAvailable ? 'https://github.com/moneyjarrod/BOND' : undefined}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={version.updateAvailable
+                  ? `Update available: v${version.local} → v${version.remote}. Click to visit repo.`
+                  : `v${version.local} — up to date`}
+                style={{
+                  fontSize: '0.65rem',
+                  padding: '2px 7px',
+                  borderRadius: 3,
+                  background: version.updateAvailable ? 'rgba(210,153,34,0.25)' : 'rgba(139,148,158,0.2)',
+                  color: version.updateAvailable ? '#e8b030' : '#b0b8c4',
+                  border: `1px solid ${version.updateAvailable ? 'rgba(210,153,34,0.5)' : 'rgba(139,148,158,0.35)'}`,
+                  textDecoration: 'none',
+                  cursor: version.updateAvailable ? 'pointer' : 'default',
+                  letterSpacing: '0.5px',
+                  fontWeight: 600,
+                }}
+              >
+                {version.updateAvailable ? `↑ v${version.remote}` : `v${version.local}`}
+              </a>
+            )}
           </span>
         </div>
         {activeEntity && <ActiveEntityBadge entity={activeEntity} />}

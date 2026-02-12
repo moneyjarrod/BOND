@@ -13,7 +13,8 @@ export default defineConfig({
       '/api/state': 'http://localhost:3000',
       '/api/bindings': 'http://localhost:3000',
       '/api/handoff': 'http://localhost:3000',
-      '/api/warm-restore': 'http://localhost:3000'
+      '/api/warm-restore': 'http://localhost:3000',
+      '/api/version': 'http://localhost:3000'
     }
   }
 });
