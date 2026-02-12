@@ -45,6 +45,19 @@ if not exist "%~dp0state\active_entity.json" (
     echo [OK] State initialized
 )
 
+:: Write platform config (efficiency hooks use this)
+if not exist "%~dp0state\config.json" (
+    echo {"save_confirmation":true,"platform":"windows"} > "%~dp0state\config.json"
+    echo [OK] Config initialized (platform: windows)
+) else (
+    :: Check if platform key exists, add if missing
+    findstr /C:"platform" "%~dp0state\config.json" >nul 2>nul || (
+        echo [NOTE] Adding platform to existing config...
+        echo {"save_confirmation":true,"platform":"windows"} > "%~dp0state\config.json"
+        echo [OK] Platform added to config
+    )
+)
+
 :: Initialize data directory (QAIS field storage)
 if not exist "%~dp0data" mkdir "%~dp0data"
 echo [OK] Data directory ready
