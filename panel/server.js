@@ -90,8 +90,6 @@ BOND_MASTER IS NOT:
 
 const FRAMEWORK_ENTITY_NAMES = Object.keys(FRAMEWORK_ENTITIES);
 
-// ─── Template Path (S95) ──────────────────────────────────
-const TEMPLATES_PATH = resolve(join(BOND_ROOT, 'templates', 'doctrine'));
 
 async function bootstrapFrameworkEntities() {
   await mkdir(DOCTRINE_PATH, { recursive: true });
@@ -134,29 +132,6 @@ async function bootstrapFrameworkEntities() {
     ) + '\n', 'bootstrap:config.json');
   }
 
-  if (existsSync(TEMPLATES_PATH)) {
-    try {
-      const templateEntities = await readdir(TEMPLATES_PATH, { withFileTypes: true });
-      for (const tDir of templateEntities) {
-        if (!tDir.isDirectory()) continue;
-        const srcDir = join(TEMPLATES_PATH, tDir.name);
-        const dstDir = join(DOCTRINE_PATH, tDir.name);
-        await mkdir(dstDir, { recursive: true });
-        const templateFiles = await readdir(srcDir);
-        for (const tf of templateFiles) {
-          if (!tf.endsWith('.md')) continue;
-          const dstFile = join(dstDir, tf);
-          if (!existsSync(dstFile)) {
-            const content = await readFile(join(srcDir, tf), 'utf-8');
-            await verifiedWrite(dstFile, content, `template:${tDir.name}/${tf}`);
-            console.log(`   → Template: ${tDir.name}/${tf}`);
-          }
-        }
-      }
-    } catch (err) {
-      console.warn('Template copy warning:', err.message);
-    }
-  }
 }
 
 const CLASS_TOOLS = {
