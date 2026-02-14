@@ -5,6 +5,21 @@ All notable changes to BOND will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [1.5.0] - 2026-02-14
+
+### Added
+- **Two-field architecture** — Each perspective now maintains two separate QAIS fields: seed field (`.npz`) for vine lifecycle resonance, crystal field (`_crystal.npz`) for narrative continuity. No cross-contamination between identity growth and session memory.
+- **Crystal routing** — When a perspective is the active entity, `{Crystal}` writes exclusively to the perspective's local crystal field instead of global. No perspective active → global as before.
+- **Entity Warm Restore** — New `perspective_crystal_restore` MCP tool retrieves all session momentum from a perspective's local crystal field. Panel shows 🔥 Warm button in the entity bar when inside a perspective.
+- **Visual Guide screenshots** — 7 annotated PNG images added to `docs/visual_guide/images/`. Fresh panel overview, header, tabs, entity card, command bar, populated panel, and entity grid.
+
+### Changed
+- **Perspective doctrine updated** — BOND_ENTITIES.md now documents the two-field architecture with explicit routing rules.
+
+### Fixed
+- **Doctrine/code drift** — S115 wrote doctrine claiming crystal routed to local fields before implementation existed. Corrected to match actual architecture before building the proven mechanism.
+- **Gitignore architecture** — `doctrine/` now tracked directly in git (BOND_MASTER/ and PROJECT_MASTER/ whitelisted). Removed stale `templates/doctrine/` redundancy and server bootstrap copy code.
+
 ## [1.4.0] - 2026-02-12
 
 ### Added
@@ -76,4 +91,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Example templates** — writer MASTER and SKILL examples for reference
 - **Documentation** — commands, entities, counter, and search reference guides
 
+[1.5.0]: https://github.com/moneyjarrod/BOND/releases/tag/v1.5.0
 [1.0.0]: https://github.com/moneyjarrod/BOND/releases/tag/v1.0.0
