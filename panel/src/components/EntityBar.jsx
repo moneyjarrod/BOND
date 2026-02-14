@@ -13,7 +13,7 @@ export default function EntityBar({ activeEntity, linkedEntities = [], onExit, o
 
   const meta = CLASS_META[activeEntity.type] || CLASS_META.doctrine;
   const label = activeEntity.display_name || activeEntity.name;
-  const canUnlink = activeEntity.name === 'BOND_MASTER';
+  const canUnlink = true; // Any active entity can manage its own links
 
   return (
     <div style={{ borderBottom: '1px solid var(--border)' }}>
