@@ -19,6 +19,7 @@ export default function DoctrineBanner({ entities, allEntities, activeEntity, li
   const [showLinkPicker, setShowLinkPicker] = useState(false);
   const pickerRef = useRef(null);
   const isActive = activeEntity?.name === MASTER_ENTITY;
+  const isLinked = linkedEntities.some(e => (typeof e === 'string' ? e : e.name) === MASTER_ENTITY);
 
   // Close picker on outside click
   useEffect(() => {
@@ -121,6 +122,24 @@ export default function DoctrineBanner({ entities, allEntities, activeEntity, li
               textTransform: 'uppercase',
             }}>
               🔗 {linkedEntities.length}
+            </span>
+          )}
+          {isLinked && (
+            <span style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              padding: '2px 8px',
+              background: 'rgba(96,165,250,0.15)',
+              border: '1px solid rgba(96,165,250,0.3)',
+              borderRadius: 'var(--radius-sm)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '0.65rem',
+              fontWeight: 600,
+              color: '#60a5fa',
+              letterSpacing: '0.5px',
+              textTransform: 'uppercase',
+            }}>
+              LINKED
             </span>
           )}
           {isActive && (

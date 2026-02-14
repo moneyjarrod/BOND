@@ -21,6 +21,7 @@ export default function ProjectMasterBanner({ entities, allEntities, activeEntit
   const [bindings, setBindings] = useState(null);
   const pickerRef = useRef(null);
   const isActive = activeEntity?.name === PM_ENTITY;
+  const isLinked = linkedEntities.some(e => (typeof e === 'string' ? e : e.name) === PM_ENTITY);
 
   useEffect(() => {
     if (!showLinkPicker) return;
@@ -80,6 +81,9 @@ export default function ProjectMasterBanner({ entities, allEntities, activeEntit
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {isActive && linkedEntities.length > 0 && (
             <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, padding: '2px 8px', background: 'rgba(86,212,221,0.12)', border: '1px solid rgba(86,212,221,0.3)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', fontWeight: 600, color: 'var(--teal)', letterSpacing: '0.5px', textTransform: 'uppercase' }}>🔗 {linkedEntities.length}</span>
+          )}
+          {isLinked && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', background: 'rgba(96,165,250,0.15)', border: '1px solid rgba(96,165,250,0.3)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', fontWeight: 600, color: '#60a5fa', letterSpacing: '0.5px', textTransform: 'uppercase' }}>LINKED</span>
           )}
           {isActive && (
             <span style={{ display: 'inline-flex', alignItems: 'center', padding: '2px 8px', background: 'rgba(63,185,80,0.15)', border: '1px solid rgba(63,185,80,0.3)', borderRadius: 'var(--radius-sm)', fontFamily: 'var(--font-mono)', fontSize: '0.6rem', fontWeight: 600, color: 'var(--status-active)', letterSpacing: '0.5px', textTransform: 'uppercase' }}>ACTIVE</span>
