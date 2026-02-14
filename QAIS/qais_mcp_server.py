@@ -586,6 +586,10 @@ TOOLS = [
          "seed_title": {"type": "string", "description": "Seed name/title to remove"},
          "seed_content": {"type": "string", "description": "Seed content text (must match what was stored)"}
      }, "required": ["perspective", "seed_title", "seed_content"]}},
+    {"name": "perspective_crystal_restore", "description": "Retrieve all crystal momentum from a perspective's local crystal field. Used by Entity Warm Restore to bring back narrative continuity. Returns all stored session momentum, context, insights, and tags.",
+     "inputSchema": {"type": "object", "properties": {
+         "perspective": {"type": "string", "description": "Perspective entity name (e.g. P11-Plumber)"}
+     }, "required": ["perspective"]}},
 ]
 
 
@@ -682,6 +686,23 @@ def handle_request(request):
                             matches.append({"seed": title, "content_preview": content[:80], "score": round(score, 4)})
                     matches.sort(key=lambda x: -x["score"])
                     result = {"perspective": args["perspective"], "matches": matches, "field_count": pf.count}
+            elif tool_name == "perspective_crystal_restore":
+                pcf = get_perspective_crystal_field(args["perspective"])
+                if pcf.count == 0:
+                    result = {"perspective": args["perspective"], "sessions": [],
+                             "note": "Crystal field empty — no session momentum stored yet."}
+                else:
+                    sessions = {}
+                    for key in pcf.stored:
+                        parts = key.split('|', 2)
+                        if len(parts) == 3:
+                            session_id, role, content = parts
+                            if session_id not in sessions:
+                                sessions[session_id] = {}
+                            sessions[session_id][role] = content
+                    session_list = [{"session": sid, **data} for sid, data in sorted(sessions.items())]
+                    result = {"perspective": args["perspective"], "sessions": session_list,
+                             "field_count": pcf.count}
             else:
                 return {"jsonrpc": "2.0", "id": req_id, "error": {
                     "code": -32601, "message": f"Unknown tool: {tool_name}"}}

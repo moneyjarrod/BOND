@@ -273,6 +273,13 @@ function AppInner() {
     }
   }, []);
 
+  // Entity Warm Restore — perspective-local crystal field (S116)
+  const handleEntityWarmRestore = useCallback(async (entityName) => {
+    try {
+      await navigator.clipboard.writeText(`BOND:{Entity Warm Restore} ${entityName}`);
+    } catch {}
+  }, []);
+
   // Handoff generator modal
   const [showHandoff, setShowHandoff] = useState(false);
 
@@ -300,7 +307,7 @@ function AppInner() {
         wsConnected={wsConnected}
       />
 
-      <EntityBar activeEntity={activeEntity} linkedEntities={linkedEntities} onExit={handleExit} onUnlink={handleUnlink} />
+      <EntityBar activeEntity={activeEntity} linkedEntities={linkedEntities} onExit={handleExit} onUnlink={handleUnlink} onEntityWarmRestore={handleEntityWarmRestore} />
 
       <nav className="tab-bar">
         {TABS.map((tab) => (
