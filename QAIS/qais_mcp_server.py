@@ -31,7 +31,7 @@ import time
 from collections import defaultdict
 from datetime import datetime
 from BOND_gate import get_gate
-from tool_auth import validate_tool_call
+from tool_auth import validate_tool_call, get_active_entity
 
 try:
     import numpy as np
@@ -493,11 +493,22 @@ PERSPECTIVE_DATA_DIR = os.path.join(
 os.makedirs(PERSPECTIVE_DATA_DIR, exist_ok=True)
 
 def get_perspective_field(perspective):
-    """Get or create an isolated QAISField for a perspective."""
+    """Get or create an isolated QAISField for a perspective's seeds."""
     if perspective not in PERSPECTIVE_FIELDS:
         field_path = os.path.join(PERSPECTIVE_DATA_DIR, f"{perspective}.npz")
         PERSPECTIVE_FIELDS[perspective] = QAISField(field_path)
     return PERSPECTIVE_FIELDS[perspective]
+
+# Crystal continuity fields — separate from seed fields (S116)
+# Same QAISField, different file. Seeds stay tight, crystal stays narrative.
+PERSPECTIVE_CRYSTAL_FIELDS = {}
+
+def get_perspective_crystal_field(perspective):
+    """Get or create an isolated QAISField for a perspective's crystal momentum."""
+    if perspective not in PERSPECTIVE_CRYSTAL_FIELDS:
+        field_path = os.path.join(PERSPECTIVE_DATA_DIR, f"{perspective}_crystal.npz")
+        PERSPECTIVE_CRYSTAL_FIELDS[perspective] = QAISField(field_path)
+    return PERSPECTIVE_CRYSTAL_FIELDS[perspective]
 
 
 # ═════════════════════════════════════════════════════
@@ -624,8 +635,20 @@ def handle_request(request):
             elif tool_name == "bond_gate":
                 result = get_gate().evaluate(args["trigger"], args.get("context", ""), args.get("message", ""))
             elif tool_name == "crystal":
-                result = get_crystal().crystallize(args["chunk_text"], args["session_num"],
-                    args.get("project", "BOND"), args.get("context"))
+                # Two-field architecture (S116): perspective active → local crystal field
+                # Seeds in {entity}.npz, crystal momentum in {entity}_crystal.npz
+                entity, entity_class = get_active_entity()
+                if entity and entity_class == 'perspective':
+                    pcf = get_perspective_crystal_field(entity)
+                    local_crystal = Crystal(pcf, HEATMAP)
+                    result = local_crystal.crystallize(args["chunk_text"], args["session_num"],
+                        args.get("project", "BOND"), args.get("context"))
+                    result["routed_to"] = entity
+                    result["field"] = "local"
+                else:
+                    result = get_crystal().crystallize(args["chunk_text"], args["session_num"],
+                        args.get("project", "BOND"), args.get("context"))
+                    result["field"] = "global"
             elif tool_name == "perspective_store":
                 pf = get_perspective_field(args["perspective"])
                 store_result = pf.store(args["seed_title"], "seed", args["seed_content"])
