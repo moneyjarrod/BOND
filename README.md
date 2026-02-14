@@ -38,6 +38,7 @@ irm https://moneyjarrod.github.io/BOND/install.ps1 | iex
 1. Add the BOND skill (`skills/bond/SKILL.md`) as Project Knowledge in a Claude Project
 2. Configure MCP servers in Claude (see `.env.example` for paths)
 3. Type `{Sync}` in Claude to initialize
+4. Browse the [Visual Guide](docs/visual_guide/VISUAL_GUIDE.md) to see what every panel element does
 
 ## Architecture
 

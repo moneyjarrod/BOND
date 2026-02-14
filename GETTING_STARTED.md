@@ -57,6 +57,8 @@ The **Control Panel** is your command center:
 - **Module Bay** — Status cards for QAIS, ISS, and other MCP servers
 - **Doctrine Viewer** — Read entity documents directly in the panel
 
+For annotated screenshots of every panel element, see the [Visual Guide](docs/visual_guide/VISUAL_GUIDE.md).
+
 ### Framework Entities
 
 Two entities exist on first run:
