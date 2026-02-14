@@ -34,7 +34,7 @@
 - IS NOT: Policed. No ISS — growth shouldn't be validated against fixed rules.
 - IS NOT: Globally entangled. Perspective fields are isolated from the global QAIS field.
 - Tools: Files + QAIS + Heatmap + Crystal.
-- Local Field: Created automatically for every perspective. Seeds write local via vine lifecycle. Entity Warm Restore queries local field only. Global Warm Restore does not touch perspective fields. Narrative continuity mechanism TBD — crystal dual-write rejected (S116, bloat).
+- Local Field: Two .npz files per perspective, created automatically. Seed field (`{entity}.npz`) for vine lifecycle. Crystal field (`{entity}_crystal.npz`) for narrative continuity. Entity Warm Restore queries crystal field. Global Warm Restore does not touch perspective fields. Exclusive routing: perspective active → crystal writes local only (S116).
 - Field Isolation: Perspective fields are independent. Linked perspectives share seed resonance through the vine lifecycle but do not access each other's local fields.
 - Example: User-created perspectives (P11+).
 
