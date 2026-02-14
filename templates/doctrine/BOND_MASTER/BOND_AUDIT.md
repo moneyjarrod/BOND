@@ -25,11 +25,11 @@ Check for code that is no longer used or was replaced by a newer approach.
 Check for absolute paths that should be relative or env-configured.
 
 **What to look for:**
-- `C:\Projects\BOND_private` hardcoded in server.js or other JS
+- Absolute paths hardcoded in server.js or other JS
 - Absolute paths in Python scripts that should use config
 - Path separators that assume Windows (`\\` instead of `path.join`)
 
-**Violation:** Path works only on J-Dub's machine.
+**Violation:** Path works only on one machine.
 **Fix:** Use relative paths, env vars, or `.env` config.
 
 ### 3. Truth Hierarchy Violations

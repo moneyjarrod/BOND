@@ -1,0 +1,9 @@
+{
+  "class": "doctrine",
+  "display_name": "Project Master",
+  "tools": {
+    "filesystem": true,
+    "iss": true
+  },
+  "links": []
+}

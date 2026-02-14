@@ -63,6 +63,7 @@ the same resonance check to pass the gate.
 - **Dead branch log preserved**: Low cost, high value. Enables re-graft.
 - **G- prefix repurposed**: Pruning journal, not growth badge.
 - **Auto-seed on {Sync}**: Threshold hit → file + QAIS injection, no user prompt.
+- **Judgment over mechanics**: ROOT lens identity alignment, not hit count thresholds.
 
 ## Seed Tracker (S99 Design)
 

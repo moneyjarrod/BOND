@@ -30,8 +30,12 @@
 ### Perspective
 - IS: An unbounded knowledge domain that grows through conversation.
 - IS: Free to accumulate seeds, crystals, and connections.
+- IS: Narratively continuous. Each perspective maintains a local QAIS field (`data/perspectives/{entity}.npz`) that accumulates crystals and narrative context independently of the global field.
 - IS NOT: Policed. No ISS — growth shouldn't be validated against fixed rules.
+- IS NOT: Globally entangled. Crystal inside a perspective stores to its local field only, not global QAIS.
 - Tools: Files + QAIS + Heatmap + Crystal.
+- Local Field: Created automatically for every perspective. Crystal writes local when entity is active. Entity Warm Restore queries local field only. Global Warm Restore does not touch perspective fields.
+- Field Isolation: Perspective fields are independent. Linked perspectives share seed resonance through the vine lifecycle but do not access each other's crystal narrative fields.
 - Example: User-created perspectives (P11+).
 
 ### Library
@@ -92,7 +96,7 @@ Every entity lives in `doctrine/ENTITY_NAME/` and contains:
 {
   "entity": "CM",
   "class": "doctrine",
-  "path": "C:\\Projects\\BOND_private\\doctrine\\CM",
+  "path": "...",
   "entered": "2026-02-07T..."
 }
 ```

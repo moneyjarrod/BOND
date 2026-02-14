@@ -1,0 +1,11 @@
+{
+  "class": "doctrine",
+  "display_name": "BOND Master",
+  "tools": {
+    "filesystem": true,
+    "iss": true
+  },
+  "links": [
+    "PROJECT_MASTER"
+  ]
+}
