@@ -10,7 +10,7 @@ const CLASS_META = {
   library:     { icon: '📚', label: 'Library',     color: 'var(--text-secondary)' },
 };
 
-export default function EntityBar({ activeEntity, linkedEntities = [], onExit, onUnlink, onEntityWarmRestore, onEntityCrystal }) {
+export default function EntityBar({ activeEntity, linkedEntities = [], onExit, onUnlink, onEntityWarmRestore, onEntityCrystal, onProjectFullRestore }) {
   if (!activeEntity) return null;
 
   const meta = CLASS_META[activeEntity.type] || CLASS_META.doctrine;
@@ -115,6 +115,27 @@ export default function EntityBar({ activeEntity, linkedEntities = [], onExit, o
               onMouseLeave={e => { e.target.style.background = 'transparent'; }}
             >
               🔥 Warm
+            </button>
+          )}
+          {isProject && onProjectFullRestore && (
+            <button
+              onClick={() => onProjectFullRestore(activeEntity.name)}
+              title="Project Full Restore — CORE + crystal + SLA + directory scan"
+              style={{
+                padding: '3px 12px',
+                fontSize: '0.75rem',
+                fontFamily: 'var(--font-mono)',
+                background: 'transparent',
+                color: 'var(--accent-teal)',
+                border: '1px solid rgba(86,212,221,0.4)',
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={e => { e.target.style.background = 'rgba(86,212,221,0.1)'; }}
+              onMouseLeave={e => { e.target.style.background = 'transparent'; }}
+            >
+              🔄 Full Restore
             </button>
           )}
           <button

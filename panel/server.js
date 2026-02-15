@@ -805,6 +805,134 @@ app.get('/api/sync-health', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── Project Full Restore (S117) ──────────────────────────
+// Assembles: CORE.md + local crystal + SLA scoped query + project dir scan
+// Writes output to state/project_restore_output.md for Claude to read
+
+app.post('/api/project-restore/:entity', async (req, res) => {
+  const { entity } = req.params;
+  try {
+    const entityPath = join(DOCTRINE_PATH, entity);
+    const configPath = join(entityPath, 'entity.json');
+    let config = {};
+    try { config = JSON.parse(await readFile(configPath, 'utf-8')); } catch {
+      return res.status(404).json({ error: `Entity '${entity}' not found` });
+    }
+    if (config.class !== 'project') {
+      return res.status(400).json({ error: `${entity} is ${config.class}-class, not project` });
+    }
+
+    const sections = [];
+    const timestamp = new Date().toISOString();
+
+    // Section 1: CORE.md
+    const coreFile = config.core || 'CORE.md';
+    let coreContent = '(No CORE.md found)';
+    try { coreContent = await readFile(join(entityPath, coreFile), 'utf-8'); } catch {}
+    sections.push(`## CORE — ${entity}\n\n${coreContent}`);
+
+    // Section 2: All doctrine .md files (excluding CORE)
+    try {
+      const files = await readdir(entityPath);
+      const mdFiles = files.filter(f => f.endsWith('.md') && f !== coreFile);
+      if (mdFiles.length > 0) {
+        const docParts = [];
+        for (const f of mdFiles) {
+          try {
+            const content = await readFile(join(entityPath, f), 'utf-8');
+            docParts.push(`### ${f}\n\n${content}`);
+          } catch {}
+        }
+        if (docParts.length > 0) {
+          sections.push(`## Project Doctrine\n\n${docParts.join('\n\n---\n\n')}`);
+        }
+      }
+    } catch {}
+
+    // Section 3: Local crystal momentum
+    let crystalSection = '(No local crystal data)';
+    try {
+      const { stdout } = await execFileAsync('python', [
+        MCP_INVOKE_SCRIPT, 'qais', 'perspective_crystal_restore', entity
+      ], { timeout: 10000, cwd: process.cwd() });
+      const crystalData = JSON.parse(stdout);
+      if (crystalData.sessions && crystalData.sessions.length > 0) {
+        const sessionLines = crystalData.sessions.map(s => {
+          const parts = [`**${s.session}**`];
+          if (s.momentum) parts.push(`Momentum: ${s.momentum}`);
+          if (s.context) parts.push(`Context: ${s.context}`);
+          if (s.insight) parts.push(`Insight: ${s.insight}`);
+          if (s.tags) parts.push(`Tags: ${s.tags}`);
+          return parts.join('\n');
+        });
+        crystalSection = sessionLines.join('\n\n---\n\n');
+      }
+    } catch (err) { console.warn(`Crystal restore warning for ${entity}:`, err.message); }
+    sections.push(`## Crystal Momentum\n\n${crystalSection}`);
+
+    // Section 4: SLA warm restore scoped to project
+    let slaSection = '(No archived handoff data)';
+    try {
+      const args = [WARM_RESTORE_SCRIPT, 'query', entity, '--top', '5'];
+      const { stdout } = await execFileAsync('python', args, {
+        timeout: 15000, cwd: BOND_ROOT,
+        env: { ...process.env, BOND_ROOT, PYTHONIOENCODING: 'utf-8' }
+      });
+      if (stdout.trim()) slaSection = stdout.trim();
+    } catch (err) { console.warn(`SLA query warning for ${entity}:`, err.message); }
+    sections.push(`## Archived Context (SLA)\n\n${slaSection}`);
+
+    // Section 5: Project directory scan (if project_path set)
+    if (config.project_path) {
+      let dirSection = '';
+      const projPath = resolve(config.project_path);
+      try {
+        // Git log — last 10 commits
+        try {
+          const { stdout: gitLog } = await execFileAsync('git', [
+            'log', '--oneline', '-10', '--no-decorate'
+          ], { timeout: 5000, cwd: projPath });
+          if (gitLog.trim()) dirSection += `### Recent Commits\n\`\`\`\n${gitLog.trim()}\n\`\`\`\n\n`;
+        } catch {}
+
+        // Git status — modified/untracked
+        try {
+          const { stdout: gitStatus } = await execFileAsync('git', [
+            'status', '--short'
+          ], { timeout: 5000, cwd: projPath });
+          if (gitStatus.trim()) dirSection += `### Working Tree\n\`\`\`\n${gitStatus.trim()}\n\`\`\`\n\n`;
+          else dirSection += `### Working Tree\nClean — no uncommitted changes.\n\n`;
+        } catch {}
+
+        // Recently modified files (last 7 days)
+        try {
+          const { stdout: recentFiles } = await execFileAsync('git', [
+            'log', '--diff-filter=M', '--name-only', '--pretty=format:', '--since=7.days'
+          ], { timeout: 5000, cwd: projPath });
+          const unique = [...new Set(recentFiles.trim().split('\n').filter(f => f.trim()))];
+          if (unique.length > 0) {
+            dirSection += `### Files Modified (7 days)\n${unique.slice(0, 20).map(f => `- ${f}`).join('\n')}\n`;
+          }
+        } catch {}
+
+        if (dirSection) sections.push(`## Project Directory — ${config.project_path}\n\n${dirSection}`);
+      } catch (err) { console.warn(`Directory scan warning for ${entity}:`, err.message); }
+    }
+
+    // Assemble and write
+    const output = `# Project Full Restore — ${entity}\n_Generated: ${timestamp}_\n\n${sections.join('\n\n---\n\n')}\n`;
+    const outputPath = join(STATE_PATH, 'project_restore_output.md');
+    await verifiedWrite(outputPath, output, `project-restore:${entity}`);
+
+    console.log(`🔄 Project Full Restore: ${entity} (${sections.length} sections)`);
+    res.json({ success: true, entity, sections: sections.length, outputFile: outputPath, timestamp });
+
+  } catch (err) {
+    console.error(`Project Restore error for ${entity}:`, err.message);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // ─── Bridge ───────────────────────────────────────────────
 // Clipboard-only. Panel writes "BOND:{cmd}" -> AHK OnClipboardChange.
 

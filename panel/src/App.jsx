@@ -302,6 +302,39 @@ function AppInner() {
     } catch {}
   }, []);
 
+  // Project Full Restore (S117)
+  const [projectRestoreStatus, setProjectRestoreStatus] = useState(null);
+  const handleProjectFullRestore = useCallback(async (entityName) => {
+    setProjectRestoreStatus('running');
+    try {
+      const res = await fetch(`/api/project-restore/${entityName}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+        window.alert(`Project Full Restore error: ${errData.error || res.status}`);
+        setProjectRestoreStatus('error');
+        setTimeout(() => setProjectRestoreStatus(null), 3000);
+        return;
+      }
+      const data = await res.json();
+      if (data.success) {
+        try { await navigator.clipboard.writeText(`BOND:{Project Full Restore} ${entityName}`); } catch {}
+        setProjectRestoreStatus('done');
+        setTimeout(() => setProjectRestoreStatus(null), 2000);
+      } else {
+        window.alert(`Project Full Restore failed: ${data.error || 'Unknown error'}`);
+        setProjectRestoreStatus('error');
+        setTimeout(() => setProjectRestoreStatus(null), 3000);
+      }
+    } catch (err) {
+      window.alert(`Project Full Restore fetch error: ${err.message}`);
+      setProjectRestoreStatus('error');
+      setTimeout(() => setProjectRestoreStatus(null), 3000);
+    }
+  }, []);
+
   // Handoff generator modal
   const [showHandoff, setShowHandoff] = useState(false);
 
@@ -359,7 +392,7 @@ function AppInner() {
         </div>
       )}
 
-      <EntityBar activeEntity={activeEntity} linkedEntities={linkedEntities} onExit={handleExit} onUnlink={handleUnlink} onEntityWarmRestore={handleEntityWarmRestore} onEntityCrystal={handleEntityCrystal} />
+      <EntityBar activeEntity={activeEntity} linkedEntities={linkedEntities} onExit={handleExit} onUnlink={handleUnlink} onEntityWarmRestore={handleEntityWarmRestore} onEntityCrystal={handleEntityCrystal} onProjectFullRestore={handleProjectFullRestore} />
 
       <nav className="tab-bar">
         {TABS.map((tab) => (
