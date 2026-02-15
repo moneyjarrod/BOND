@@ -23,7 +23,7 @@ Lost count: recommend {Sync}.
   c) AUTO-SEED (novel discovery): Claude reads conversation through the perspective's ROOT lens. Patterns that fit the perspective's worldview but aren't captured = candidates. Check candidates against field — LOW resonance confirms novelty (high = already known).
      RE-GRAFT CHECK: perspective_check now returns `pruned_seeds` array. If candidate name matches a previously pruned seed, apply re-graft gate: count how many LIVING seeds scored above seed_threshold in step (a). If 2+ living seeds co-fired → re-graft allowed (vine grew around it, context changed). If <2 co-fired → blocked (old pattern repeating alone). Log re-graft with reason "re-graft: co-resonated with [seed1, seed2]".
      If candidate passes (novel + not pruned, or novel + re-graft approved): auto-write .md file + perspective_store into QAIS (pass reason + session for auto-logging) + add tracker entry. No approval gate.
-  d) PRUNE (self-sovereign): Claude enters the perspective's ROOT lens and evaluates each seed by identity alignment, not hit count. The tracker is evidence, not verdict. Ask: does this seed grow from who this perspective IS? Dormant seeds that align with roots stay. Active seeds that drift from roots get questioned. See ROOT-self-pruning-authority.md.
+  d) PRUNE (self-sovereign, requires {Enter}): Prune decisions MUST occur while the perspective is the active entity. Claude cannot judge through a perspective's ROOT lens from outside it. During vine lifecycle under a different entity, Claude reports "N seeds at prune window — prune evaluation requires {Enter [perspective]}" and moves on. When the perspective IS entered, Claude reads through its ROOT lens and evaluates each seed by identity alignment, not hit count. The tracker is evidence, not verdict. Ask: does this seed grow from who this perspective IS? Dormant seeds that align with roots stay. Active seeds that drift from roots get questioned. State verdict and execute — do not ask the user for permission. The perspective holds its own shears. See ROOT-self-pruning-authority.md.
      PRUNE EXECUTION (per cut seed):
        i.   Write G-pruned-{seed-name}.md to entity dir with: seed name, ROOT lens reason, tracker stats at time of cut, timestamp.
        ii.  Call perspective_remove(perspective, seed_title, seed_content, reason, session, tracker_stats) — subtracts vectors from QAIS field + auto-logs to seed_decisions.jsonl.
@@ -48,8 +48,17 @@ Lost count: recommend {Sync}.
   If no panel, Claude drafts all six sections manually.
   No counter reset.
 
+## COMPACTION RECOVERY
+When Claude detects a compaction note at the top of context ("[NOTE: This conversation was successfully compacted...]" block), this is an obligation trigger:
+1) Read the transcript path from the compaction note for reference (do not read full transcript unless needed)
+2) Run heatmap_hot(top_k=5) to recover what was warm before compaction
+3) Run qais_passthrough against the compaction summary to pull any stored bindings that match lost context
+4) Check state/active_entity.json — if entity was active, re-read its files (compaction may have dropped entity context)
+5) Check armed seeders — vine state may have been mid-pass
+Compaction = context was lost. QAIS retrieval is non-optional. This is an Armed=Obligated trigger (BOND_MASTER principle 8).
+
 ## COMMANDS
-{Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (Layer 1: last handoff, Layer 2: archive query with confidence badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot | {Tick} quick status | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Relational} arch re-anchor | {Drift?} self-check
+{Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (Layer 1: last handoff, Layer 2: archive query with confidence badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot | {Tick} quick status + obligation audit (GET /api/sync-health) | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Relational} arch re-anchor | {Drift?} self-check
 
 ## TOOL WIRING
 Command tools (fire on command, respect class boundaries):
@@ -57,7 +66,7 @@ Command tools (fire on command, respect class boundaries):
 {Warm Restore} → read state/warm_restore_output.md (pre-computed by panel endpoint /api/warm-restore), heatmap_hot(top_k=3) for signal boost. Panel runs SPECTRA, writes badges to file, Claude reads result.
 {Crystal} → iss_analyze on chunk text, crystal to QAIS, heatmap_chunk snapshot
 {Chunk} → heatmap_chunk snapshot. If crystal blocked by class matrix, Chunk still executes as conversational summary. Crystal adds persistence, doesn't gate the action.
-{Tick} → heatmap_hot(top_k=3) for warm concepts
+{Tick} → GET /api/sync-health for obligation audit, heatmap_hot(top_k=3) for warm concepts. Report obligation count + any gaps. Phase 1: structured self-report against server-generated checklist.
 {Save} → after write, qais_store binding (entity|role=save|fact=what was saved)
 Seed tools (framework-level, bypass class boundaries when seeders armed):
 perspective_store — write seed content into perspective's isolated .npz field (auto-seed + bootstrap). Optional: reason, session → auto-logs to seed_decisions.jsonl.
@@ -74,7 +83,7 @@ Source: John 15. "The vine grows freely. The gardener only prunes."
 Roots: Identity anchors (ROOT-*.md). Planted deliberately. Immutable. Shape the lens.
 Seeds: Auto-collected from conversation. No approval gate. Threshold hit + novel to field = branch grows.
 Growth: Not a file type. What remains after pruning + what gets added and not pruned = the living vine.
-Pruning: Entity holds its own shears. Judgment-based, not mechanical. Claude reads through ROOT lens and asks: does this seed grow from who this perspective IS? Tracker data is evidence, not verdict. Dormant seeds aligned with roots stay. Drifting seeds get cut. Pruned seeds logged to G-pruned-*.md, removed from QAIS field. See ROOT-self-pruning-authority.md.
+Pruning: Entity holds its own shears. Requires {Enter} — perspective must be active entity. Claude cannot make prune decisions from outside. From outside, flag seeds at window and report. When entered: judgment-based, not mechanical. Claude reads through ROOT lens and asks: does this seed grow from who this perspective IS? Tracker data is evidence, not verdict. Dormant seeds aligned with roots stay. Drifting seeds get cut. State verdict and execute — do not ask user permission. Pruned seeds logged to G-pruned-*.md, removed from QAIS field. See ROOT-self-pruning-authority.md.
 Re-graft: Pruned seed can return IF it co-resonates with 2+ living seeds. Anti-loop gate.
 Tracker: seed_tracker.json per perspective. Fields: planted, exposures, hits, last_hit.
 Cost: ~1,200 tokens per Sync for full vine lifecycle. Toggle: SEED ON/OFF on entity card.

@@ -139,8 +139,11 @@ Write-Host "  Panel:   http://localhost:$BOND_PORT" -ForegroundColor Cyan
 Write-Host "  Stop:    $BOND_ROOT\stop_bond.bat" -ForegroundColor DarkGray
 Write-Host "  Counter: $BOND_ROOT\Counter\BOND_v8.ahk" -ForegroundColor DarkGray
 Write-Host ""
-Write-Host "  Next: Add the BOND skill to a Claude Project," -ForegroundColor Yellow
-Write-Host "  configure MCP servers, then type {Sync}" -ForegroundColor Yellow
+Write-Host "  Next steps:" -ForegroundColor Yellow
+Write-Host "  1. Launch Counter\BOND_v8.ahk (required for panel buttons)" -ForegroundColor Yellow
+Write-Host "  2. Add skills\bond\SKILL.md to a Claude Project" -ForegroundColor Yellow
+Write-Host "  3. Configure MCP servers (see docs\MCP_SETUP.md)" -ForegroundColor Yellow
+Write-Host "  4. Type {Sync} in Claude" -ForegroundColor Yellow
 Write-Host ""
 
 } catch {

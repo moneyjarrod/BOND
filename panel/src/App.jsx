@@ -45,6 +45,8 @@ function AppInner() {
   const [activeEntity, setActiveEntity] = useState(null);
   const [linkedEntities, setLinkedEntities] = useState([]);
   const [bondConfig, setBondConfig] = useState({ save_confirmation: true });
+  const [ahkRunning, setAhkRunning] = useState(null); // null=unknown, true/false
+  const [ahkDismissed, setAhkDismissed] = useState(false);
   // LOADED state removed S90 — replaced by ACTIVE + LINKED badges
 
   const { entities, loading, error, refresh } = useEntities();
@@ -80,6 +82,19 @@ function AppInner() {
     document.addEventListener('visibilitychange', onFocus);
     return () => document.removeEventListener('visibilitychange', onFocus);
   }, [refreshState]);
+
+  // Poll AHK status for banner
+  useEffect(() => {
+    const poll = () => {
+      fetch('/api/ahk-status').then(r => r.json()).then(s => {
+        setAhkRunning(s.running ?? false);
+        if (s.running) setAhkDismissed(false); // reset dismiss when AHK comes back
+      }).catch(() => setAhkRunning(false));
+    };
+    poll();
+    const id = setInterval(poll, 5000);
+    return () => clearInterval(id);
+  }, []);
 
   // ─── WebSocket live updates ─────────────────────────────
   const { lastEvent, connected: wsConnected } = useContext(WebSocketContext);
@@ -306,6 +321,36 @@ function AppInner() {
         onSaveConfirmToggle={handleSaveConfirmToggle}
         wsConnected={wsConnected}
       />
+
+      {ahkRunning === false && !ahkDismissed && (
+        <div style={{
+          background: 'rgba(248,81,73,0.15)',
+          border: '1px solid rgba(248,81,73,0.4)',
+          borderRadius: 'var(--radius-sm)',
+          padding: '8px 14px',
+          margin: '0 12px 4px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          fontFamily: 'var(--font-mono)',
+          fontSize: '0.75rem',
+          color: '#f85149',
+          animation: 'fadeIn 0.3s ease',
+        }}>
+          <span>
+            ⚠️ <strong>Counter not detected.</strong> Panel buttons copy to clipboard but won't reach Claude without the AHK bridge.
+            Run <code style={{ background: 'rgba(248,81,73,0.2)', padding: '1px 5px', borderRadius: 3 }}>Counter/BOND_v8.ahk</code> to connect.
+          </span>
+          <button
+            onClick={() => setAhkDismissed(true)}
+            style={{
+              background: 'none', border: 'none', color: '#f85149',
+              cursor: 'pointer', fontSize: '1rem', padding: '0 4px', opacity: 0.6,
+            }}
+            title="Dismiss (will return if AHK still not detected)"
+          >×</button>
+        </div>
+      )}
 
       <EntityBar activeEntity={activeEntity} linkedEntities={linkedEntities} onExit={handleExit} onUnlink={handleUnlink} onEntityWarmRestore={handleEntityWarmRestore} />
 

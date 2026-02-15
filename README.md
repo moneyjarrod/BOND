@@ -30,15 +30,16 @@ One command. Paste it into PowerShell, press Enter, BOND installs and opens.
 irm https://moneyjarrod.github.io/BOND/install.ps1 | iex
 ```
 
-**Requirements:** Node.js 18+ · Python 3.8+ · Git · Windows 10/11
+**Requirements:** Node.js 18+ · Python 3.8+ · Git · [AutoHotkey v2](https://www.autohotkey.com/) · Windows 10/11
 
 > ⚠️ **Platform Notice:** Full BOND (panel + counter + clipboard bridge) currently requires **Windows 10/11**. The core architecture — Node.js server, Python MCP servers, React panel — is cross-platform, but the installer, startup scripts, and AutoHotkey counter/bridge have no Linux or macOS equivalents yet. Community contributors with access to these systems are welcome to build platform-native tooling. Credit the fundamental architecture to J-Dub and Claude.
 
 **After install:**
-1. Add the BOND skill (`skills/bond/SKILL.md`) as Project Knowledge in a Claude Project
-2. Configure MCP servers in Claude (see `.env.example` for paths)
-3. Type `{Sync}` in Claude to initialize
-4. Browse the [Visual Guide](docs/visual_guide/VISUAL_GUIDE.md) to see what every panel element does
+1. **Launch the counter** — Run `Counter/BOND_v8.ahk` (AutoHotkey). This is required. The counter tracks context freshness AND acts as the clipboard bridge between the panel and Claude. Without it, **panel buttons will not work** — they'll copy to clipboard but nothing will reach Claude.
+2. Add the BOND skill (`skills/bond/SKILL.md`) as Project Knowledge in a Claude Project
+3. Configure MCP servers in Claude (see [docs/MCP_SETUP.md](docs/MCP_SETUP.md) for copy-paste config)
+4. Type `{Sync}` in Claude to initialize
+5. Browse the [Visual Guide](docs/visual_guide/VISUAL_GUIDE.md) to see what every panel element does
 
 ## Architecture
 

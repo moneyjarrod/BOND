@@ -15,7 +15,7 @@ If you ran the installer, you should have:
 - **Counter + Bridge** — AutoHotkey script running in your system tray
 - **MCP Servers** — QAIS (memory) and ISS (analysis) ready to configure
 
-If the counter isn't running, launch `Counter/BOND_v8.ahk` manually. **The counter is not optional** — it tracks context freshness and the clipboard bridge connects panel commands to Claude. Without it, panel buttons won't work. [Read why the counter matters →](docs/COUNTER.md)
+> ⚠️ **IMPORTANT: Launch the counter before using the panel.** Run `Counter/BOND_v8.ahk` (requires [AutoHotkey v2](https://www.autohotkey.com/)). The counter does two jobs: it tracks context freshness (the `«tN/L emoji»` tags on your messages) and it acts as the **clipboard bridge** between the panel and Claude. When you click a panel button like Sync or Save, the panel copies a command to your clipboard — the AHK script detects it and types it into Claude's chat window. **Without the counter running, panel buttons will appear to do nothing.** The panel isn't broken — the bridge just isn't connected. [Read why the counter matters →](docs/COUNTER.md)
 
 ## First Session Setup
 
@@ -25,7 +25,7 @@ In Claude, create a new Project. Add `skills/bond/SKILL.md` as Project Knowledge
 
 ### 2. Configure MCP Servers
 
-Add QAIS, ISS, and the filesystem server to your Claude MCP settings. See `.env.example` in the repo for exact paths. You need:
+Add QAIS, ISS, and the filesystem server to your Claude MCP settings. The full config with copy-paste JSON is in **[docs/MCP_SETUP.md](docs/MCP_SETUP.md)**. In short, you need three servers in your `claude_desktop_config.json`:
 - **Filesystem** — gives Claude access to read and write BOND files
 - **QAIS** — resonance-based memory (hyperdimensional vectors)
 - **ISS** — semantic force measurement (text analysis)
@@ -142,6 +142,6 @@ Check `CHANGELOG.md` for what's new.
 
 ## Need Help?
 
-- **Documentation** — `docs/` folder: [Commands](docs/COMMANDS.md), [Entities](docs/ENTITIES.md), [Counter](docs/COUNTER.md)
+- **Documentation** — `docs/` folder: [MCP Setup](docs/MCP_SETUP.md), [Commands](docs/COMMANDS.md), [Entities](docs/ENTITIES.md), [Counter](docs/COUNTER.md)
 - **Examples** — `examples/` folder has sample configurations
 - **Issues** — [github.com/moneyjarrod/BOND/issues](https://github.com/moneyjarrod/BOND/issues)
