@@ -24,23 +24,7 @@ const CLASS_META = {
   library:     { icon: '📚', label: 'LB', badge: 'badge-lb', name: 'Library' },
 };
 
-// Base perspective slots (P01-P10)
-const BASE_PERSPECTIVES = Array.from({ length: 10 }, (_, i) => {
-  const num = String(i + 1).padStart(2, '0');
-  return {
-    name: `P${num}`,
-    type: 'perspective',
-    files: [],
-    tools: { filesystem: true, qais: true, heatmap: true, crystal: true },
-    seed_count: 0,
-    root_count: 0,
-    growth_count: 0,
-    doctrine_count: 0,
-    core: null,
-    isBase: true,
-    label: num === '10' ? 'Wildcard' : null,
-  };
-});
+
 
 export default function EntityCards({
   entities,
@@ -56,24 +40,6 @@ export default function EntityCards({
 }) {
   const linkedNames = new Set((linkedEntities || []).map(e => typeof e === 'string' ? e : e.name));
   const cards = useMemo(() => {
-    if (filter === 'perspective') {
-      const detected = entities.filter(e => e.type === 'perspective');
-      const detectedNames = new Set(detected.map(e => e.name));
-
-      const base = BASE_PERSPECTIVES.map(bp => {
-        const match = detected.find(d => d.name.startsWith(bp.name));
-        if (match) return { ...match, isBase: true, label: bp.label };
-        return bp;
-      });
-
-      const userCreated = detected.filter(d => {
-        const num = parseInt(d.name.match(/^P(\d+)/)?.[1] || '0', 10);
-        return num > 10;
-      }).map(e => ({ ...e, isBase: false, label: null }));
-
-      return [...base, ...userCreated];
-    }
-
     return entities
       .filter(e => e.type === filter)
       .map(e => ({ ...e, isBase: false, label: null }));
@@ -120,7 +86,7 @@ export default function EntityCards({
 }
 
 function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToolToggle, onRename }) {
-  const isEmpty = entity.isBase && entity.seed_count === 0 && entity.files.length === 0;
+  const isEmpty = entity.files.length === 0 && (entity.seed_count || 0) === 0;
   const meta = CLASS_META[entity.type] || CLASS_META.library;
   const tools = entity.tools || {};
   const [editing, setEditing] = useState(false);

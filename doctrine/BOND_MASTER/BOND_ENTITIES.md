@@ -108,7 +108,7 @@ Every entity lives in `doctrine/ENTITY_NAME/` and contains:
 ## Naming
 
 - Doctrine/Project: Descriptive names (BOND_MASTER, CM)
-- Perspectives: P01-P10 (base), P11+ (user-created)
+- Perspectives: User-created via + button (auto-numbered P1, P2, etc.)
 - Library: Descriptive names
 - Files within: `[ENTITY]_[topic].md` pattern
 
