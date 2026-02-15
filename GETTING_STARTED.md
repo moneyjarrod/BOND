@@ -103,6 +103,17 @@ Projects get a `CORE.md` on creation. Claude will guide you through populating i
 
 Full command reference: [docs/COMMANDS.md](docs/COMMANDS.md)
 
+## Crystal: Global vs Local
+
+The `{Crystal}` command saves a session snapshot to QAIS memory. **Where** it saves depends on context:
+
+- **Global crystal** — When no perspective is entered (or a non-perspective entity is active), `{Crystal}` writes to the global QAIS field. This is the shared memory space visible to all entities and sessions.
+- **Local crystal** — When a perspective is entered, `{Crystal}` writes to that perspective's isolated field. This keeps the perspective's memory separate from global context.
+
+The **💎 Crystal** button on the EntityBar (visible when a perspective is entered) fires `{Crystal}` with visual confirmation that it routes locally. The `Q:N` badge next to the button shows how many bindings exist in the perspective's local crystal field.
+
+The command bar `{Crystal}` does the same routing automatically — the EntityBar button just makes the scoping visible.
+
 ## Customizing BOND
 
 ### Hooks

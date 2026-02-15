@@ -1,6 +1,8 @@
 // EntityBar.jsx — Active entity status strip with Exit button
 // S86: Multi-link support — hub-and-spoke from BOND_MASTER
 
+import { useState, useEffect } from 'react';
+
 const CLASS_META = {
   doctrine:    { icon: '📜', label: 'Doctrine',    color: 'var(--accent-amber)' },
   project:     { icon: '⚒️', label: 'Project',     color: 'var(--accent-teal)' },
@@ -8,13 +10,28 @@ const CLASS_META = {
   library:     { icon: '📚', label: 'Library',     color: 'var(--text-secondary)' },
 };
 
-export default function EntityBar({ activeEntity, linkedEntities = [], onExit, onUnlink, onEntityWarmRestore }) {
+export default function EntityBar({ activeEntity, linkedEntities = [], onExit, onUnlink, onEntityWarmRestore, onEntityCrystal }) {
   if (!activeEntity) return null;
 
   const meta = CLASS_META[activeEntity.type] || CLASS_META.doctrine;
   const label = activeEntity.display_name || activeEntity.name;
   const isPerspective = activeEntity.type === 'perspective';
   const canUnlink = true; // Any active entity can manage its own links
+
+  // S116: Local crystal field Q counter for perspectives
+  const [crystalCount, setCrystalCount] = useState(null);
+  useEffect(() => {
+    if (!isPerspective) { setCrystalCount(null); return; }
+    const fetchCount = () => {
+      fetch(`/api/perspective/${activeEntity.name}/crystal-stats`)
+        .then(r => r.json())
+        .then(d => setCrystalCount(d.count ?? 0))
+        .catch(() => setCrystalCount(null));
+    };
+    fetchCount();
+    const id = setInterval(fetchCount, 10000); // refresh every 10s
+    return () => clearInterval(id);
+  }, [isPerspective, activeEntity.name]);
 
   return (
     <div style={{ borderBottom: '1px solid var(--border)' }}>
@@ -47,6 +64,36 @@ export default function EntityBar({ activeEntity, linkedEntities = [], onExit, o
           </span>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
+          {isPerspective && onEntityCrystal && (
+            <button
+              onClick={() => onEntityCrystal(activeEntity.name)}
+              title="Crystal — crystallize into this perspective's local field"
+              style={{
+                padding: '3px 12px',
+                fontSize: '0.75rem',
+                fontFamily: 'var(--font-mono)',
+                background: 'transparent',
+                color: 'var(--accent-amber)',
+                border: '1px solid rgba(209,154,102,0.4)',
+                borderRadius: 'var(--radius-sm)',
+                cursor: 'pointer',
+                transition: 'all 0.15s ease',
+              }}
+              onMouseEnter={e => { e.target.style.background = 'rgba(209,154,102,0.1)'; }}
+              onMouseLeave={e => { e.target.style.background = 'transparent'; }}
+            >
+              💎 Crystal{crystalCount !== null && (
+                <span style={{
+                  marginLeft: 4,
+                  padding: '0 5px',
+                  fontSize: '0.65rem',
+                  background: 'rgba(209,154,102,0.2)',
+                  borderRadius: 8,
+                  color: 'var(--accent-amber)',
+                }}>Q:{crystalCount}</span>
+              )}
+            </button>
+          )}
           {isPerspective && onEntityWarmRestore && (
             <button
               onClick={() => onEntityWarmRestore(activeEntity.name)}

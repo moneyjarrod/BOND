@@ -66,6 +66,19 @@ def limbic_stats():
         "genome": "v2.0 evolved"
     }
 
+def perspective_crystal_stats(perspective_name):
+    """Read crystal count from perspective's local crystal field."""
+    field_path = os.path.join(BOND_ROOT, 'data', 'perspectives', f"{perspective_name}_crystal.npz")
+    try:
+        import numpy as np
+        if not os.path.exists(field_path):
+            return {"status": "empty", "count": 0, "perspective": perspective_name}
+        data = np.load(field_path, allow_pickle=True)
+        count = int(data['count'])
+        return {"status": "active", "count": count, "perspective": perspective_name}
+    except Exception as e:
+        return {"status": "error", "count": 0, "error": str(e)}
+
 def main():
     system = sys.argv[1] if len(sys.argv) > 1 else "all"
     
@@ -76,7 +89,10 @@ def main():
         "limbic": limbic_stats,
     }
     
-    if system == "all":
+    if system == "perspective_crystal":
+        name = sys.argv[2] if len(sys.argv) > 2 else ""
+        print(json.dumps(perspective_crystal_stats(name)))
+    elif system == "all":
         results = {name: fn() for name, fn in handlers.items()}
         print(json.dumps(results))
     elif system in handlers:

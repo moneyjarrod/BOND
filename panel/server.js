@@ -462,6 +462,14 @@ async function getMcpStats(system) {
   } catch (err) { return { status: 'offline', error: err.message }; }
 }
 app.get('/api/mcp/:system/stats', async (req, res) => { const data = await getMcpStats(req.params.system); if (data.status === 'offline' || data.error) { res.status(503).json(data); } else { res.json(data); } });
+
+// Perspective crystal field stats (S116: local Q counter)
+app.get('/api/perspective/:entity/crystal-stats', async (req, res) => {
+  try {
+    const { stdout } = await execFileAsync('python', [MCP_STATS_SCRIPT, 'perspective_crystal', req.params.entity], { timeout: 5000, cwd: process.cwd() });
+    res.json(JSON.parse(stdout));
+  } catch (err) { res.json({ status: 'empty', count: 0, perspective: req.params.entity }); }
+});
 app.get('/api/mcp/:system/status', async (req, res) => { const data = await getMcpStats(req.params.system); if (data.status === 'offline' || data.error) { res.status(503).json(data); } else { res.json(data); } });
 app.get('/api/mcp/all', async (req, res) => { const data = await getMcpStats('all'); res.json(data); });
 

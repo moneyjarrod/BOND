@@ -295,6 +295,13 @@ function AppInner() {
     } catch {}
   }, []);
 
+  // Entity Crystal — perspective-local crystal (S116)
+  const handleEntityCrystal = useCallback(async () => {
+    try {
+      await navigator.clipboard.writeText('BOND:{Crystal}');
+    } catch {}
+  }, []);
+
   // Handoff generator modal
   const [showHandoff, setShowHandoff] = useState(false);
 
@@ -352,7 +359,7 @@ function AppInner() {
         </div>
       )}
 
-      <EntityBar activeEntity={activeEntity} linkedEntities={linkedEntities} onExit={handleExit} onUnlink={handleUnlink} onEntityWarmRestore={handleEntityWarmRestore} />
+      <EntityBar activeEntity={activeEntity} linkedEntities={linkedEntities} onExit={handleExit} onUnlink={handleUnlink} onEntityWarmRestore={handleEntityWarmRestore} onEntityCrystal={handleEntityCrystal} />
 
       <nav className="tab-bar">
         {TABS.map((tab) => (
