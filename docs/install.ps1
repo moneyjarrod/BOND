@@ -92,6 +92,8 @@ Write-Host ""
 
 Push-Location "$BOND_ROOT\panel"
 npm.cmd install 2>&1 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkGray }
+Write-Host "   Building panel..." -ForegroundColor Yellow
+npm.cmd run build 2>&1 | ForEach-Object { Write-Host "   $_" -ForegroundColor DarkGray }
 Pop-Location
 
 # Create data directory
