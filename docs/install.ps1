@@ -31,7 +31,21 @@ catch {
 }
 
 # Check Node
-try { $null = Get-Command node -ErrorAction Stop; Write-Host "   [OK] Node.js" -ForegroundColor Green }
+try {
+    $null = Get-Command node -ErrorAction Stop
+    $nodeVer = (node --version) -replace 'v',''
+    $nodeMajor = [int]($nodeVer.Split('.')[0])
+    if ($nodeMajor -lt 18) {
+        Write-Host "   [OLD] Node.js $nodeVer (need 18+)" -ForegroundColor Red
+        Write-Host ""
+        Write-Host "   BOND requires Node.js 18 or newer. You have $nodeVer." -ForegroundColor Yellow
+        Write-Host "   Download the latest LTS from: https://nodejs.org" -ForegroundColor Cyan
+        Write-Host ""
+        Write-Host "   After updating Node.js, close this window and run the install command again." -ForegroundColor Yellow
+        Write-Host ""; Read-Host "Press Enter to exit"; return
+    }
+    Write-Host "   [OK] Node.js $nodeVer" -ForegroundColor Green
+}
 catch {
     Write-Host "   [MISSING] Node.js" -ForegroundColor Red
     Write-Host ""
@@ -132,6 +146,24 @@ if (Test-Path "$BOND_ROOT\panel\dist\index.html") {
     Start-Process "http://localhost:5173"
 }
 
+# Launch Counter + Clipboard Bridge (if AHK installed)
+$ahkScript = "$BOND_ROOT\Counter\BOND_v8.ahk"
+$ahkLaunched = $false
+if (Test-Path $ahkScript) {
+    $ahkExe = Get-Command autohotkey -ErrorAction SilentlyContinue
+    if ($ahkExe) {
+        Start-Process $ahkScript
+        $ahkLaunched = $true
+        Write-Host "   [OK] Counter + clipboard bridge launched" -ForegroundColor Green
+    } else {
+        Write-Host "   [WARN] AutoHotkey not found — counter won't auto-start" -ForegroundColor Yellow
+        Write-Host "          Install from https://www.autohotkey.com" -ForegroundColor Yellow
+        Write-Host "          Then run Counter\BOND_v8.ahk manually" -ForegroundColor Yellow
+    }
+} else {
+    Write-Host "   [WARN] Counter script not found" -ForegroundColor Yellow
+}
+
 Write-Host ""
 Write-Host "  ====================================" -ForegroundColor DarkGray
 Write-Host "  BOND is running!" -ForegroundColor Green
@@ -139,13 +171,23 @@ Write-Host "  ====================================" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "  Panel:   http://localhost:$BOND_PORT" -ForegroundColor Cyan
 Write-Host "  Stop:    $BOND_ROOT\stop_bond.bat" -ForegroundColor DarkGray
-Write-Host "  Counter: $BOND_ROOT\Counter\BOND_v8.ahk" -ForegroundColor DarkGray
+if (-not $ahkLaunched) {
+    Write-Host "  Counter: $BOND_ROOT\Counter\BOND_v8.ahk (launch manually)" -ForegroundColor Yellow
+} else {
+    Write-Host "  Counter: Running" -ForegroundColor Green
+}
 Write-Host ""
 Write-Host "  Next steps:" -ForegroundColor Yellow
-Write-Host "  1. Launch Counter\BOND_v8.ahk (required for panel buttons)" -ForegroundColor Yellow
-Write-Host "  2. Add skills\bond\SKILL.md to a Claude Project" -ForegroundColor Yellow
-Write-Host "  3. Configure MCP servers (see docs\MCP_SETUP.md)" -ForegroundColor Yellow
-Write-Host "  4. Type {Sync} in Claude" -ForegroundColor Yellow
+if (-not $ahkLaunched) {
+    Write-Host "  1. Install AutoHotkey v2 and launch Counter\BOND_v8.ahk" -ForegroundColor Yellow
+    Write-Host "  2. Add skills\bond\SKILL.md to a Claude Project" -ForegroundColor Yellow
+    Write-Host "  3. Configure MCP servers (see docs\MCP_SETUP.md)" -ForegroundColor Yellow
+    Write-Host "  4. Type {Sync} in Claude" -ForegroundColor Yellow
+} else {
+    Write-Host "  1. Add skills\bond\SKILL.md to a Claude Project" -ForegroundColor Yellow
+    Write-Host "  2. Configure MCP servers (see docs\MCP_SETUP.md)" -ForegroundColor Yellow
+    Write-Host "  3. Type {Sync} in Claude" -ForegroundColor Yellow
+}
 Write-Host ""
 
 } catch {

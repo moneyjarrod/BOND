@@ -27,6 +27,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Crystal section bug** — Fixed missing function reference, wrong file path, and wrong data access pattern in crystal section code.
 - **Path traversal guards** — All four new project endpoints sanitize `../` and absolute paths. Security standard for all new endpoints going forward.
 - **EntityBar cross-repo match** — EntityBar.jsx exact-matched between public and private repos.
+- **Stale template code in private server.js** — Removed 1,135 bytes of dead `templates/doctrine/` bootstrap code that had been cleaned from public but lingered in private. Repos now match.
+- **Installer: Node version check** — `install.ps1` now validates Node.js 18+ instead of just checking existence. Users with Node 16 get a clear error and download link instead of cryptic npm failures.
+- **Installer: Counter auto-launch** — `install.ps1` now attempts to start `BOND_v8.ahk` automatically on install (matching `start_bond.bat` behavior). Adapts output: if AHK present, counter launches and "Next steps" skips manual launch; if AHK missing, yellow warning with install link.
 
 ## [1.4.0] - 2026-02-12
 
