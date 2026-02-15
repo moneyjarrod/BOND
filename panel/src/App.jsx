@@ -479,6 +479,7 @@ function AppInner() {
             onRename={handleRename}
             onExit={handleExit}
             onCreate={() => setShowCreate(currentTab.filter)}
+            onLink={handleLink}
           />
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
             <button

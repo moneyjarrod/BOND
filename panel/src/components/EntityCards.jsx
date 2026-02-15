@@ -4,7 +4,7 @@
 // Perspective: Unbounded growth, Files + QAIS + Heatmap + Crystal
 // Library: Reference shelf, Files only
 
-import { useState, useMemo, useCallback, useContext, useEffect } from 'react';
+import { useState, useMemo, useCallback, useContext, useEffect, useRef } from 'react';
 import { WebSocketContext } from '../context/WebSocketContext';
 
 // Tool definitions with class availability
@@ -37,6 +37,7 @@ export default function EntityCards({
   onRename,
   onExit,
   onCreate,
+  onLink,
 }) {
   const linkedNames = new Set((linkedEntities || []).map(e => typeof e === 'string' ? e : e.name));
   const cards = useMemo(() => {
@@ -79,13 +80,14 @@ export default function EntityCards({
           onToolToggle={onToolToggle}
           onRename={onRename}
           onExit={onExit}
+          onLink={onLink}
         />
       ))}
     </div>
   );
 }
 
-function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToolToggle, onRename }) {
+function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToolToggle, onRename, onLink }) {
   const isEmpty = entity.files.length === 0 && (entity.seed_count || 0) === 0;
   const meta = CLASS_META[entity.type] || CLASS_META.library;
   const tools = entity.tools || {};
@@ -94,7 +96,35 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
   const [saved, setSaved] = useState(false);
   const [seeding, setSeeding] = useState(entity.seeding || false);
   const [seedingLoading, setSeedingLoading] = useState(false);
+  const [showLinkPicker, setShowLinkPicker] = useState(false);
+  const [linkable, setLinkable] = useState([]);
+  const pickerRef = useRef(null);
   const { lastEvent } = useContext(WebSocketContext);
+
+  // Fetch linkable entities when active and picker opens
+  useEffect(() => {
+    if (!isActive || !showLinkPicker) return;
+    fetch('/api/state/linkable').then(r => r.json()).then(data => {
+      setLinkable((data.linkable || []).map(l => ({ name: l.entity, type: l.class, display_name: l.display_name })));
+    }).catch(() => setLinkable([]));
+  }, [isActive, showLinkPicker]);
+
+  // Close picker on outside click
+  useEffect(() => {
+    if (!showLinkPicker) return;
+    const handler = (e) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target)) {
+        setShowLinkPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showLinkPicker]);
+
+  const handleLinkSelect = useCallback((ent) => {
+    setShowLinkPicker(false);
+    if (onLink) onLink(ent);
+  }, [onLink]);
 
   // Sync seeding state from WebSocket events
   useEffect(() => {
@@ -293,12 +323,83 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
       </div>
 
       {/* Action buttons */}
-      <div style={{ display: 'flex', gap: 8 }}>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', position: 'relative' }}>
         <ActionBtn label="View" disabled={isEmpty} onClick={() => onView(entity)} />
         {isActive ? (
           <ActionBtn label="Exit" disabled={false} primary={true} onClick={() => onExit && onExit()} />
         ) : (
           <ActionBtn label="Enter" disabled={false} primary={true} onClick={() => onEnter(entity)} />
+        )}
+        {isActive && onLink && (
+          <div ref={pickerRef} style={{ position: 'relative' }}>
+            <ActionBtn label="🔗 Link" disabled={false} onClick={() => setShowLinkPicker(!showLinkPicker)} />
+            {showLinkPicker && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                marginBottom: 6,
+                background: '#1e2030',
+                border: '1px solid rgba(96,165,250,0.4)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: '0 -8px 32px rgba(0,0,0,0.6)',
+                minWidth: 220,
+                maxHeight: 260,
+                overflowY: 'auto',
+                zIndex: 1000,
+                padding: '6px 0',
+              }}>
+                {linkable.length === 0 ? (
+                  <div style={{
+                    padding: '12px 16px',
+                    fontSize: '0.75rem',
+                    color: 'var(--text-muted)',
+                    fontFamily: 'var(--font-mono)',
+                  }}>
+                    No compatible entities to link
+                  </div>
+                ) : (
+                  linkable.map(ent => {
+                    const cm = CLASS_META[ent.type] || CLASS_META.library;
+                    return (
+                      <button
+                        key={ent.name}
+                        onClick={() => handleLinkSelect(ent)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          width: '100%',
+                          padding: '8px 14px',
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text-primary)',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'background 0.1s ease',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(96,165,250,0.12)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <span style={{ flexShrink: 0 }}>{cm.icon}</span>
+                        <span style={{ flex: 1 }}>{ent.display_name || ent.name}</span>
+                        <span style={{
+                          fontSize: '0.6rem',
+                          color: 'var(--text-muted)',
+                          textTransform: 'uppercase',
+                          flexShrink: 0,
+                        }}>
+                          {ent.type?.slice(0, 3)}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
