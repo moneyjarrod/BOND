@@ -16,12 +16,14 @@ export default function EntityBar({ activeEntity, linkedEntities = [], onExit, o
   const meta = CLASS_META[activeEntity.type] || CLASS_META.doctrine;
   const label = activeEntity.display_name || activeEntity.name;
   const isPerspective = activeEntity.type === 'perspective';
+  const isProject = activeEntity.type === 'project';
+  const hasLocalCrystal = isPerspective || isProject;
   const canUnlink = true; // Any active entity can manage its own links
 
-  // S116: Local crystal field Q counter for perspectives
+  // S116: Local crystal field Q counter for perspectives and projects
   const [crystalCount, setCrystalCount] = useState(null);
   useEffect(() => {
-    if (!isPerspective) { setCrystalCount(null); return; }
+    if (!hasLocalCrystal) { setCrystalCount(null); return; }
     const fetchCount = () => {
       fetch(`/api/perspective/${activeEntity.name}/crystal-stats`)
         .then(r => r.json())
@@ -31,7 +33,7 @@ export default function EntityBar({ activeEntity, linkedEntities = [], onExit, o
     fetchCount();
     const id = setInterval(fetchCount, 10000); // refresh every 10s
     return () => clearInterval(id);
-  }, [isPerspective, activeEntity.name]);
+  }, [hasLocalCrystal, activeEntity.name]);
 
   return (
     <div style={{ borderBottom: '1px solid var(--border)' }}>
@@ -64,10 +66,10 @@ export default function EntityBar({ activeEntity, linkedEntities = [], onExit, o
           </span>
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          {isPerspective && onEntityCrystal && (
+          {hasLocalCrystal && onEntityCrystal && (
             <button
               onClick={() => onEntityCrystal(activeEntity.name)}
-              title="Crystal — crystallize into this perspective's local field"
+              title="Crystal — crystallize into this entity's local field"
               style={{
                 padding: '3px 12px',
                 fontSize: '0.75rem',
@@ -94,7 +96,7 @@ export default function EntityBar({ activeEntity, linkedEntities = [], onExit, o
               )}
             </button>
           )}
-          {isPerspective && onEntityWarmRestore && (
+          {hasLocalCrystal && onEntityWarmRestore && (
             <button
               onClick={() => onEntityWarmRestore(activeEntity.name)}
               title="Entity Warm Restore — local crystal field"

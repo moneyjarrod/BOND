@@ -639,10 +639,10 @@ def handle_request(request):
             elif tool_name == "bond_gate":
                 result = get_gate().evaluate(args["trigger"], args.get("context", ""), args.get("message", ""))
             elif tool_name == "crystal":
-                # Two-field architecture (S116): perspective active → local crystal field
+                # Two-field architecture (S116): perspective/project active → local crystal field
                 # Seeds in {entity}.npz, crystal momentum in {entity}_crystal.npz
                 entity, entity_class = get_active_entity()
-                if entity and entity_class == 'perspective':
+                if entity and entity_class in ('perspective', 'project'):
                     pcf = get_perspective_crystal_field(entity)
                     local_crystal = Crystal(pcf, HEATMAP)
                     result = local_crystal.crystallize(args["chunk_text"], args["session_num"],
