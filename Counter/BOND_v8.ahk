@@ -177,9 +177,11 @@ WriteStatus() {
     json .= '"commands_typed":' . commandsTyped
     json .= '}'
     try {
-        if FileExist(StatusFile)
-            FileDelete(StatusFile)
-        FileAppend(json, StatusFile)
+        tmpFile := StatusFile . ".tmp"
+        if FileExist(tmpFile)
+            FileDelete(tmpFile)
+        FileAppend(json, tmpFile)
+        FileMove(tmpFile, StatusFile, true)
     }
 }
 
