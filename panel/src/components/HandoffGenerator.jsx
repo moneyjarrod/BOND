@@ -24,7 +24,8 @@ const SECTION_SOURCES = {
   files: 'Claude-drafted',
 };
 
-export default function HandoffGenerator({ onClose }) {
+export default function HandoffGenerator({ onClose, projectEntity = null }) {
+  const isProjectMode = !!projectEntity;
   const [sessionNum, setSessionNum] = useState(null);
   const [entityName, setEntityName] = useState(null);
   const [sections, setSections] = useState({
@@ -44,7 +45,10 @@ export default function HandoffGenerator({ onClose }) {
   // Fetch next session number + pre-fill on mount
   useEffect(() => {
     let cancelled = false;
-    fetch('/api/handoff/next')
+    const url = isProjectMode
+      ? `/api/project-handoff/next/${projectEntity}`
+      : '/api/handoff/next';
+    fetch(url)
       .then(r => r.json())
       .then(data => {
         if (cancelled) return;
@@ -72,14 +76,17 @@ export default function HandoffGenerator({ onClose }) {
 
   // Send {Handoff} through clipboard bridge to Claude
   const handleBridgeSend = useCallback(async () => {
+    const cmd = isProjectMode
+      ? `{Project Handoff} ${projectEntity}`
+      : '{Handoff}';
     try {
-      await navigator.clipboard.writeText(BRIDGE_PREFIX + '{Handoff}');
+      await navigator.clipboard.writeText(BRIDGE_PREFIX + cmd);
       setBridgeSent(true);
       setTimeout(() => setBridgeSent(false), 2000);
     } catch (err) {
       // Fallback: textarea copy
       const ta = document.createElement('textarea');
-      ta.value = BRIDGE_PREFIX + '{Handoff}';
+      ta.value = BRIDGE_PREFIX + cmd;
       ta.style.position = 'fixed';
       ta.style.opacity = '0';
       document.body.appendChild(ta);
@@ -132,7 +139,10 @@ export default function HandoffGenerator({ onClose }) {
     setWriting(true);
     setError(null);
     try {
-      const res = await fetch('/api/handoff/write', {
+      const url = isProjectMode
+        ? `/api/project-handoff/write/${projectEntity}`
+        : '/api/handoff/write';
+      const res = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -169,7 +179,7 @@ export default function HandoffGenerator({ onClose }) {
       <div className="handoff-modal" onClick={e => e.stopPropagation()}>
         <div className="handoff-header">
           <span className="handoff-title">
-            GENERATE HANDOFF — S{sessionNum}
+            {isProjectMode ? `${projectEntity} HANDOFF` : 'GENERATE HANDOFF'} — S{sessionNum}
           </span>
           <button className="modal-close" onClick={onClose}>✕</button>
         </div>

@@ -338,6 +338,37 @@ function AppInner() {
   // Handoff generator modal
   const [showHandoff, setShowHandoff] = useState(false);
 
+  // Project Handoff modal (S117)
+  const [showProjectHandoff, setShowProjectHandoff] = useState(null); // null or entity name
+  const handleProjectHandoff = useCallback((entityName) => {
+    setShowProjectHandoff(entityName);
+  }, []);
+
+  // Project Tick (S117) — server-side health pulse (writes state/project_tick_output.md)
+  const [projectTickStatus, setProjectTickStatus] = useState(null);
+  const handleProjectTick = useCallback(async (entityName) => {
+    setProjectTickStatus('running');
+    try {
+      const res = await fetch(`/api/project-tick/${entityName}`);
+      if (!res.ok) {
+        setProjectTickStatus('error');
+        setTimeout(() => setProjectTickStatus(null), 3000);
+        return;
+      }
+      try { await navigator.clipboard.writeText(`BOND:{Project Tick} ${entityName}`); } catch {}
+      setProjectTickStatus('done');
+      setTimeout(() => setProjectTickStatus(null), 2000);
+    } catch {
+      setProjectTickStatus('error');
+      setTimeout(() => setProjectTickStatus(null), 3000);
+    }
+  }, []);
+
+  // Project Chunk (S117) — clipboard bridge to local crystal
+  const handleProjectChunk = useCallback(async (entityName) => {
+    try { await navigator.clipboard.writeText(`BOND:{Project Chunk} ${entityName}`); } catch {}
+  }, []);
+
   // Create entity modal
   const [showCreate, setShowCreate] = useState(null); // null or class string
 
@@ -392,7 +423,7 @@ function AppInner() {
         </div>
       )}
 
-      <EntityBar activeEntity={activeEntity} linkedEntities={linkedEntities} onExit={handleExit} onUnlink={handleUnlink} onEntityWarmRestore={handleEntityWarmRestore} onEntityCrystal={handleEntityCrystal} onProjectFullRestore={handleProjectFullRestore} />
+      <EntityBar activeEntity={activeEntity} linkedEntities={linkedEntities} onExit={handleExit} onUnlink={handleUnlink} onEntityWarmRestore={handleEntityWarmRestore} onEntityCrystal={handleEntityCrystal} onProjectFullRestore={handleProjectFullRestore} onProjectHandoff={handleProjectHandoff} onProjectTick={handleProjectTick} onProjectChunk={handleProjectChunk} />
 
       <nav className="tab-bar">
         {TABS.map((tab) => (
@@ -489,6 +520,13 @@ function AppInner() {
 
       {showHandoff && (
         <HandoffGenerator onClose={() => setShowHandoff(false)} />
+      )}
+
+      {showProjectHandoff && (
+        <HandoffGenerator
+          projectEntity={showProjectHandoff}
+          onClose={() => setShowProjectHandoff(null)}
+        />
       )}
     </div>
   );

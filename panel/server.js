@@ -813,6 +813,7 @@ app.post('/api/project-restore/:entity', async (req, res) => {
   const { entity } = req.params;
   try {
     const entityPath = join(DOCTRINE_PATH, entity);
+    if (!resolve(entityPath).startsWith(resolve(DOCTRINE_PATH))) return res.status(403).json({ error: 'Access denied' });
     const configPath = join(entityPath, 'entity.json');
     let config = {};
     try { config = JSON.parse(await readFile(configPath, 'utf-8')); } catch {
@@ -870,17 +871,37 @@ app.post('/api/project-restore/:entity', async (req, res) => {
     } catch (err) { console.warn(`Crystal restore warning for ${entity}:`, err.message); }
     sections.push(`## Crystal Momentum\n\n${crystalSection}`);
 
-    // Section 4: SLA warm restore scoped to project
-    let slaSection = '(No archived handoff data)';
+    // Section 4: Local project handoffs (direct read) + SLA fallback
+    let handoffSection = '';
+    // 4a: Local handoffs (highest fidelity — pre-scoped at write time)
+    try {
+      const handoffsDir = join(entityPath, 'handoffs');
+      const hFiles = await readdir(handoffsDir);
+      const handoffFiles = hFiles.filter(f => /^HANDOFF_S\d+\.md$/.test(f)).sort().reverse().slice(0, 5);
+      if (handoffFiles.length > 0) {
+        const hParts = [];
+        for (const hf of handoffFiles) {
+          try {
+            const hContent = await readFile(join(handoffsDir, hf), 'utf-8');
+            hParts.push(hContent);
+          } catch {}
+        }
+        if (hParts.length > 0) handoffSection += `### Local Handoffs (${hParts.length} most recent)\n\n${hParts.join('\n\n---\n\n')}`;
+      }
+    } catch {}
+    // 4b: SLA archive query (broader, keyword-filtered)
     try {
       const args = [WARM_RESTORE_SCRIPT, 'query', entity, '--top', '5'];
       const { stdout } = await execFileAsync('python', args, {
         timeout: 15000, cwd: BOND_ROOT,
         env: { ...process.env, BOND_ROOT, PYTHONIOENCODING: 'utf-8' }
       });
-      if (stdout.trim()) slaSection = stdout.trim();
+      if (stdout.trim()) {
+        handoffSection += handoffSection ? '\n\n---\n\n### SLA Archive\n\n' + stdout.trim() : stdout.trim();
+      }
     } catch (err) { console.warn(`SLA query warning for ${entity}:`, err.message); }
-    sections.push(`## Archived Context (SLA)\n\n${slaSection}`);
+    sections.push(`## Archived Context\n\n${handoffSection || '(No archived handoff data)'}`);
+
 
     // Section 5: Project directory scan (if project_path set)
     if (config.project_path) {
@@ -931,6 +952,181 @@ app.post('/api/project-restore/:entity', async (req, res) => {
     console.error(`Project Restore error for ${entity}:`, err.message);
     res.status(500).json({ success: false, error: err.message });
   }
+});
+
+// ─── Project Tick (S117) ───────────────────────────────
+// Quick project health pulse: crystal, handoffs, git, obligations
+
+app.get('/api/project-tick/:entity', async (req, res) => {
+  const { entity } = req.params;
+  try {
+    const entityPath = join(DOCTRINE_PATH, entity);
+    if (!resolve(entityPath).startsWith(resolve(DOCTRINE_PATH))) return res.status(403).json({ error: 'Access denied' });
+    const configPath = join(entityPath, 'entity.json');
+    let config = {};
+    try { config = JSON.parse(await readFile(configPath, 'utf-8')); } catch {
+      return res.status(404).json({ error: `Entity '${entity}' not found` });
+    }
+    if (config.class !== 'project') {
+      return res.status(400).json({ error: `${entity} is ${config.class}-class, not project` });
+    }
+
+    const tick = { entity, timestamp: new Date().toISOString() };
+
+    // Crystal count
+    try {
+      const { stdout } = await execFileAsync('python', [MCP_STATS_SCRIPT, 'perspective_crystal', entity], { timeout: 5000, cwd: process.cwd() });
+      const stats = JSON.parse(stdout);
+      tick.crystal = { count: stats.count || 0, status: stats.status || 'empty' };
+    } catch { tick.crystal = { count: 0, status: 'empty' }; }
+
+    // Local handoff count + most recent
+    try {
+      const handoffsDir = join(entityPath, 'handoffs');
+      const hFiles = await readdir(handoffsDir);
+      const handoffFiles = hFiles.filter(f => /^HANDOFF_S\d+\.md$/.test(f)).sort();
+      tick.handoffs = { count: handoffFiles.length, latest: handoffFiles.length > 0 ? handoffFiles[handoffFiles.length - 1] : null };
+    } catch { tick.handoffs = { count: 0, latest: null }; }
+
+    // Doctrine file count
+    try {
+      const files = await readdir(entityPath);
+      const mdFiles = files.filter(f => f.endsWith('.md'));
+      tick.doctrine = { file_count: mdFiles.length, files: mdFiles };
+    } catch { tick.doctrine = { file_count: 0, files: [] }; }
+
+    // Git status (if project_path set)
+    if (config.project_path) {
+      const projPath = resolve(config.project_path);
+      tick.git = {};
+      try {
+        const { stdout: status } = await execFileAsync('git', ['status', '--short'], { timeout: 5000, cwd: projPath });
+        const changed = status.trim().split('\n').filter(l => l.trim());
+        tick.git.working_tree = changed.length > 0 ? `${changed.length} changed` : 'clean';
+        tick.git.changes = changed.slice(0, 10);
+      } catch { tick.git.working_tree = 'unavailable'; }
+      try {
+        const { stdout: log } = await execFileAsync('git', ['log', '--oneline', '-1', '--no-decorate'], { timeout: 5000, cwd: projPath });
+        tick.git.last_commit = log.trim();
+      } catch { tick.git.last_commit = 'unavailable'; }
+      try {
+        const { stdout: branch } = await execFileAsync('git', ['branch', '--show-current'], { timeout: 5000, cwd: projPath });
+        tick.git.branch = branch.trim();
+      } catch {}
+    }
+
+    // CORE status
+    const coreFile = config.core || 'CORE.md';
+    try {
+      const coreContent = await readFile(join(entityPath, coreFile), 'utf-8');
+      const isStarter = coreContent.includes('Replace these prompts with your CORE') || coreContent.trim().split('\n').filter(l => l.trim() && !l.startsWith('#') && !l.startsWith('>') && !l.startsWith('*')).length === 0;
+      tick.core = { initialized: !isStarter, file: coreFile };
+    } catch { tick.core = { initialized: false, file: coreFile }; }
+
+    // Links
+    tick.links = config.links || [];
+
+    // Write tick output for Claude to read
+    const lines = [`# Project Tick \u2014 ${entity}`, `_${tick.timestamp}_`, '',
+      `**CORE:** ${tick.core?.initialized ? '\u2705 initialized' : '\u26a0\ufe0f not initialized'} (${tick.core?.file})`,
+      `**Crystal:** ${tick.crystal?.count || 0} sessions`,
+      `**Handoffs:** ${tick.handoffs?.count || 0} local${tick.handoffs?.latest ? ` (latest: ${tick.handoffs.latest})` : ''}`,
+      `**Doctrine:** ${tick.doctrine?.file_count || 0} files`,
+      `**Links:** ${tick.links?.length ? tick.links.join(', ') : 'none'}`,
+    ];
+    if (tick.git) {
+      lines.push('', '**Git:**',
+        `- Branch: ${tick.git.branch || 'unknown'}`,
+        `- Tree: ${tick.git.working_tree}`,
+        `- Last commit: ${tick.git.last_commit || 'none'}`);
+      if (tick.git.changes?.length) tick.git.changes.forEach(c => lines.push(`  ${c}`));
+    }
+    lines.push('');
+    const tickPath = join(STATE_PATH, 'project_tick_output.md');
+    await verifiedWrite(tickPath, lines.join('\n'), `project-tick:${entity}`);
+
+    console.log(`\u26a1 Project Tick: ${entity}`);
+    res.json(tick);
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+// ─── Project Handoff (S117) ─────────────────────────────
+// Scoped handoffs stored inside doctrine/{PROJECT}/handoffs/
+
+app.get('/api/project-handoff/next/:entity', async (req, res) => {
+  const { entity } = req.params;
+  try {
+    const entityPath = join(DOCTRINE_PATH, entity);
+    if (!resolve(entityPath).startsWith(resolve(DOCTRINE_PATH))) return res.status(403).json({ error: 'Access denied' });
+    const configPath = join(entityPath, 'entity.json');
+    let config = {};
+    try { config = JSON.parse(await readFile(configPath, 'utf-8')); } catch {
+      return res.status(404).json({ error: `Entity '${entity}' not found` });
+    }
+    if (config.class !== 'project') {
+      return res.status(400).json({ error: `${entity} is ${config.class}-class, not project` });
+    }
+
+    const handoffsDir = join(entityPath, 'handoffs');
+    await mkdir(handoffsDir, { recursive: true });
+    const files = await readdir(handoffsDir);
+    const handoffFiles = files.filter(f => /^HANDOFF_S\d+\.md$/.test(f));
+    const nums = handoffFiles.map(f => parseInt(f.match(/S(\d+)/)[1]));
+    const nextSession = nums.length > 0 ? Math.max(...nums) + 1 : 1;
+
+    // Pre-fill CONTEXT from CORE.md
+    const coreFile = config.core || 'CORE.md';
+    let coreContent = '';
+    try { coreContent = await readFile(join(entityPath, coreFile), 'utf-8'); } catch {}
+    const coreFirstLine = coreContent.split('\n').find(l => l.trim() && !l.startsWith('#')) || '';
+    const context = `Project ${entity} — Session ${nextSession}. ${coreFirstLine.trim()}`;
+
+    // Pre-fill STATE with git info if project_path set
+    let state = `Entity: ${entity} (${config.class})`;
+    if (config.project_path) {
+      state += `\nProject path: ${config.project_path}`;
+      try {
+        const { stdout: gitStatus } = await execFileAsync('git', ['status', '--short'], { timeout: 5000, cwd: resolve(config.project_path) });
+        state += gitStatus.trim() ? `\nGit: ${gitStatus.trim().split('\n').length} changed files` : '\nGit: clean working tree';
+      } catch {}
+    }
+
+    res.json({ nextSession, entityName: entity, context, state, existingFile: handoffFiles.includes(`HANDOFF_S${nextSession}.md`), handoffCount: handoffFiles.length });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/project-handoff/write/:entity', async (req, res) => {
+  const { entity } = req.params;
+  try {
+    const entityPath = join(DOCTRINE_PATH, entity);
+    if (!resolve(entityPath).startsWith(resolve(DOCTRINE_PATH))) return res.status(403).json({ error: 'Access denied' });
+    const configPath = join(entityPath, 'entity.json');
+    let config = {};
+    try { config = JSON.parse(await readFile(configPath, 'utf-8')); } catch {
+      return res.status(404).json({ error: `Entity '${entity}' not found` });
+    }
+    if (config.class !== 'project') {
+      return res.status(400).json({ error: `${entity} is ${config.class}-class, not project` });
+    }
+
+    const { session, context, work, decisions, state, threads, files } = req.body;
+    if (!session) return res.status(400).json({ error: 'session number required' });
+
+    const handoffsDir = join(entityPath, 'handoffs');
+    await mkdir(handoffsDir, { recursive: true });
+
+    const date = new Date().toISOString().split('T')[0];
+    const content = `# ${entity} — HANDOFF S${session}\n## Written: ${date}\n## Session: ${session}\n\n---\n\n## CONTEXT\n${context || 'No context provided.'}\n\n## WORK\n${work || 'No work recorded.'}\n\n## DECISIONS\n${decisions || 'No decisions recorded.'}\n\n## STATE\n${state || 'No state recorded.'}\n\n## THREADS\n${threads || 'No threads recorded.'}\n\n## FILES\n${files || 'No files recorded.'}\n`;
+
+    const filename = `HANDOFF_S${session}.md`;
+    const filePath = join(handoffsDir, filename);
+    const resolved = resolve(filePath);
+    if (!resolved.startsWith(resolve(entityPath))) return res.status(403).json({ error: 'Access denied' });
+
+    await verifiedWrite(filePath, content, `project-handoff:${entity}/${filename}`);
+    console.log(`📋 Project Handoff: ${entity}/handoffs/${filename} (${content.length} bytes)`);
+    res.json({ written: true, filename, path: resolved, verified: true, entity });
+  } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 // ─── Bridge ───────────────────────────────────────────────

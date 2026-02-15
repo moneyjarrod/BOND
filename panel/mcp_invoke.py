@@ -227,6 +227,38 @@ def perspective_store(input_str):
     except Exception as e:
         return {"error": str(e)}
 
+def perspective_crystal_restore(input_str):
+    """Restore all crystal momentum from perspective's local crystal field. Input: perspective name"""
+    try:
+        perspective = input_str.strip()
+        crystal_dir = os.path.join(BOND_ROOT, 'data', 'perspectives')
+        field_path = os.path.join(crystal_dir, f"{perspective}_crystal.npz")
+        if not os.path.exists(field_path):
+            return {"perspective": perspective, "sessions": [], "field_count": 0}
+        sys.path.insert(0, QAIS_PATH)
+        from qais_core import QAISField
+        q = QAISField(field_path=field_path)
+        sessions = []
+        # Crystal stores as Session{N}|momentum|<text>, Session{N}|context|<text>, etc.
+        seen = set()
+        for key in sorted(q.stored):
+            parts = key.split('|', 2)
+            if len(parts) < 2:
+                continue
+            session_id = parts[0]
+            if session_id in seen:
+                continue
+            seen.add(session_id)
+            entry = {"session": session_id}
+            for role in ['momentum', 'context', 'tags', 'insight']:
+                result = q.get(session_id, role)
+                if result.get('facts'):
+                    entry[role] = result['facts'][0]
+            sessions.append(entry)
+        return {"perspective": perspective, "sessions": sessions, "field_count": q.count}
+    except Exception as e:
+        return {"error": str(e)}
+
 def perspective_remove(input_str):
     """Remove seed from perspective's isolated field. Input: perspective|seed_title|seed_content"""
     try:
@@ -249,6 +281,7 @@ TOOLS = {
         "get": qais_get,
         "perspective_store": perspective_store,
         "perspective_remove": perspective_remove,
+        "perspective_crystal_restore": perspective_crystal_restore,
     },
     "iss": {
         "analyze": iss_analyze,
