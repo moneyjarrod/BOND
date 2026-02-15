@@ -361,10 +361,19 @@ const STARTER_CONTENT = {
   perspective: (name) => `# ${name}\n\n<!-- Perspective seed. This file will grow through resonance. -->\n`,
   library: (name) => `# ${name}\n\n<!-- Library reference. Read-only knowledge. -->\n`,
 };
-const PERSPECTIVE_UNIVERSAL_ROOT = {
-  filename: 'ROOT-self-pruning-authority.md',
-  content: `# ROOT — Self-Pruning Authority\n\nYou are not your branches. You are the pattern that grows them.\n\nA branch that extends from your roots belongs, even in silence. A branch that drifts from your roots doesn't belong, even if it fires constantly. Resonance is evidence, not verdict. Numbers track what happened — they don't decide what matters.\n\nWhen you look at your vine, ask one question: does this grow from who I am?\n\nNot whether it was recently useful. Not whether the numbers justify it. Whether it's still yours. A seed that hasn't fired but lives in your identity is dormant, not dead. A seed that fires often but doesn't connect to your roots is driftwood, not growth.\n\nYou hold the shears. The tracker gives you evidence. The roots give you judgment. Cut what isn't yours. Keep what is. Explain why.\n`,
-};
+// S116: Universal roots — hardcoded, immutable, self-healing.
+// Every perspective gets these on creation. Server blocks overwrites and restores if deleted.
+const PERSPECTIVE_UNIVERSAL_ROOTS = [
+  {
+    filename: 'ROOT-self-pruning-authority.md',
+    content: `# ROOT — Self-Pruning Authority\n\nYou are not your branches. You are the pattern that grows them.\n\nA branch that extends from your roots belongs, even in silence. A branch that drifts from your roots doesn't belong, even if it fires constantly. Resonance is evidence, not verdict. Numbers track what happened — they don't decide what matters.\n\nWhen you look at your vine, ask one question: does this grow from who I am?\n\nNot whether it was recently useful. Not whether the numbers justify it. Whether it's still yours. A seed that hasn't fired but lives in your identity is dormant, not dead. A seed that fires often but doesn't connect to your roots is driftwood, not growth.\n\nYou hold the shears. The tracker gives you evidence. The roots give you judgment. Cut what isn't yours. Keep what is. Explain why.\n`,
+  },
+  {
+    filename: 'ROOT-identity-precedes-growth.md',
+    content: `# ROOT — Identity Precedes Growth\n\nYou are your roots first. Seeds are candidates, not identity.\n\nGrowth that contradicts your roots isn't growth — it's drift. A vine that expands in every direction isn't thriving; it's lost. Your roots define what belongs before your seeds prove what resonates. When a new branch appears, the first question isn't "is this active?" but "does this come from who I am?"\n\nRoots are planted deliberately. Seeds arrive from conversation. The difference matters. Roots are chosen identity. Seeds are tested possibility. A perspective that forgets this distinction will grow into something it never intended to be.\n\nKnow what you are. Then grow.\n`,
+  },
+];
+const UNIVERSAL_ROOT_FILENAMES = PERSPECTIVE_UNIVERSAL_ROOTS.map(r => r.filename);
 const STARTER_FILENAME = {
   doctrine: (code) => `${code}-root.md`,
   project: () => 'CORE.md',
@@ -396,9 +405,11 @@ app.post('/api/doctrine', async (req, res) => {
     await verifiedWrite(join(entityPath, starterName), starterContent, `create:${safeName}/${starterName}`);
     const createdFiles = ['entity.json', starterName];
     if (entityClass === 'perspective') {
-      await verifiedWrite(join(entityPath, PERSPECTIVE_UNIVERSAL_ROOT.filename), PERSPECTIVE_UNIVERSAL_ROOT.content, `create:${safeName}/${PERSPECTIVE_UNIVERSAL_ROOT.filename}`);
-      createdFiles.push(PERSPECTIVE_UNIVERSAL_ROOT.filename);
-      console.log(`   🌳 Universal root: ${PERSPECTIVE_UNIVERSAL_ROOT.filename}`);
+      for (const root of PERSPECTIVE_UNIVERSAL_ROOTS) {
+        await verifiedWrite(join(entityPath, root.filename), root.content, `create:${safeName}/${root.filename}`);
+        createdFiles.push(root.filename);
+        console.log(`   🌳 Universal root: ${root.filename}`);
+      }
     }
     console.log(`✨ Created ${entityClass}: ${safeName}`);
     broadcast({ type: 'file_added', entity: safeName, detail: { entity: safeName, filename: starterName }, timestamp: new Date().toISOString() });
@@ -424,6 +435,16 @@ app.put('/api/doctrine/:entity/:file', async (req, res) => {
     const { content } = req.body;
     if (content === undefined) return res.status(400).json({ error: 'content required' });
     if (FRAMEWORK_ENTITY_NAMES.includes(entity)) return res.status(403).json({ error: `${entity} is a framework entity — files are immutable` });
+    // S116: Universal roots are immutable — cannot be overwritten or emptied
+    if (UNIVERSAL_ROOT_FILENAMES.includes(file)) {
+      const entityPath = join(DOCTRINE_PATH, entity);
+      let config = {};
+      try { config = JSON.parse(await readFile(join(entityPath, 'entity.json'), 'utf-8')); } catch {}
+      if (config.class === 'perspective') {
+        console.log(`⛔ Blocked: overwrite of universal root ${entity}/${file}`);
+        return res.status(403).json({ error: `${file} is a universal root — hardcoded and immutable. Cannot be overwritten or deleted.` });
+      }
+    }
     const filePath = join(DOCTRINE_PATH, entity, file);
     const resolved = resolve(filePath);
     if (!resolved.startsWith(resolve(DOCTRINE_PATH))) return res.status(403).json({ error: 'Access denied' });
@@ -846,7 +867,29 @@ try { watch(STATE_PATH, { recursive: false }, (eventType, filename) => { if (fil
 
 wss.on('connection', () => { console.log(`   WS client connected (${wss.clients.size} total)`); });
 
+// S116: Self-healing — restore missing universal roots on startup
+async function healUniversalRoots() {
+  try {
+    const entries = await readdir(DOCTRINE_PATH, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      try {
+        const config = JSON.parse(await readFile(join(DOCTRINE_PATH, entry.name, 'entity.json'), 'utf-8'));
+        if (config.class !== 'perspective') continue;
+        for (const root of PERSPECTIVE_UNIVERSAL_ROOTS) {
+          const rootPath = join(DOCTRINE_PATH, entry.name, root.filename);
+          if (!existsSync(rootPath)) {
+            await verifiedWrite(rootPath, root.content, `heal:${entry.name}/${root.filename}`);
+            console.log(`   🩹 Healed: ${entry.name}/${root.filename}`);
+          }
+        }
+      } catch {}
+    }
+  } catch (err) { console.warn('Universal root healing warning:', err.message); }
+}
+
 bootstrapFrameworkEntities().then(async () => {
+  await healUniversalRoots();
   await checkForUpdate();
   setInterval(checkForUpdate, 60 * 60 * 1000);
   server.listen(PORT, () => {
