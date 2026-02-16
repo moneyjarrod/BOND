@@ -74,7 +74,7 @@ Command tools (fire on command, respect class boundaries):
 {Warm Restore} → read state/warm_restore_output.md (pre-computed by panel endpoint /api/warm-restore), heatmap_hot(top_k=3) for signal boost. Panel runs SPECTRA, writes badges to file, Claude reads result.
 {Crystal} → iss_analyze on chunk text, crystal to QAIS, heatmap_chunk snapshot
 {Chunk} → heatmap_chunk snapshot. If crystal blocked by class matrix, Chunk still executes as conversational summary. Crystal adds persistence, doesn't gate the action.
-{Tick} → GET /api/sync-health for obligation audit, heatmap_hot(top_k=3) for warm concepts. Report obligation count + any gaps. Phase 1: structured self-report against server-generated checklist.
+{Tick} → Panel button hits /api/sync-health, writes state/tick_output.md. Claude reads the file for server-generated obligations, then adds Layer 1 session report (work completed, vine health, open threads) + heatmap_hot(top_k=3) for warm concepts. Three layers: (1) Claude session report, (2) Server obligation audit from tick_output.md, (3) Project health from project_tick_output.md if project active. Phase 1: structured self-report against server-generated checklist.
 {Save} → after write, qais_store binding (entity|role=save|fact=what was saved)
 Seed tools (framework-level, bypass class boundaries when seeders armed):
 perspective_store — write seed content into perspective's isolated .npz field (auto-seed + bootstrap). Optional: reason, session → auto-logs to seed_decisions.jsonl.

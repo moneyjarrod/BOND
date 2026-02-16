@@ -364,6 +364,26 @@ function AppInner() {
     }
   }, []);
 
+  // Global Tick (S118) — obligation audit (writes state/tick_output.md)
+  const [tickStatus, setTickStatus] = useState(null);
+  const handleTick = useCallback(async () => {
+    setTickStatus('running');
+    try {
+      const res = await fetch('/api/sync-health');
+      if (!res.ok) {
+        setTickStatus('error');
+        setTimeout(() => setTickStatus(null), 3000);
+        return;
+      }
+      try { await navigator.clipboard.writeText('BOND:{Tick}'); } catch {}
+      setTickStatus('done');
+      setTimeout(() => setTickStatus(null), 2000);
+    } catch {
+      setTickStatus('error');
+      setTimeout(() => setTickStatus(null), 3000);
+    }
+  }, []);
+
   // Project Chunk (S117) — clipboard bridge to local crystal
   const handleProjectChunk = useCallback(async (entityName) => {
     try { await navigator.clipboard.writeText(`BOND:{Project Chunk} ${entityName}`); } catch {}
@@ -509,6 +529,8 @@ function AppInner() {
       <CommandBar
         onGenerateHandoff={() => setShowHandoff(true)}
         onWarmRestore={handleWarmRestore}
+        onTick={handleTick}
+        tickStatus={tickStatus}
       />
 
       {showCreate && (

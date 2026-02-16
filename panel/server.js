@@ -817,7 +817,34 @@ app.get('/api/sync-health', async (req, res) => {
     const syncObligations = result.obligations.filter(o => o.command === 'sync');
     const enterObligations = result.obligations.filter(o => o.command === 'enter');
     const conditionalObligations = result.obligations.filter(o => o.conditional);
-    res.json({ ...result, health: { sync_obligations: syncObligations.length, enter_obligations: enterObligations.length, conditional_obligations: conditionalObligations.length, total: result.obligation_count, verified: 0, unverified: result.obligation_count, phase: 1, note: 'Phase 1: structured self-report. Server generates, Claude audits against list.' }, by_command: { sync: syncObligations, enter: enterObligations, conditional: conditionalObligations } });
+    const response = { ...result, health: { sync_obligations: syncObligations.length, enter_obligations: enterObligations.length, conditional_obligations: conditionalObligations.length, total: result.obligation_count, verified: 0, unverified: result.obligation_count, phase: 1, note: 'Phase 1: structured self-report. Server generates, Claude audits against list.' }, by_command: { sync: syncObligations, enter: enterObligations, conditional: conditionalObligations } };
+
+    // S118: Write tick output for Claude to read
+    const lines = [`# Tick — Obligation Audit`, `_${result.generated_at}_`, '',
+      `**Active Entity:** ${result.active_entity || 'none'} (${result.active_class || 'unscoped'})`,
+      `**Total Obligations:** ${result.obligation_count}`,
+      `**Armed Perspectives:** ${result.armed_perspectives}`, ''];
+    if (syncObligations.length > 0) {
+      lines.push('## Sync Obligations');
+      syncObligations.forEach(o => lines.push(`- **${o.id}**: ${o.description}`));
+      lines.push('');
+    }
+    if (enterObligations.length > 0) {
+      lines.push('## Enter Obligations');
+      enterObligations.forEach(o => lines.push(`- **${o.id}**: ${o.description} ${o.severity === 'warn' ? '⚠️' : ''}`));
+      lines.push('');
+    }
+    if (conditionalObligations.length > 0) {
+      lines.push('## Conditional Obligations');
+      conditionalObligations.forEach(o => lines.push(`- **${o.id}**: ${o.description}`));
+      lines.push('');
+    }
+    if (result.obligation_count === 0) lines.push('No obligations. System at rest.', '');
+    const tickPath = join(STATE_PATH, 'tick_output.md');
+    await verifiedWrite(tickPath, lines.join('\n'), 'tick:sync-health');
+    console.log(`⚡ Tick: ${result.obligation_count} obligations, ${result.armed_perspectives} armed`);
+
+    res.json(response);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 

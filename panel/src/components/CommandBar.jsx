@@ -8,13 +8,12 @@ const COMMANDS = [
   { icon: '⚡', label: 'Sync',    value: '{Sync}' },
   { icon: '💾', label: 'Save',    value: '{Save}' },
   { icon: '💎', label: 'Crystal', value: '{Crystal}' },
-  { icon: '📍', label: 'Tick',    value: '{Tick}' },
   { icon: '🌀', label: 'Chunk',   value: '{Chunk}' },
 ];
 
 const BRIDGE_PREFIX = 'BOND:';
 
-export default function CommandBar({ onGenerateHandoff, onWarmRestore }) {
+export default function CommandBar({ onGenerateHandoff, onWarmRestore, onTick, tickStatus }) {
   const [sentCmd, setSentCmd] = useState(null);
 
   const handleClick = useCallback(async (cmd) => {
@@ -64,6 +63,15 @@ export default function CommandBar({ onGenerateHandoff, onWarmRestore }) {
         </button>
       ))}
       <span style={{ width: 1, height: 20, background: 'var(--border)', flexShrink: 0 }} />
+      <button
+        className={`cmd-btn ${tickStatus === 'done' ? 'sent' : ''}`}
+        onClick={onTick}
+        disabled={tickStatus === 'running'}
+        title="Tick — obligation audit + health pulse (writes state/tick_output.md)"
+      >
+        <span className="cmd-icon">{tickStatus === 'running' ? '⏳' : '📍'}</span>
+        <span>{tickStatus === 'running' ? 'Running...' : tickStatus === 'done' ? 'Done' : 'Tick'}</span>
+      </button>
       <button
         className="cmd-btn cmd-btn-warm"
         onClick={onWarmRestore}
