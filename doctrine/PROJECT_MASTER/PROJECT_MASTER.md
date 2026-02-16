@@ -22,9 +22,9 @@ BOND_MASTER (doctrine) — authority over BOND protocol
   └── links: [PROJECT_MASTER]
 
 PROJECT_MASTER (doctrine) — authority over project lifecycle
-  └── links: [GSG, future_projects...]
+  └── links: [your_project, other_projects...]
 
-GSG (project class) — has CORE (local constitution)
+YourProject (project class) — has CORE (local constitution)
   └── doctrine flows in as read-only pipe
 
 ## CORE vs Doctrine
@@ -75,9 +75,9 @@ Example:
 ```
 ## IS
 
-- GSG IS a terrain-building game. Terrain is the primary mechanic.
-- The resource IS alive and female. She is not a commodity.
-- The story IS optional. The player is never gated by narrative.
+- This project IS a [core identity]. [Primary mechanic/function] is the foundation.
+- The [key element] IS [defining constraint]. It is not [what it must never become].
+- The [optional layer] IS optional. The user is never gated by [non-essential element].
 ```
 
 The protection is the protocol (both-agree), not the location. No escalation to PM is needed to change a project's own IS statements.
