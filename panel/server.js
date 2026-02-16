@@ -225,6 +225,22 @@ app.get('/api/doctrine', async (req, res) => {
         growth_count: type === 'perspective' ? (roots.length + seeds.length) : 0, pruned_count: pruned.length, tracker,
       });
     }
+    // S118: Compute reverse links (linked_by) — who links TO each entity
+    const linkMap = {};
+    for (const ent of entities) {
+      try {
+        const config = JSON.parse(await readFile(join(DOCTRINE_PATH, ent.name, 'entity.json'), 'utf-8'));
+        const links = config.links || [];
+        for (const target of links) {
+          if (!linkMap[target]) linkMap[target] = [];
+          linkMap[target].push({ entity: ent.name, class: ent.type, display_name: ent.display_name });
+        }
+      } catch {}
+    }
+    for (const ent of entities) {
+      ent.linked_by = linkMap[ent.name] || [];
+    }
+
     res.json({ entities, doctrine_path: DOCTRINE_PATH });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
