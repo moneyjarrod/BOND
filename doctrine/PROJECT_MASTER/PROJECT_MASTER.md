@@ -22,10 +22,11 @@ BOND_MASTER (doctrine) — authority over BOND protocol
   └── links: [PROJECT_MASTER]
 
 PROJECT_MASTER (doctrine) — authority over project lifecycle
-  └── links: [your_project, other_projects...]
+  └── holds: PERSPECTIVE_REGISTRY.md (cross-class bridge)
 
 YourProject (project class) — has CORE (local constitution)
-  └── doctrine flows in as read-only pipe
+  └── links up to: PROJECT_MASTER (loads governance)
+  └── links across to: perspectives (guided by PM registry)
 
 ## CORE vs Doctrine
 

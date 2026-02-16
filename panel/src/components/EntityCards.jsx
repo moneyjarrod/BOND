@@ -232,9 +232,9 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
         </div>
         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
           {isLinked && <span className="badge badge-linked" style={{ background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)' }}>LINKED</span>}
-          {entity.linked_by && entity.linked_by.length > 0 && (
-            <span className="badge" title={`Linked by: ${entity.linked_by.map(l => l.display_name || l.entity).join(', ')}`} style={{ background: 'rgba(168,130,255,0.12)', color: '#a882ff', border: '1px solid rgba(168,130,255,0.3)', fontSize: '0.6rem' }}>🔗 {entity.linked_by.length}</span>
-          )}
+          {(() => { const sameClass = (entity.linked_by || []).filter(l => l.class === entity.type); return sameClass.length > 0 ? (
+            <span className="badge" title={`Linked by: ${sameClass.map(l => l.display_name || l.entity).join(', ')}`} style={{ background: 'rgba(168,130,255,0.12)', color: '#a882ff', border: '1px solid rgba(168,130,255,0.3)', fontSize: '0.6rem' }}>🔗 {sameClass.length}</span>
+          ) : null; })()}
           {isActive && <span className="badge badge-active">ACTIVE</span>}
           {entity.core && <span className="badge badge-core">🔒 CORE</span>}
           <span className={`badge ${meta.badge}`}>{meta.label}</span>

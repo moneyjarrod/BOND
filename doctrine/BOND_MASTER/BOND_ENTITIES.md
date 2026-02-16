@@ -16,7 +16,7 @@
 - IS: Self-auditable. ISS validates code against IS statements.
 - IS NOT: Growable. Doctrine doesn't learn — it defines.
 - Tools: Filesystem (read doctrine files) + ISS (audit/validate).
-- Example: BOND_MASTER, Calendar Master, ROSETTA.
+- Example: BOND_MASTER, PROJECT_MASTER, your doctrine entities.
 
 ### Project
 - IS: A bounded workspace with a mission.
@@ -25,7 +25,7 @@
 - IS NOT: Open-ended. CORE constrains scope.
 - Tools: Files + QAIS + Heatmap + Crystal + ISS.
 - CORE file: Loaded once, refreshed on {Sync}. Counter cycle IS the refresh timer.
-- Example: GSG (Gnome Sweet Gnome).
+- Example: Your project entity.
 
 ### Perspective
 - IS: An unbounded knowledge domain that grows through conversation.
@@ -36,7 +36,7 @@
 - Tools: Files + QAIS + Heatmap + Crystal.
 - Local Field: Two .npz files per perspective, created automatically. Seed field (`{entity}.npz`) for vine lifecycle. Crystal field (`{entity}_crystal.npz`) for narrative continuity. Entity Warm Restore queries crystal field. Global Warm Restore does not touch perspective fields. Exclusive routing: perspective active → crystal writes local only (S116).
 - Field Isolation: Perspective fields are independent. Linked perspectives share seed resonance through the vine lifecycle but do not access each other's local fields.
-- Example: User-created perspectives (P11+).
+- Example: User-created perspectives (P1, P2, etc.).
 
 ### Library
 - IS: A reference shelf. Static knowledge for lookup.
@@ -71,6 +71,15 @@ This is enforced at three levels:
 3. **Protocol** — Claude flags violations in conversation. {Tick} audits existing links for compliance.
 
 Even if the user requests a forbidden link, the system refuses. The wall is structural, not advisory.
+
+## Link Badges (S118)
+
+Two distinct visual signals on entity cards:
+
+- **Blue LINKED** — Entity is actively loaded as context in the current session. Appears when the active entity's links array includes this entity. Session-level, temporary.
+- **Purple 🔗 N** — Same-class peer references only. Counts how many entities of the SAME class permanently link to this entity in their entity.json. Cross-class links (project→perspective) do NOT count toward the purple badge.
+
+Purple = "peers referencing you." Blue = "active in this session." Cross-class governance flows through PROJECT_MASTER's PERSPECTIVE_REGISTRY, not through badge clutter on perspective cards.
 
 ## Cross-Class Consultation
 

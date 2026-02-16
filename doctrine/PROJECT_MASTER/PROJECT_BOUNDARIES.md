@@ -18,8 +18,8 @@ A project cannot change its own class designation or tool matrix. Class is set a
 ### B4: CORE Is Sovereign Inside the Boundary
 Within its own directory, a project's CORE is the highest authority. Doctrine provides the frame, CORE defines the content. If doctrine and CORE conflict on project-internal matters, CORE wins. But CORE cannot override boundary rules B1-B3 — those belong to PROJECT_MASTER.
 
-### B5: Links Are Directional by Default
-PROJECT_MASTER links to projects (authority flows down). Projects may link to other projects or to library/perspective entities for reference. Projects do not link to doctrine entities — doctrine is accessed through the existing load pipeline, not through project-level links.
+### B5: Links Are Directional by Design
+Projects link up to PROJECT_MASTER to load governance doctrine. PM does not link down to projects — the panel already displays all projects; downward links would be redundant state. Projects may link to other projects, library entities, or perspectives for cross-class context injection. Perspective links from projects are guided by PM's PERSPECTIVE_REGISTRY.md — PM curates the menu, projects order from it. The class matrix enforces what's allowed; the registry curates what's recommended.
 
 ## Why Doctrine, Not Code
 
