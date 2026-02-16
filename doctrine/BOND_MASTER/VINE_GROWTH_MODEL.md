@@ -18,20 +18,55 @@
 - Auto-written as .md file + auto-injected into QAIS field.
 - Low barrier, high volume. The vine grows freely.
 - Logged to seed_decisions.jsonl for record.
+- Seeds are delivery mechanisms, not permanent residents. They exist to prove a pattern, then either germinate into vine density or get composted.
 
-### Pruning — The Only Deliberate Act
+### Rain — Ambient Nourishment (S118)
+- Scores below sunshine threshold but above rain floor nourish existing seeds without creating new ones.
+- Rain represents conversation climate — the vine's neighborhood is active even when nothing lands directly.
+- Rain does NOT create hits. It feeds vine density around existing seeds.
+- Capped: max 1 rain event per seed per Sync pass, max 1 per seed per session.
+- Rain is tracked in seed_tracker.json alongside hits and exposures.
+
+**Threshold Bands:**
+| Entity Type | Sunshine (hit) | Rain Band | Dry (no effect) |
+|---|---|---|---|
+| Standard (seed_threshold: 0.04) | ≥ 0.040 | 0.025 – 0.039 | < 0.025 |
+| Wide-net (seed_threshold: 0.035) | ≥ 0.035 | 0.020 – 0.034 | < 0.020 |
+
+**Rain floor formula:** `seed_threshold × 0.625` (rounded to nearest 0.005)
+
+### Pruning — The Gardener's Only Cut
 - Judgment-based, not mechanical. Requires {Enter} — the perspective must be the active entity.
 - Claude cannot make prune decisions from outside the perspective. During vine lifecycle under a different entity, seeds at prune window are flagged but NOT evaluated.
 - When entered: Claude reads through ROOT lens. Ask: does this seed grow from who this perspective IS?
 - Tracker data is evidence, not verdict. Dormant seeds aligned with roots stay.
 - State verdict and execute — do not ask the user for permission. Explain why, then cut or keep.
+
+**Prune Health Formula (S118):**
+```
+effective_health = hits + (rain × 0.25)
+prune_eligible = exposures >= prune_window
+prune_risk = prune_eligible AND effective_health < 1.0
+```
+A seed needs at least 1 direct hit OR 4 rain events to clear the health floor. Rain provides partial credit — the conversation stayed in the neighborhood without ever landing directly. Seeds with rain but no hits are climate-supported but unproven. Seeds with neither rain nor hits are genuinely dormant.
+
+**Prune evaluation now considers three categories:**
+1. **Healthy:** effective_health ≥ 1.0 — seed has proven itself or is well-watered. No prune risk.
+2. **Dry but aligned:** effective_health < 1.0 but ROOT lens confirms identity alignment. Kept. Topic neglect is not a death sentence.
+3. **Dry and misaligned:** effective_health < 1.0 AND ROOT lens finds no identity connection. Composted.
+
 - Pruned seeds are:
-  1. Logged to G-pruned-*.md with ROOT lens reason + tracker stats
+  1. Logged to G-pruned-*.md with ROOT lens reason + tracker stats (including rain)
   2. Removed from QAIS field via perspective_remove (exact vector subtraction)
   3. Removed from seed_tracker.json
   4. Seed .md file deleted
   5. Auto-logged to seed_decisions.jsonl
-- The gardener's only job. No promotion, no tiers.
+
+### Germination — Seeds Become Vine (S118, Future Phase)
+- A seed that has proven itself structurally — through sustained hits, consistent rain, and co-resonance with other living seeds — is no longer a branch. It became load-bearing. The seed shell cracks and the vine emerges.
+- Germination transforms the seed's contribution into vine density in the crystal momentum field. The seed .md is retired. The pattern lives on as accumulated structural weight, not a discrete label.
+- **Not yet implemented.** Criteria under development. Candidate threshold: ≥ 5 hits, planted across ≥ 5 sessions, co-resonates with 2+ living seeds. Requires dedicated design session.
+- Design principle: you don't promote seeds to vine. You recognize that a seed WAS vine all along and the shell finally fell away.
 
 ### Re-Grafting — Compost Reclaimed
 - The perspective revisits the dead branch log.
@@ -53,19 +88,21 @@ the same resonance check to pass the gate.
 ### Growth — The Living State
 - Not a file type. Not a promotion.
 - Growth IS what remains after pruning + what gets added and not pruned.
-- Measured, not stored: root count + active seed count + field health.
+- Measured, not stored: root count + active seed count + rain health + field density.
 - G- prefix marks pruning journals, not promoted content.
 
 ## Design Decisions
 
 - **No approval gate on seeds**: Replaced by pruning. Quality lives downstream.
-- **No promotion**: Only pruning. What survives IS the growth.
+- **Rain not sunshine**: Sub-threshold scores nourish, don't plant. The vine gets thicker without getting longer.
+- **Rain caps prevent flooding**: 1 per seed per session. Six Sync passes about UI work don't give a testing seed 6 rain ticks.
+- **Effective health, not raw hits**: Prune decisions consider the full picture — sunshine, rain, and ROOT alignment. Topic neglect doesn't kill aligned seeds.
 - **Dead branch log preserved**: Low cost, high value. Enables re-graft.
 - **G- prefix repurposed**: Pruning journal, not growth badge.
 - **Auto-seed on {Sync}**: Threshold hit → file + QAIS injection, no user prompt.
-- **Judgment over mechanics**: ROOT lens identity alignment, not hit count thresholds.
+- **Germination deferred**: Seed-to-vine transformation designed but not implemented. Seeds remain discrete until criteria finalized.
 
-## Seed Tracker (S99 Design)
+## Seed Tracker (S118 Format)
 
 Each perspective maintains `seed_tracker.json` in its folder:
 ```json
@@ -74,17 +111,23 @@ Each perspective maintains `seed_tracker.json` in its folder:
     "planted": "2026-02-11",
     "exposures": 0,
     "hits": 0,
-    "last_hit": null
+    "rain": 0,
+    "last_hit": null,
+    "last_rain": null
   }
 }
 ```
 
 **Sync lifecycle (one pass):**
 1. Run resonance check (perspective_check) — ~600-900 tokens
-2. Auto-seed: new hits above threshold → file + QAIS injection + tracker entry
-3. Increment exposures on ALL active seeds
-4. Re-graft gate: check pruning log for returning candidates, require 2+ living co-resonance
-5. Prune eligible: seeds past `prune_window` exposures are FLAGGED. Prune evaluation requires {Enter} — perspective must be active entity. From outside, report and move on.
+2. Auto-seed: new hits above sunshine threshold → file + QAIS injection + tracker entry
+3. Score existing seeds:
+   a. Score ≥ sunshine threshold → increment hits, record last_hit
+   b. Score ≥ rain floor AND < sunshine threshold → increment rain (max 1 per seed per session), record last_rain
+   c. Score < rain floor → no effect
+4. Increment exposures on ALL active seeds
+5. Re-graft gate: check pruning log for returning candidates, require 2+ living co-resonance
+6. Prune eligible: seeds past `prune_window` exposures with effective_health < 1.0 are FLAGGED. Prune evaluation requires {Enter} — perspective must be active entity. From outside, report and move on.
 
 **Entity sovereignty:** The perspective holds its own shears.
 - `prune_window` lives in entity.json — how many exposures before eligible
@@ -93,7 +136,8 @@ Each perspective maintains `seed_tracker.json` in its folder:
 - User is gardener (can review log, re-graft manually) not shears
 
 **Default tuning (set on perspective creation):**
-- `seed_threshold: 0.04` — wide net, lets the entity catch patterns we wouldn't expect
+- `seed_threshold: 0.04` — sunshine threshold for hits and new seeds
+- `rain_floor: auto` — computed as seed_threshold × 0.625, rounded to nearest 0.005
 - `prune_window: 10` — seeds get 10 Sync exposures before pruning eligibility
 - `seeding: false` — armed manually via panel toggle (SEED ON/OFF)
 - Each entity can override these in its own entity.json
@@ -122,8 +166,11 @@ Toggle: SEED ON/OFF on entity card disarms completely.
 - [x] Re-graft gate (anti-loop, co-resonance check via pruned_seeds in perspective_check)
 - [x] Growth measurement (derive from living state)
 - [x] Universal root (ROOT-self-pruning-authority.md auto-planted on perspective creation)
+- [x] Rain mechanic (S118 — threshold bands, capped per-session, tracker field)
+- [ ] Germination phase (seed → vine density in crystal field) — designed, not implemented
 - [ ] Panel visual status (active/stable/dormant) — deferred
+- [ ] Panel rain display — deferred
 
 ## Mantra
 
-"The vine grows freely. The gardener only prunes."
+"The vine grows freely. The rain falls gently. The gardener only prunes."
