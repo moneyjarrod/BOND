@@ -2,13 +2,30 @@
 echo Starting BOND...
 echo.
 
-:: Start Express sidecar
 cd /d "%~dp0panel"
+
+:: Force rebuild with --rebuild flag
+if "%1"=="--rebuild" (
+  echo [!] Forcing clean rebuild...
+  if exist dist rmdir /s /q dist
+  call npx vite build
+  echo [OK] Clean rebuild complete.
+  echo.
+)
+
+:: Start Express sidecar
 start "BOND Sidecar" /min cmd /c "node server.js"
 echo [OK] Sidecar starting on http://localhost:3000
 
+:: Build dist/ if missing
+if not exist dist\index.html (
+  echo [!] No dist/ found — building panel...
+  call npx vite build
+  echo.
+)
+
 :: Check if production build exists
-if exist "%~dp0panel\dist\index.html" (
+if exist "dist\index.html" (
     echo [OK] Serving production build from dist/
     timeout /t 2 /nobreak >nul
     start http://localhost:3000

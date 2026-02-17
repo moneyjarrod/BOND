@@ -1242,8 +1242,12 @@ app.get('/api/version', (req, res) => { res.json(versionCache); });
 // ─── Production static serving ────────────────────────────
 const DIST_PATH = join(process.cwd(), 'dist');
 if (existsSync(DIST_PATH)) {
-  app.use(express.static(DIST_PATH));
-  app.get('/{*path}', (req, res) => { if (!req.path.startsWith('/api/')) res.sendFile(join(DIST_PATH, 'index.html')); });
+  // Cache JS/CSS assets aggressively (content-hashed filenames)
+  app.use('/assets', express.static(join(DIST_PATH, 'assets'), { maxAge: '7d' }));
+  // Never cache index.html — always serve fresh to pick up new asset hashes
+  app.get('/', (req, res) => { res.set('Cache-Control', 'no-store'); res.sendFile(join(DIST_PATH, 'index.html')); });
+  app.use(express.static(DIST_PATH, { maxAge: 0 }));
+  app.get('/{*path}', (req, res) => { if (!req.path.startsWith('/api/')) { res.set('Cache-Control', 'no-store'); res.sendFile(join(DIST_PATH, 'index.html')); } });
   console.log('   Serving built panel from dist/');
 }
 
@@ -1254,10 +1258,10 @@ const wss = new WebSocketServer({ server });
 function broadcast(event) { const msg = JSON.stringify(event); wss.clients.forEach(client => { if (client.readyState === 1) client.send(msg); }); }
 
 let watchDebounce = null;
-try { watch(DOCTRINE_PATH, { recursive: true }, (eventType, filename) => { clearTimeout(watchDebounce); watchDebounce = setTimeout(() => { broadcast({ type: 'file_changed', detail: { filename, eventType }, timestamp: new Date().toISOString() }); }, 500); }); } catch (err) { console.warn('fs.watch (doctrine) warning:', err.message); }
+try { watch(DOCTRINE_PATH, { recursive: true }, (eventType, filename) => { clearTimeout(watchDebounce); watchDebounce = setTimeout(() => { broadcast({ type: 'file_changed', detail: { filename, eventType }, timestamp: new Date().toISOString() }); }, 2000); }); } catch (err) { console.warn('fs.watch (doctrine) warning:', err.message); }
 
 let stateDebounce = null;
-try { watch(STATE_PATH, { recursive: false }, (eventType, filename) => { if (filename === 'active_entity.json') { clearTimeout(stateDebounce); stateDebounce = setTimeout(() => { console.log('📡 State file changed externally — broadcasting'); broadcast({ type: 'state_changed', detail: { source: 'file_watch' }, timestamp: new Date().toISOString() }); }, 300); } }); } catch (err) { console.warn('fs.watch (state) warning:', err.message); }
+try { watch(STATE_PATH, { recursive: false }, (eventType, filename) => { if (filename === 'active_entity.json') { clearTimeout(stateDebounce); stateDebounce = setTimeout(() => { console.log('📡 State file changed externally — broadcasting'); broadcast({ type: 'state_changed', detail: { source: 'file_watch' }, timestamp: new Date().toISOString() }); }, 1000); } }); } catch (err) { console.warn('fs.watch (state) warning:', err.message); }
 
 let ahkDebounce = null;
 try { watch(STATE_PATH, { recursive: false }, (eventType, filename) => { if (filename === 'ahk_status.json') { clearTimeout(ahkDebounce); ahkDebounce = setTimeout(async () => { try { const raw = await readFile(AHK_STATUS_FILE, 'utf-8'); const status = JSON.parse(raw); broadcast({ type: 'ahk_status_changed', detail: { ...status, running: true }, timestamp: new Date().toISOString() }); } catch {} }, 300); } }); } catch (err) { console.warn('fs.watch (ahk_status) warning:', err.message); }

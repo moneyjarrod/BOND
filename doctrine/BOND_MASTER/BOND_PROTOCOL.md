@@ -81,13 +81,14 @@ Hooks are subordinate to BOND_MASTER doctrine. They augment, never override.
 | {Exit} | Clear active entity, drop boundaries | No |
 | {Relational} | Architecture re-anchor | No |
 | {Drift?} | Self-check | No |
+| {Consult ENTITY} | Read-only lens — load entity ROOTs/docs, speak through lens, no entity switch | No |
 
 ## Command Recognition
 
 Commands are parsed by **core keyword**, not exact string match. When Claude encounters `{}` braces in user input:
 
 1. Extract all words inside the braces.
-2. Match against known command keywords: Sync, Full Restore, Warm Restore, Save, Crystal, Chunk, Tick, Enter, Exit, Relational, Drift, Handoff.
+2. Match against known command keywords: Sync, Full Restore, Warm Restore, Save, Crystal, Chunk, Tick, Enter, Exit, Relational, Drift, Handoff, Consult.
 3. If a known keyword is found, fire that command.
 4. All other words (inside or outside braces) are treated as **parameters** — entity names, project context, descriptors.
 5. Multiple commands in one message are processed left-to-right.
@@ -165,3 +166,28 @@ Consecutive {Handoff} calls in the same session automatically combine. Each writ
 ```
 
 {Warm Restore} Layer 1 picks up the one file. Everything synthesized. Nothing lost.
+
+## Consult Protocol
+
+{Consult ENTITY} provides a **read-only lens** — a perspective or doctrine entity speaks without becoming active.
+
+**Requirements:**
+- Active entity must be project-class.
+- Consulted entity must be linked to the active project.
+- Perspectives and doctrine entities are consultable.
+
+**What it does:**
+1. Claude reads the consulted entity's ROOT files (perspectives) or key .md files (doctrine).
+2. Claude speaks *through* that lens for the current response.
+3. Active entity stays unchanged — no write to active_entity.json.
+
+**What it does NOT do:**
+- Change active entity or class boundaries.
+- Trigger vine lifecycle (no seed tracking, no exposure increment).
+- Fire hooks or crystal.
+- Write anything to disc.
+- Grant prune authority.
+
+Consult is **one-shot by default**. The lens applies to the current response only. Call again for another consultation. For sustained work through a perspective, use {Enter} instead.
+
+**Panel integration:** Consult button appears on active project cards. Dropdown populated from `GET /api/state/consultable` — returns linked perspectives and doctrine. Selection copies `BOND:{Consult ENTITY}` to clipboard for AHK bridge.

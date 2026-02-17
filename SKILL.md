@@ -2,8 +2,8 @@
 name: bond
 description: >-
   BOND protocol. Triggers: Sync, Save, Crystal, Chunk, Tick, Enter, Exit,
-  Full Restore, Warm Restore, Handoff, Drift, counter, emoji, bonfire, drift,
-  session, entity, doctrine, perspective, project class, library class,
+  Full Restore, Warm Restore, Handoff, Consult, Drift, counter, emoji, bonfire,
+  drift, session, entity, doctrine, perspective, project class, library class,
   save protocol, sync limit, compaction, context degradation.
 ---
 
@@ -61,6 +61,16 @@ Lost count: recommend {Sync}.
   Panel pre-fills CONTEXT + STATE. Claude drafts the four content sections.
   If no panel, Claude drafts all six sections manually.
   No counter reset.
+{Consult ENTITY}: Read-only lens. Load a linked perspective or doctrine entity's files, speak through its lens for one response.
+  1) Verify active entity is project-class.
+  2) Verify consulted entity is linked to active project (check entity.json links array).
+  3) For perspectives: read all ROOT-*.md files. For doctrine: read all .md files.
+  4) Speak through that entity's lens for the current response.
+  5) Active entity stays unchanged. No write to active_entity.json.
+  Does NOT trigger: vine lifecycle, seed tracking, crystal, hooks, prune authority.
+  One-shot default. Call again for another consultation. For sustained work, use {Enter} instead.
+  Panel: 🔭 Consult button on active project cards → dropdown from GET /api/state/consultable.
+  No counter reset.
 
 ## COMPACTION RECOVERY
 When Claude detects a compaction note at the top of context ("[NOTE: This conversation was successfully compacted...]" block), this is an obligation trigger:
@@ -73,7 +83,7 @@ Compaction = context was lost. QAIS retrieval is non-optional. This is an Armed=
 
 ## COMMANDS
 Commands are keyword-driven, not exact-match. `{Sync}`, `{Project Sync}`, `{Sync} GSG` all fire Sync. Additional words = parameters/context. Case insensitive. Multiple commands per message processed left-to-right.
-{Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (Layer 1: last handoff, Layer 2: archive query with confidence badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot → append to state/session_chunks.md (timestamped, 10-20 lines). Chunks are ingredients for {Handoff}, not standalone. Compaction insurance + handoff enrichment | {Tick} quick status + obligation audit (GET /api/sync-health) | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Relational} arch re-anchor | {Drift?} self-check
+{Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (Layer 1: last handoff, Layer 2: archive query with confidence badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot → append to state/session_chunks.md (timestamped, 10-20 lines). Chunks are ingredients for {Handoff}, not standalone. Compaction insurance + handoff enrichment | {Tick} quick status + obligation audit (GET /api/sync-health) | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Consult ENTITY} read-only lens: read entity ROOTs/docs, speak through lens, no entity switch, no lifecycle triggers. Requires active project + entity linked to project. One-shot default | {Relational} arch re-anchor | {Drift?} self-check
 
 ## TOOL WIRING
 Command tools (fire on command, respect class boundaries):
