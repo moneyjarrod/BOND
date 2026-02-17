@@ -18,6 +18,35 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// ─── Searchable File Types (S118: Expanded Search) ────────
+const SEARCHABLE_EXTENSIONS = ['.md', '.txt', '.pdf', '.docx'];
+function isSearchable(filename) {
+  return SEARCHABLE_EXTENSIONS.some(ext => filename.toLowerCase().endsWith(ext));
+}
+
+// Extract text from supported file types
+async function extractText(filePath) {
+  const lower = filePath.toLowerCase();
+  try {
+    if (lower.endsWith('.pdf')) {
+      const pdfParse = (await import('pdf-parse/lib/pdf-parse.js')).default;
+      const buffer = await readFile(filePath);
+      const data = await pdfParse(buffer);
+      return data.text || '';
+    }
+    if (lower.endsWith('.docx')) {
+      const mammoth = await import('mammoth');
+      const result = await mammoth.extractRawText({ path: filePath });
+      return result.value || '';
+    }
+    // .md, .txt, and anything else — read as UTF-8
+    return await readFile(filePath, 'utf-8');
+  } catch (err) {
+    console.warn(`⚠️ Text extraction failed for ${filePath}: ${err.message}`);
+    return '';
+  }
+}
+
 // ─── Verified Write (S114: Ghost Write Prevention) ────────
 async function verifiedWrite(filePath, content, label = '') {
   await writeFile(filePath, content);
@@ -251,8 +280,8 @@ app.get('/api/doctrine/:entity', async (req, res) => {
     const resolved = resolve(entityPath);
     if (!resolved.startsWith(resolve(DOCTRINE_PATH))) return res.status(403).json({ error: 'Access denied' });
     const files = await readdir(entityPath);
-    const mdFiles = files.filter(f => f.endsWith('.md'));
-    const fileDetails = await Promise.all(mdFiles.map(async (f) => {
+    const searchableFiles = files.filter(f => isSearchable(f));
+    const fileDetails = await Promise.all(searchableFiles.map(async (f) => {
       const filePath = join(entityPath, f);
       const info = await stat(filePath);
       return { name: f, size: info.size, modified: info.mtime, type: !!f.match(/^G-|^.*-G\d/) ? 'growth' : 'doctrine' };
@@ -438,7 +467,8 @@ app.get('/api/doctrine/:entity/:file', async (req, res) => {
     const filePath = join(DOCTRINE_PATH, req.params.entity, req.params.file);
     const resolved = resolve(filePath);
     if (!resolved.startsWith(resolve(DOCTRINE_PATH))) return res.status(403).json({ error: 'Access denied' });
-    const content = await readFile(filePath, 'utf-8');
+    // S118: Extract text from any searchable type (.md, .txt, .pdf, .docx)
+    const content = await extractText(filePath);
     res.json({ file: req.params.file, entity: req.params.entity, type: !!req.params.file.match(/^G-|^.*-G\d/) ? 'growth' : 'doctrine', content });
   } catch (err) { res.status(500).json({ error: err.message }); }
 });

@@ -58,10 +58,11 @@ export function useSearch(activeEntityName, linkedEntities = []) {
           const listData = await listRes.json();
           const fileList = listData.files || [];
 
-          // Fetch each file's content
+          // Fetch each file's content (S118: expanded to .md, .txt, .pdf, .docx)
+          const SEARCHABLE_EXT = ['.md', '.txt', '.pdf', '.docx'];
           for (const f of fileList) {
             if (ctrl.abort) return;
-            if (!f.name.endsWith('.md')) continue;
+            if (!SEARCHABLE_EXT.some(ext => f.name.toLowerCase().endsWith(ext))) continue;
 
             const contentRes = await fetch(
               `/api/doctrine/${encodeURIComponent(name)}/${encodeURIComponent(f.name)}`
