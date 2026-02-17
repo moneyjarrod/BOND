@@ -22,14 +22,29 @@ export function useSearch(activeEntityName, linkedEntities = []) {
   const [error, setError] = useState(null);
   const abortRef = useRef(null);
 
-  // Build index when active entity changes
+  // LAZY BUILD: Don't auto-build on Enter. Build only when requestBuild() is called.
+  const buildRequestedRef = useRef(false);
+
+  const requestBuild = useCallback(() => {
+    if (!activeEntityName || buildRequestedRef.current) return;
+    buildRequestedRef.current = true;
+    // Trigger the effect by bumping a counter
+    setBuildTrigger(t => t + 1);
+  }, [activeEntityName]);
+
+  const [buildTrigger, setBuildTrigger] = useState(0);
+
+  // Reset on entity change
   useEffect(() => {
-    if (!activeEntityName) {
-      setCorpus(null);
-      setIndexReady(false);
-      setIndexStats(null);
-      return;
-    }
+    buildRequestedRef.current = false;
+    setCorpus(null);
+    setIndexReady(false);
+    setIndexStats(null);
+  }, [activeEntityName]);
+
+  // Build index only when triggered
+  useEffect(() => {
+    if (!activeEntityName || !buildRequestedRef.current) return;
 
     // Abort any previous build
     if (abortRef.current) abortRef.current.abort = true;
@@ -79,7 +94,9 @@ export function useSearch(activeEntityName, linkedEntities = []) {
 
         if (ctrl.abort) return;
 
-        // Build index
+        // Build index — yield to browser first so UI stays responsive
+        await new Promise(resolve => setTimeout(resolve, 0));
+        if (ctrl.abort) return;
         const idx = buildIndex(allFiles, activeEntityName);
         if (idx && !ctrl.abort) {
           setCorpus(idx);
@@ -96,7 +113,7 @@ export function useSearch(activeEntityName, linkedEntities = []) {
     build();
 
     return () => { ctrl.abort = true; };
-  }, [activeEntityName, linkedEntities.map(e => typeof e === 'string' ? e : e.name).join(',')]);
+  }, [activeEntityName, buildTrigger, linkedEntities.map(e => typeof e === 'string' ? e : e.name).join(',')]);
 
   // Query function
   const query = useCallback((queryText) => {
@@ -104,5 +121,5 @@ export function useSearch(activeEntityName, linkedEntities = []) {
     return corpus.query(queryText);
   }, [corpus]);
 
-  return { query, indexReady, indexStats, indexing, error };
+  return { query, indexReady, indexStats, indexing, error, requestBuild };
 }

@@ -139,7 +139,12 @@ export default function DoctrineViewer({
         <div style={{ display: 'flex', gap: 6 }}>
           {search && (
             <button
-              onClick={() => setShowSearch(s => !s)}
+              onClick={() => {
+                setShowSearch(s => {
+                  if (!s && search.requestBuild) search.requestBuild();
+                  return !s;
+                });
+              }}
               style={{
                 padding: '4px 12px',
                 fontSize: '0.75rem',

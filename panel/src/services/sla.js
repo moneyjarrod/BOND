@@ -122,8 +122,18 @@ class SLACorpus {
       this.tfidfNormed.push(normalize(vec));
     }
 
-    this._buildContrastiveAnchors();
-    this._buildNeighborhoods();
+    // O(n²) guard: skip contrastive anchors + neighborhoods on large corpora
+    // TF-IDF query via _spectraShortlist still works (O(n) per query)
+    const MAX_PARAGRAPHS_FOR_FULL_INDEX = 200;
+    if (this.n <= MAX_PARAGRAPHS_FOR_FULL_INDEX) {
+      this._buildContrastiveAnchors();
+      this._buildNeighborhoods();
+    } else {
+      console.warn(`SLA: ${this.n} paragraphs exceeds ${MAX_PARAGRAPHS_FOR_FULL_INDEX} — skipping O(n²) anchor/neighborhood build`);
+      this.anchors = this.paragraphs.map(() => ({}));
+      this.confusers = {};
+      this.neighbors = {};
+    }
   }
 
   _buildContrastiveAnchors() {
