@@ -7,6 +7,7 @@ Standalone process that:
   - Derives scope from active_entity.json + link graph
   - Indexes entity .md files at paragraph level
   - Serves search queries via HTTP on port 3003
+  - Loads external corpora for SLA v2 retrieval
 
 Usage:
     python bond_search.py                # start daemon
@@ -14,10 +15,14 @@ Usage:
     python bond_search.py --once "query" # one-shot query, no server
 
 Endpoints:
-    GET /search?q=backflow+prevention          # query the index (explore mode)
-    GET /search?q=the+lord+is+my+shepherd&mode=retrieve  # SLA v2 retrieval
+    GET /search?q=backflow+prevention          # query the index (auto mode)
+    GET /search?q=query&mode=explore             # force editorial weights
+    GET /search?q=the+lord+is+my+shepherd&mode=retrieve  # force SLA v2 retrieval
     GET /search?q=pressure&scope=all           # search all entities
     GET /search?q=pressure&entity=P11-Plumber  # local valve: single entity
+    GET /load?path=C:/texts/psalms.md          # load external corpus (auto-retrieve)
+    GET /load?path=C:/texts/bible/&name=Bible  # load directory with custom name
+    GET /unload                                # return to doctrine index
     GET /duplicates                            # find similar paragraphs
     GET /duplicates?threshold=0.6              # lower = more results
     GET /duplicates?exclude_shared=true        # skip shared framework files
@@ -34,14 +39,18 @@ from pathlib import Path
 from collections import defaultdict
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, unquote
+
+# ─── Config ────────────────────────────────────────────────
 
 BOND_ROOT = os.environ.get('BOND_ROOT', str(Path(__file__).parent.parent))
 DOCTRINE_PATH = os.path.join(BOND_ROOT, 'doctrine')
 STATE_PATH = os.path.join(BOND_ROOT, 'state')
 DEFAULT_PORT = 3003
-WATCH_INTERVAL = 2.0
-MIN_PARAGRAPH_LENGTH = 20
+WATCH_INTERVAL = 2.0  # seconds between file change checks
+MIN_PARAGRAPH_LENGTH = 20  # characters — skip tiny fragments
+
+# ─── Text Processing (from warm_restore.py) ────────────────
 
 SUFFIXES = ['ation','tion','sion','ness','ment','able','ible','ful','ous','ing','ed','ly','s']
 STEM_EXCEPTIONS = {
@@ -82,9 +91,18 @@ def tokenize(text):
 def content_stems(text):
     return [s for s in tokenize(text) if s not in STOP_WORDS and len(s) > 2]
 
+
+# ─── Scope Derivation ─────────────────────────────────────
+
 def get_active_scope():
+    """Read active_entity.json + follow link graph to determine search scope."""
     state_file = Path(STATE_PATH) / 'active_entity.json'
-    scope = {'active_entity': None, 'active_class': None, 'entities': [], 'mode': 'all'}
+    scope = {
+        'active_entity': None,
+        'active_class': None,
+        'entities': [],
+        'mode': 'all',
+    }
     try:
         state = json.loads(state_file.read_text(encoding='utf-8'))
         if state.get('entity'):
@@ -112,44 +130,99 @@ def get_active_scope():
             pass
     return scope
 
-def extract_paragraphs(filepath):
-    try:
-        text = Path(filepath).read_text(encoding='utf-8')
-    except Exception:
-        return []
+
+# ─── Paragraph Extractors ─────────────────────────────────
+
+HEADING_RE = re.compile(r'^(#{1,3})\s+(.+)$')
+
+def _parse_paragraphs(text, entity, filename):
+    """Core paragraph parser for both doctrine and external files."""
     paragraphs = []
     current_heading = None
     current_lines = []
-    filename = Path(filepath).name
-    entity = Path(filepath).parent.name
+
+    def flush():
+        nonlocal current_lines
+        if current_lines:
+            content = '\n'.join(current_lines).strip()
+            if len(content) >= MIN_PARAGRAPH_LENGTH:
+                paragraphs.append({
+                    'entity': entity,
+                    'file': filename,
+                    'heading': current_heading,
+                    'text': content,
+                })
+            current_lines = []
+
     for line in text.split('\n'):
-        hm = re.match(r'^(#{1,3})\s+(.+)$', line)
+        hm = HEADING_RE.match(line)
         if hm:
-            if current_lines:
-                content = '\n'.join(current_lines).strip()
-                if len(content) >= MIN_PARAGRAPH_LENGTH:
-                    paragraphs.append({'entity': entity, 'file': filename, 'heading': current_heading, 'text': content})
-                current_lines = []
+            flush()
             current_heading = hm.group(2).strip()
             continue
         if not line.strip():
-            if current_lines:
-                content = '\n'.join(current_lines).strip()
-                if len(content) >= MIN_PARAGRAPH_LENGTH:
-                    paragraphs.append({'entity': entity, 'file': filename, 'heading': current_heading, 'text': content})
-                current_lines = []
+            flush()
             continue
         if line.strip() in ('---', '```') or line.strip().startswith('<!--'):
             continue
         current_lines.append(line)
-    if current_lines:
-        content = '\n'.join(current_lines).strip()
-        if len(content) >= MIN_PARAGRAPH_LENGTH:
-            paragraphs.append({'entity': entity, 'file': filename, 'heading': current_heading, 'text': content})
+    flush()
     return paragraphs
 
 
+def extract_paragraphs(filepath):
+    """Split a doctrine markdown file into paragraphs with metadata."""
+    try:
+        text = Path(filepath).read_text(encoding='utf-8')
+    except Exception:
+        return []
+    filename = Path(filepath).name
+    entity = Path(filepath).parent.name
+    return _parse_paragraphs(text, entity, filename)
+
+
+def extract_external_paragraphs(filepath, corpus_name=None):
+    """Extract paragraphs from any .md or .txt file outside doctrine/."""
+    fp = Path(filepath)
+    if not fp.exists():
+        return []
+    if not corpus_name:
+        corpus_name = fp.parent.name or fp.stem
+    try:
+        text = fp.read_text(encoding='utf-8')
+    except Exception:
+        return []
+    return _parse_paragraphs(text, corpus_name, fp.name)
+
+
+def load_external_corpus(path, corpus_name=None):
+    """Load paragraphs from a file or directory of files.
+
+    Returns (paragraphs, corpus_name, file_count).
+    """
+    p = Path(path)
+    if not p.exists():
+        return [], None, 0
+    if not corpus_name:
+        corpus_name = p.stem if p.is_file() else p.name
+    all_paragraphs = []
+    file_count = 0
+    if p.is_file():
+        all_paragraphs = extract_external_paragraphs(p, corpus_name)
+        file_count = 1
+    elif p.is_dir():
+        for f in sorted(p.iterdir()):
+            if f.suffix.lower() in ('.md', '.txt'):
+                all_paragraphs.extend(extract_external_paragraphs(f, corpus_name))
+                file_count += 1
+    return all_paragraphs, corpus_name, file_count
+
+
+# ─── Search Index ──────────────────────────────────────────
+
 class SearchIndex:
+    """TF-IDF + Contrastive Anchor index over paragraphs."""
+
     def __init__(self, anchor_k=5, confuser_k=3):
         self.anchor_k = anchor_k
         self.confuser_k = confuser_k
@@ -165,13 +238,23 @@ class SearchIndex:
         self.build_time_ms = 0
         self._lock = threading.Lock()
 
-    def build(self, scope=None, force_scope=None):
+    def build(self, scope=None, force_scope=None, corpus_origin='doctrine'):
+        """Build index from doctrine entity files. Thread-safe.
+
+        corpus_origin: 'doctrine' (default) or 'external'
+        Set at ingest time — determines auto mode routing.
+        """
         start = time.time()
         if force_scope:
-            scope_info = {'active_entity': None, 'active_class': None,
-                          'entities': force_scope if isinstance(force_scope, list) else [force_scope], 'mode': 'explicit'}
+            scope_info = {
+                'active_entity': None, 'active_class': None,
+                'entities': force_scope if isinstance(force_scope, list) else [force_scope],
+                'mode': 'explicit', 'corpus_origin': corpus_origin,
+            }
         else:
             scope_info = scope or get_active_scope()
+            scope_info['corpus_origin'] = 'doctrine'
+
         all_paragraphs = []
         for entity_name in scope_info['entities']:
             entity_dir = Path(DOCTRINE_PATH) / entity_name
@@ -179,24 +262,56 @@ class SearchIndex:
                 continue
             for md_file in entity_dir.glob('*.md'):
                 all_paragraphs.extend(extract_paragraphs(md_file))
+
+        stats = self._index_paragraphs(all_paragraphs, scope_info, start)
+        return stats
+
+    def build_external(self, path, corpus_name=None):
+        """Build index from an external file or directory. Sets corpus_origin='external'.
+
+        This is the ingest path for alien corpora (Psalms, etc).
+        Auto mode will resolve to 'retrieve' for all searches.
+        """
+        start = time.time()
+        paragraphs, name, file_count = load_external_corpus(path, corpus_name)
+        if not paragraphs:
+            return {'error': f'No paragraphs found at {path}', 'paragraphs': 0, 'files': 0}
+
+        scope_info = {
+            'active_entity': None, 'active_class': None,
+            'entities': [name], 'mode': 'external',
+            'corpus_origin': 'external', 'source_path': str(path),
+        }
+
+        stats = self._index_paragraphs(paragraphs, scope_info, start)
+        stats['corpus_name'] = name
+        stats['files'] = file_count
+        return stats
+
+    def _index_paragraphs(self, all_paragraphs, scope_info, start):
+        """Shared indexing logic for both doctrine and external builds."""
         def searchable_text(p):
             parts = []
             if p.get('heading'):
                 parts.append(p['heading'])
-            parts.append(p['file'].replace('.md', '').replace('-', ' '))
+            parts.append(p['file'].replace('.md', '').replace('.txt', '').replace('-', ' '))
             parts.append(p['text'])
             return ' '.join(parts)
+
         tokens_list = [content_stems(searchable_text(p)) for p in all_paragraphs]
         vocab = set(s for pt in tokens_list for s in pt)
         n = len(all_paragraphs)
+
         df = defaultdict(int)
         for pt in tokens_list:
             for w in set(pt):
                 df[w] += 1
+
         idf = {}
         for w in vocab:
             if df[w] > 0:
                 idf[w] = math.log(n / df[w]) if n > 0 else 0.0
+
         anchors = []
         if n <= 500:
             anchors = self._build_anchors(n, tokens_list, idf)
@@ -205,7 +320,9 @@ class SearchIndex:
                 scores = {w: idf.get(w, 0) for w in set(tokens_list[i])}
                 ranked = sorted(scores.items(), key=lambda x: -x[1])[:self.anchor_k]
                 anchors.append({w: s for w, s in ranked})
+
         elapsed = (time.time() - start) * 1000
+
         with self._lock:
             self.paragraphs = all_paragraphs
             self.tokens = tokens_list
@@ -217,10 +334,15 @@ class SearchIndex:
             self.scope = scope_info
             self.built_at = time.strftime('%Y-%m-%dT%H:%M:%S')
             self.build_time_ms = round(elapsed)
-        return {'paragraphs': n, 'entities': len(scope_info['entities']),
-                'vocab': len(vocab), 'build_time_ms': round(elapsed), 'scope_mode': scope_info['mode']}
+
+        return {
+            'paragraphs': n, 'entities': len(scope_info['entities']),
+            'vocab': len(vocab), 'build_time_ms': round(elapsed),
+            'scope_mode': scope_info['mode'],
+        }
 
     def _build_anchors(self, n, tokens_list, idf):
+        """Contrastive anchors — words that distinguish each paragraph from its neighbors."""
         anchors = []
         for i in range(n):
             sims = []
@@ -298,27 +420,47 @@ class SearchIndex:
             total += sum(self.idf.get(w, 0) for w in overlap)
         return total / len(neighbors)
 
+    def _resolve_mode(self, mode):
+        """Auto-resolve search mode from context.
+
+        corpus_origin is authoritative — set when the index is built,
+        not guessed from file naming conventions.
+        """
+        if mode != 'auto':
+            return mode
+        origin = self.scope.get('corpus_origin', 'doctrine')
+        if origin == 'external':
+            return 'retrieve'
+        return 'explore'
+
     def search(self, query_text, top_n=10, anchor_weight=15, nbr_weight=10,
-               entity_boost=1.3, entity_filter=None, mode='explore'):
+               entity_boost=1.3, entity_filter=None, mode='auto'):
         """Search the index.
 
-        mode='explore' — editorial weights in score (doctrine browsing)
+        mode='auto'     — daemon decides from context (default)
+        mode='explore'  — editorial weights in score (doctrine browsing)
         mode='retrieve' — pure BM25 ranking, adjustments to margin only (SLA v2)
         """
         with self._lock:
             if self.n == 0:
                 return {'results': [], 'margin': 0.0, 'query': query_text, 'indexed': 0}
+
+            mode = self._resolve_mode(mode)
+
             q_stems = content_stems(query_text)
             q_unique = set(q_stems)
             if not q_unique:
                 return {'results': [], 'margin': 0.0, 'query': query_text, 'indexed': self.n}
+
             avgdl = sum(len(pt) for pt in self.tokens) / max(self.n, 1)
+
             boosted_entities = set()
             active = self.scope.get('active_entity')
             if active:
                 boosted_entities.add(active)
                 for ent in self.scope.get('entities', []):
                     boosted_entities.add(ent)
+
             qs = max(len(q_unique), 1)
             scores = []
             for i, pt in enumerate(self.tokens):
@@ -330,7 +472,6 @@ class SearchIndex:
                     scores.append((i, 0.0, overlap))
                     continue
                 dl = len(pt)
-                # BM25 scoring — immutable ranking signal
                 bm25_score = 0.0
                 for w in overlap:
                     tf = pt.count(w)
@@ -340,7 +481,7 @@ class SearchIndex:
                 score = bm25_score * (1.0 + coverage * 0.5)
                 proximity = self._phrase_proximity(pt, q_unique)
                 score *= (1.0 + proximity * 0.5)
-                # === Mode-dependent scoring ===
+                # Mode-dependent scoring
                 if mode == 'explore':
                     fname = p['file']
                     if fname.startswith('ROOT-') or fname.startswith('ROOT_'):
@@ -349,9 +490,10 @@ class SearchIndex:
                         score *= 0.5
                     if boosted_entities and p['entity'] in boosted_entities:
                         score *= entity_boost
-                # mode='retrieve': score stays pure. SLA v2.
                 scores.append((i, score, overlap))
+
             scores.sort(key=lambda x: -x[1])
+
             # Dedup
             seen_groups = {}
             deduped = []
@@ -375,6 +517,7 @@ class SearchIndex:
                 deduped.append(group_key)
                 if len(deduped) >= top_n:
                     break
+
             results = []
             result_indices = []
             for key in deduped:
@@ -382,7 +525,8 @@ class SearchIndex:
                 r['siblings'] = count - 1
                 results.append(r)
                 result_indices.append(idx)
-            # === Margin calculation ===
+
+            # Margin calculation
             if len(results) >= 2:
                 raw = (results[0]['score'] - results[1]['score']) / max(results[0]['score'], 1e-10) * 100
                 ad = len(results[0].get('anchor_hits', [])) - len(results[1].get('anchor_hits', []))
@@ -410,6 +554,7 @@ class SearchIndex:
                 margin = 100.0
             else:
                 margin = 0.0
+
             # Confidence gate — SLA Layer 4
             if mode == 'retrieve':
                 if margin > 50:
@@ -433,6 +578,7 @@ class SearchIndex:
                             r['confidence'] = 'MED'
                         else:
                             r['confidence'] = 'LOW'
+
             return {
                 'results': results, 'margin': round(margin, 1), 'query': query_text,
                 'mode': mode, 'indexed': self.n,
@@ -561,18 +707,25 @@ class SearchIndex:
                 'paragraphs': self.n, 'entities': self.scope.get('entities', []),
                 'entity_count': len(self.scope.get('entities', [])),
                 'vocab_size': len(self.vocab), 'scope_mode': self.scope.get('mode', 'none'),
+                'corpus_origin': self.scope.get('corpus_origin', 'doctrine'),
+                'source_path': self.scope.get('source_path'),
                 'active_entity': self.scope.get('active_entity'),
                 'built_at': self.built_at, 'build_time_ms': self.build_time_ms,
                 'anchors': len(self.anchors),
             }
 
 
+# ─── File Watcher ──────────────────────────────────────────
+
 class FileWatcher:
+    """Polls for file changes and triggers reindex."""
+
     def __init__(self, index, interval=WATCH_INTERVAL):
         self.index = index
         self.interval = interval
         self._signatures = {}
         self._running = False
+        self._paused = False
         self._thread = None
 
     def _snapshot(self):
@@ -597,12 +750,13 @@ class FileWatcher:
     def _watch_loop(self):
         while self._running:
             try:
-                new_sigs, scope = self._snapshot()
-                if new_sigs != self._signatures:
-                    self._signatures = new_sigs
-                    stats = self.index.build(scope=scope)
-                    ts = time.strftime('%H:%M:%S')
-                    print(f"  [{ts}] Reindexed: {stats['paragraphs']} paragraphs from {stats['entities']} entities ({stats['build_time_ms']}ms)")
+                if not self._paused:
+                    new_sigs, scope = self._snapshot()
+                    if new_sigs != self._signatures:
+                        self._signatures = new_sigs
+                        stats = self.index.build(scope=scope)
+                        ts = time.strftime('%H:%M:%S')
+                        print(f"  [{ts}] Reindexed: {stats['paragraphs']} paragraphs from {stats['entities']} entities ({stats['build_time_ms']}ms)")
             except Exception as e:
                 print(f"  Watch error: {e}", file=sys.stderr)
             time.sleep(self.interval)
@@ -619,12 +773,24 @@ class FileWatcher:
     def stop(self):
         self._running = False
 
+    def pause(self):
+        """Pause watching — used when external corpus is loaded."""
+        self._paused = True
+
+    def resume(self):
+        """Resume watching and rebuild doctrine index."""
+        self._paused = False
+        self._signatures = {}
+
+
+# ─── HTTP Server ───────────────────────────────────────────
 
 index = SearchIndex()
 watcher = FileWatcher(index)
 
 
 class SearchHandler(BaseHTTPRequestHandler):
+
     def do_GET(self):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip('/')
@@ -638,9 +804,9 @@ class SearchHandler(BaseHTTPRequestHandler):
             top_n = int(params.get('top', ['10'])[0])
             scope_override = params.get('scope', [None])[0]
             entity_filter = params.get('entity', [None])[0]
-            mode = params.get('mode', ['explore'])[0]
-            if mode not in ('explore', 'retrieve'):
-                mode = 'explore'
+            mode = params.get('mode', ['auto'])[0]
+            if mode not in ('auto', 'explore', 'retrieve'):
+                mode = 'auto'
             if scope_override == 'all':
                 all_entities = []
                 try:
@@ -655,6 +821,29 @@ class SearchHandler(BaseHTTPRequestHandler):
             else:
                 result = index.search(query, top_n=top_n, entity_filter=entity_filter, mode=mode)
             self._json(200, result)
+
+        elif path == '/load':
+            file_path = params.get('path', [''])[0]
+            if not file_path:
+                self._json(400, {'error': 'Missing ?path= parameter'})
+                return
+            file_path = unquote(file_path)
+            corpus_name = params.get('name', [None])[0]
+            watcher.pause()
+            stats = index.build_external(file_path, corpus_name)
+            if 'error' in stats:
+                watcher.resume()
+                self._json(400, stats)
+            else:
+                ts = time.strftime('%H:%M:%S')
+                print(f"  [{ts}] External corpus loaded: {stats['paragraphs']} paragraphs from {stats.get('files', '?')} files ({stats['build_time_ms']}ms)")
+                self._json(200, {'loaded': True, 'watcher': 'paused', **stats})
+
+        elif path == '/unload':
+            watcher.resume()
+            ts = time.strftime('%H:%M:%S')
+            print(f"  [{ts}] External corpus unloaded, resuming doctrine watch")
+            self._json(200, {'unloaded': True, 'watcher': 'resumed'})
 
         elif path == '/status':
             self._json(200, index.status())
@@ -683,7 +872,7 @@ class SearchHandler(BaseHTTPRequestHandler):
             result = index.entity_similarity()
             self._json(200, result)
         else:
-            self._json(404, {'error': 'Endpoints: /search, /duplicates, /orphans, /coverage, /similarity, /status, /reindex'})
+            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /status, /reindex'})
 
     def _json(self, code, data):
         body = json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8')
@@ -699,6 +888,8 @@ class SearchHandler(BaseHTTPRequestHandler):
             super().log_message(format, *args)
 
 
+# ─── CLI Entry Point ──────────────────────────────────────
+
 def write_results_file(results, output_path=None):
     if not output_path:
         output_path = os.path.join(STATE_PATH, 'search_results.md')
@@ -709,7 +900,7 @@ def write_results_file(results, output_path=None):
         lines.append(f"**{len(results['results'])} results** | Scope: {results.get('scope', 'unknown')} | Margin: {results.get('margin', 0)}%")
         lines.append('')
         for i, r in enumerate(results['results'], 1):
-            conf = {'HIGH': '🟢', 'MED': '🟡', 'LOW': '🔴'}.get(r.get('confidence', 'LOW'), '⚪')
+            conf = {'HIGH': '\U0001f7e2', 'MED': '\U0001f7e1', 'LOW': '\U0001f534'}.get(r.get('confidence', 'LOW'), '\u26aa')
             heading = f" > {r['heading']}" if r.get('heading') else ''
             sibling_tag = f" (+{r['siblings']} more)" if r.get('siblings', 0) > 0 else ''
             lines.append(f"### {conf} {i}. {r['entity']}/{r['file']}{heading}{sibling_tag}")
@@ -743,13 +934,13 @@ if __name__ == '__main__':
         print(f"\nQuery: {query}")
         print(f"Results: {len(results['results'])} | Margin: {results['margin']}%")
         for r in results['results']:
-            conf = {'HIGH': '🟢', 'MED': '🟡', 'LOW': '🔴'}.get(r.get('confidence'), '⚪')
+            conf = {'HIGH': '\U0001f7e2', 'MED': '\U0001f7e1', 'LOW': '\U0001f534'}.get(r.get('confidence'), '\u26aa')
             sib = f" (+{r['siblings']})" if r.get('siblings', 0) > 0 else ''
-            print(f"  {conf} {r['entity']}/{r['file']} — {r['score']} — {r.get('heading', '')}{sib}")
+            print(f"  {conf} {r['entity']}/{r['file']} -- {r['score']} -- {r.get('heading', '')}{sib}")
         print(f"\nResults written to: {path}")
         sys.exit(0)
 
-    print(f"🔍 BOND Search Daemon starting on port {port}")
+    print(f"\U0001f50d BOND Search Daemon starting on port {port}")
     print(f"   BOND_ROOT: {BOND_ROOT}")
     print(f"   Doctrine:  {DOCTRINE_PATH}")
     print(f"   State:     {STATE_PATH}")
@@ -760,7 +951,8 @@ if __name__ == '__main__':
     print(f"     GET http://localhost:{port}/search?q=your+query")
     print(f"     GET http://localhost:{port}/search?q=query&mode=retrieve")
     print(f"     GET http://localhost:{port}/search?q=query&scope=all")
-    print(f"     GET http://localhost:{port}/search?q=query&entity=P11-Plumber")
+    print(f"     GET http://localhost:{port}/load?path=C:/texts/psalms.md")
+    print(f"     GET http://localhost:{port}/unload")
     print(f"     GET http://localhost:{port}/duplicates")
     print(f"     GET http://localhost:{port}/orphans")
     print(f"     GET http://localhost:{port}/coverage?entity=P11-Plumber")
@@ -774,11 +966,11 @@ if __name__ == '__main__':
 
     try:
         server = ThreadedServer(('127.0.0.1', port), SearchHandler)
-        print(f"🔥 Search daemon listening on http://localhost:{port}")
+        print(f"\U0001f525 Search daemon listening on http://localhost:{port}")
         print(f"   Watching for file changes every {WATCH_INTERVAL}s")
         print()
         server.serve_forever()
     except KeyboardInterrupt:
-        print("\n🛑 Search daemon stopped")
+        print("\n\U0001f6d1 Search daemon stopped")
         watcher.stop()
         sys.exit(0)
