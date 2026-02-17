@@ -42,9 +42,15 @@ Lost count: recommend {Sync}.
   Claude reads the file, echoes the badged sections, then adds a brief pickup summary and asks what to work on. Do not strip, reformat, or consolidate the badge output.
   No counter reset. Does not replace {Full Restore} — use Full for comprehensive cold boot, Warm for contextual pickup.
   See: doctrine/BOND_MASTER/WARM_RESTORE.md for full architecture.
-{Handoff}: Draft WORK, DECISIONS, THREADS, FILES sections for session handoff.
+{Handoff}: Auto-combining session record. Always reads before writing.
+  1) Check for existing handoffs/HANDOFF_S{N}.md for this session.
+  2) Check state/session_chunks.md for accumulated chunks.
+  3) Synthesize: previous handoff + new chunks + current context → WORK, DECISIONS, THREADS, FILES sections.
+  4) Write to handoffs/HANDOFF_S{N}.md (overwrite if exists).
+  5) Clear state/session_chunks.md.
+  Consecutive calls auto-combine. Each write is richer. Last write = most complete. No "mid" or "final" labels.
   Output format: code block with ===SECTION=== delimiters (preserves markdown through clipboard).
-  Panel pre-fills CONTEXT + STATE. Claude drafts the four content sections from conversation context.
+  Panel pre-fills CONTEXT + STATE. Claude drafts the four content sections.
   If no panel, Claude drafts all six sections manually.
   No counter reset.
 
@@ -59,7 +65,7 @@ Compaction = context was lost. QAIS retrieval is non-optional. This is an Armed=
 
 ## COMMANDS
 Commands are keyword-driven, not exact-match. `{Sync}`, `{Project Sync}`, `{Sync} GSG` all fire Sync. Additional words = parameters/context. Case insensitive. Multiple commands per message processed left-to-right.
-{Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (Layer 1: last handoff, Layer 2: archive query with confidence badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot | {Tick} quick status + obligation audit (GET /api/sync-health) | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Relational} arch re-anchor | {Drift?} self-check
+{Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (Layer 1: last handoff, Layer 2: archive query with confidence badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot → append to state/session_chunks.md (timestamped, 10-20 lines). Chunks are ingredients for {Handoff}, not standalone. Compaction insurance + handoff enrichment | {Tick} quick status + obligation audit (GET /api/sync-health) | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Relational} arch re-anchor | {Drift?} self-check
 
 ## TOOL WIRING
 Command tools (fire on command, respect class boundaries):

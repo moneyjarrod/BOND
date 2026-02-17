@@ -75,7 +75,7 @@ Hooks are subordinate to BOND_MASTER doctrine. They augment, never override.
 | {Full Restore} | Complete reload + full depth read | Yes |
 | {Save} | Write proven work (both agree) | No |
 | {Crystal} | QAIS crystallization | No |
-| {Chunk} | Session snapshot | No |
+| {Chunk} | Session snapshot → appends to state/session_chunks.md | No |
 | {Tick} | Quick status | No |
 | {Enter ENTITY} | Load entity files, apply class boundaries | No |
 | {Exit} | Clear active entity, drop boundaries | No |
@@ -128,3 +128,40 @@ Save writes to the appropriate layer:
 - Doctrine changes (entity files)
 
 Bug-to-fix link format: Symptom + Fix + Link.
+
+## Chunk Persistence
+
+{Chunk} writes a timestamped snapshot to `state/session_chunks.md` (append-only). Each entry is a concise summary (10-20 lines) of work completed, decisions made, and open threads at that point in the session.
+
+Chunks are **ingredients for {Handoff}**, not standalone artifacts. They serve two purposes:
+1. **Compaction insurance** — if context is lost mid-session, chunks on disc carry what was lost.
+2. **Handoff enrichment** — {Handoff} synthesizes all accumulated chunks into a complete session record.
+
+Chunk format:
+```
+---CHUNK S{N} t{X}/{L} {timestamp}---
+[concise snapshot]
+---END CHUNK---
+```
+
+## Handoff Protocol
+
+{Handoff} always **reads before it writes**. One file per session, auto-combining.
+
+1. Check for existing `handoffs/HANDOFF_S{N}.md` for this session.
+2. Check `state/session_chunks.md` for accumulated chunks.
+3. Synthesize: previous handoff content + new chunks + current context → structured sections (WORK, DECISIONS, THREADS, FILES).
+4. Write to `handoffs/HANDOFF_S{N}.md` (overwrite if exists).
+5. Clear `state/session_chunks.md`.
+
+Consecutive {Handoff} calls in the same session automatically combine. Each write is richer than the last. The final write is always the most complete — no "mid" or "final" labels needed.
+
+```
+{Chunk} t3  → session_chunks.md
+{Chunk} t7  → session_chunks.md
+{Handoff} t10 → reads chunks → writes HANDOFF_S119.md → clears chunks
+{Chunk} t14 → session_chunks.md
+{Handoff} t20 → reads HANDOFF_S119.md + chunks → overwrites HANDOFF_S119.md → clears chunks
+```
+
+{Warm Restore} Layer 1 picks up the one file. Everything synthesized. Nothing lost.
