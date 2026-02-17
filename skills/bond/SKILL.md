@@ -17,7 +17,7 @@ No reset: {Save}, {Chunk}, {Warm Restore}, {Handoff}, bonfire, task completion, 
 Lost count: recommend {Sync}.
 
 ## SYNC
-{Sync}: 1) Read project SKILL 2) Read OPS/MASTER 3) Read state/active_entity.json — if entity set, read all files at path field; then read entity's entity.json for links array, load linked entities' .md files; if null, skip 4) Read state/config.json for save_confirmation toggle 5) Vine lifecycle: GET /api/seeders — if any armed perspectives returned, run the full vine pass for each:
+{Sync}: 1) Read project SKILL 2) Read OPS/MASTER 3) Read state/active_entity.json — if entity set, read all files at path field; then read entity's entity.json for links array, load linked entities' .md files; if null, skip 4) Read state/config.json for save_confirmation toggle 5) Vine lifecycle: GET /api/seeders — if API unavailable, fallback: scan doctrine/*/entity.json for perspective-class entities with `"seeding": true`. If any armed perspectives found, run the full vine pass for each:
   a) RESONATE: perspective_check(perspective, text) with substantive content from recent exchanges.
   b) TRACK: Read perspective's seed_tracker.json. Increment `exposures` on ALL active seeds. Seeds that scored above entity's `seed_threshold` in (a) get `hits += 1` and `last_hit` updated.
   c) AUTO-SEED (novel discovery): Claude reads conversation through the perspective's ROOT lens. Patterns that fit the perspective's worldview but aren't captured = candidates. Check candidates against field — LOW resonance confirms novelty (high = already known).

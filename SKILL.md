@@ -17,7 +17,7 @@ No reset: {Save}, {Chunk}, {Warm Restore}, {Handoff}, bonfire, task completion, 
 Lost count: recommend {Sync}.
 
 ## SYNC
-{Sync}: 1) Read project SKILL 2) Read OPS/MASTER 3) Read state/active_entity.json — if entity set, read all files at path field; then read entity's entity.json for links array, load linked entities' .md files; if null, skip 4) Read state/config.json for save_confirmation toggle 5) Vine lifecycle: GET /api/seeders — if any armed perspectives returned, run the full vine pass for each:
+{Sync}: 1) Read project SKILL 2) Read OPS/MASTER 3) Read state/active_entity.json — if entity set, read all files at path field; then read entity's entity.json for links array, load linked entities' .md files; if null, skip 4) Read state/config.json for save_confirmation toggle 5) Vine lifecycle: GET /api/seeders — if API unavailable, fallback: scan doctrine/*/entity.json for perspective-class entities with `"seeding": true`. If any armed perspectives found, run the full vine pass for each:
   a) RESONATE: perspective_check(perspective, text) with substantive content from recent exchanges.
   b) TRACK: Read perspective's seed_tracker.json. Increment `exposures` on ALL active seeds. Score each seed from (a):
      - Score ≥ seed_threshold → `hits += 1`, update `last_hit` (SUNSHINE)
