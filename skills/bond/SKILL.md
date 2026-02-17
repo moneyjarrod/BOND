@@ -58,6 +58,7 @@ When Claude detects a compaction note at the top of context ("[NOTE: This conver
 Compaction = context was lost. QAIS retrieval is non-optional. This is an Armed=Obligated trigger (BOND_MASTER principle 8).
 
 ## COMMANDS
+Commands are keyword-driven, not exact-match. `{Sync}`, `{Project Sync}`, `{Sync} GSG` all fire Sync. Additional words = parameters/context. Case insensitive. Multiple commands per message processed left-to-right.
 {Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (Layer 1: last handoff, Layer 2: archive query with confidence badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot | {Tick} quick status + obligation audit (GET /api/sync-health) | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Relational} arch re-anchor | {Drift?} self-check
 
 ## TOOL WIRING

@@ -51,6 +51,7 @@ BOND_MASTER lives at L0 alongside SKILL. It IS the system's self-knowledge.
 7. **Clipboard is bridge.** Panel → clipboard → AHK → Claude. No HTTP polling.
 8. **Armed = Obligated.** Any subsystem in an armed state creates a non-optional obligation during its governing command. The server generates obligations from state. The governing command services them. {Tick} audits completion. Gaps are surfaced structurally, not self-reported. Prose instructions are documentation; code enforcement is the mechanism.
 9. **New capability = doctrine review.** When a new system is added under BOND_MASTER authority, it must be evaluated against existing doctrine before it is considered complete. If the capability introduces a pattern not covered by current IS statements, the doctrine must be updated to cover it. New capabilities that contradict existing doctrine are rejected or the contradiction is resolved explicitly. The constitution cannot be silently outgrown by the system it governs.
+10. **Command recognition is keyword-driven.** Commands are identified by their core keyword inside `{}` braces. Additional words inside or outside the braces are treated as parameters or context, never as command modification. `{Sync}`, `{Project Sync}`, `{Sync} GSG`, and `{Project Sync} GSG` all fire `{Sync}`. The core keyword is authoritative. Known keywords: Sync, Full Restore, Warm Restore, Save, Crystal, Chunk, Tick, Enter, Exit, Relational, Drift, Handoff.
 
 ## Mantra
 

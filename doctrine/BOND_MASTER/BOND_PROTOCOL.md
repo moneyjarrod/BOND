@@ -82,6 +82,27 @@ Hooks are subordinate to BOND_MASTER doctrine. They augment, never override.
 | {Relational} | Architecture re-anchor | No |
 | {Drift?} | Self-check | No |
 
+## Command Recognition
+
+Commands are parsed by **core keyword**, not exact string match. When Claude encounters `{}` braces in user input:
+
+1. Extract all words inside the braces.
+2. Match against known command keywords: Sync, Full Restore, Warm Restore, Save, Crystal, Chunk, Tick, Enter, Exit, Relational, Drift, Handoff.
+3. If a known keyword is found, fire that command.
+4. All other words (inside or outside braces) are treated as **parameters** — entity names, project context, descriptors.
+5. Multiple commands in one message are processed left-to-right.
+
+**Examples:**
+- `{Sync}` → fires Sync
+- `{Sync} GSG` → fires Sync, "GSG" is context
+- `{Project Sync} GSG` → fires Sync, "Project" and "GSG" are context
+- `{Project Chunk} GSG{Project Sync} GSG` → fires Chunk then Sync
+- `{Enter BOND_MASTER}` → fires Enter, "BOND_MASTER" is the entity parameter
+
+**Case insensitive.** `{sync}`, `{SYNC}`, `{Sync}` all match.
+
+**Unknown keywords are ignored.** `{Thoughts on dinner}` does not fire any command.
+
 ## Sync Protocol
 
 {Sync} reads in order:
