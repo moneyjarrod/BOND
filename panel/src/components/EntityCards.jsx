@@ -100,8 +100,8 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
   const pickerRef = useRef(null);
   const [showConsultPicker, setShowConsultPicker] = useState(false);
   const [consultable, setConsultable] = useState([]);
-  const [consultSent, setConsultSent] = useState(null);
   const consultPickerRef = useRef(null);
+
   const { lastEvent } = useContext(WebSocketContext);
 
   // Fetch linkable entities when active and picker opens
@@ -124,18 +124,13 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
     return () => document.removeEventListener('mousedown', handler);
   }, [showLinkPicker]);
 
-  const handleLinkSelect = useCallback((ent) => {
-    setShowLinkPicker(false);
-    if (onLink) onLink(ent);
-  }, [onLink]);
-
-  // Fetch consultable entities when active project and picker opens
+  // Fetch consultable entities when consult picker opens
   useEffect(() => {
-    if (!isActive || entity.type !== 'project' || !showConsultPicker) return;
+    if (!isActive || !showConsultPicker) return;
     fetch('/api/state/consultable').then(r => r.json()).then(data => {
-      setConsultable(data.consultable || []);
+      setConsultable((data.consultable || []).map(c => ({ name: c.entity, type: c.class, display_name: c.display_name })));
     }).catch(() => setConsultable([]));
-  }, [isActive, entity.type, showConsultPicker]);
+  }, [isActive, showConsultPicker]);
 
   // Close consult picker on outside click
   useEffect(() => {
@@ -149,16 +144,16 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
     return () => document.removeEventListener('mousedown', handler);
   }, [showConsultPicker]);
 
+  const handleLinkSelect = useCallback((ent) => {
+    setShowLinkPicker(false);
+    if (onLink) onLink(ent);
+  }, [onLink]);
+
   const handleConsultSelect = useCallback(async (ent) => {
     setShowConsultPicker(false);
-    const cmd = `BOND:{Consult ${ent.entity}}`;
-    try { await navigator.clipboard.writeText(cmd); } catch {
-      const ta = document.createElement('textarea');
-      ta.value = cmd; document.body.appendChild(ta); ta.select();
-      document.execCommand('copy'); document.body.removeChild(ta);
-    }
-    setConsultSent(ent.entity);
-    setTimeout(() => setConsultSent(null), 1500);
+    try {
+      await navigator.clipboard.writeText(`BOND:{Consult ${ent.name}}`);
+    } catch {}
   }, []);
 
   // Sync seeding state from WebSocket events
@@ -368,6 +363,77 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
         ) : (
           <ActionBtn label="Enter" disabled={false} primary={true} onClick={() => onEnter(entity)} />
         )}
+        {isActive && entity.type === 'project' && (
+          <div ref={consultPickerRef} style={{ position: 'relative' }}>
+            <ActionBtn label="🔭 Consult" disabled={false} onClick={() => setShowConsultPicker(!showConsultPicker)} />
+            {showConsultPicker && (
+              <div style={{
+                position: 'absolute',
+                bottom: '100%',
+                left: 0,
+                marginBottom: 6,
+                background: '#1e2030',
+                border: '1px solid rgba(168,130,255,0.4)',
+                borderRadius: 'var(--radius-md)',
+                boxShadow: '0 -8px 32px rgba(0,0,0,0.6)',
+                minWidth: 220,
+                maxHeight: 260,
+                overflowY: 'auto',
+                zIndex: 1000,
+                padding: '6px 0',
+              }}>
+                {consultable.length === 0 ? (
+                  <div style={{
+                    padding: '12px 16px',
+                    fontSize: '0.75rem',
+                    color: 'var(--text-muted)',
+                    fontFamily: 'var(--font-mono)',
+                  }}>
+                    No consultable entities
+                  </div>
+                ) : (
+                  consultable.map(ent => {
+                    const cm = CLASS_META[ent.type] || CLASS_META.library;
+                    return (
+                      <button
+                        key={ent.name}
+                        onClick={() => handleConsultSelect(ent)}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          width: '100%',
+                          padding: '8px 14px',
+                          background: 'transparent',
+                          border: 'none',
+                          color: 'var(--text-primary)',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: '0.78rem',
+                          cursor: 'pointer',
+                          textAlign: 'left',
+                          transition: 'background 0.1s ease',
+                        }}
+                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(168,130,255,0.12)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
+                      >
+                        <span style={{ flexShrink: 0 }}>{cm.icon}</span>
+                        <span style={{ flex: 1 }}>{ent.display_name || ent.name}</span>
+                        <span style={{
+                          fontSize: '0.6rem',
+                          color: 'var(--text-muted)',
+                          textTransform: 'uppercase',
+                          flexShrink: 0,
+                        }}>
+                          {ent.type?.slice(0, 3)}
+                        </span>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        )}
         {isActive && onLink && (
           <div ref={pickerRef} style={{ position: 'relative' }}>
             <ActionBtn label="🔗 Link" disabled={false} onClick={() => setShowLinkPicker(!showLinkPicker)} />
@@ -439,81 +505,7 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
             )}
           </div>
         )}
-        {isActive && entity.type === 'project' && (
-          <div ref={consultPickerRef} style={{ position: 'relative' }}>
-            <ActionBtn
-              label={consultSent ? `✅ ${consultSent}` : '🔭 Consult'}
-              disabled={false}
-              onClick={() => setShowConsultPicker(!showConsultPicker)}
-            />
-            {showConsultPicker && (
-              <div style={{
-                position: 'absolute',
-                bottom: '100%',
-                left: 0,
-                marginBottom: 6,
-                background: '#1e2030',
-                border: '1px solid rgba(168,130,255,0.4)',
-                borderRadius: 'var(--radius-md)',
-                boxShadow: '0 -8px 32px rgba(0,0,0,0.6)',
-                minWidth: 240,
-                maxHeight: 260,
-                overflowY: 'auto',
-                zIndex: 1000,
-                padding: '6px 0',
-              }}>
-                {consultable.length === 0 ? (
-                  <div style={{
-                    padding: '12px 16px',
-                    fontSize: '0.75rem',
-                    color: 'var(--text-muted)',
-                    fontFamily: 'var(--font-mono)',
-                  }}>
-                    No linked perspectives or doctrine — use 🔗 Link first
-                  </div>
-                ) : (
-                  consultable.map(ent => {
-                    const cm = CLASS_META[ent.class] || CLASS_META.library;
-                    return (
-                      <button
-                        key={ent.entity}
-                        onClick={() => handleConsultSelect(ent)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: 8,
-                          width: '100%',
-                          padding: '8px 14px',
-                          background: 'transparent',
-                          border: 'none',
-                          color: 'var(--text-primary)',
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: '0.78rem',
-                          cursor: 'pointer',
-                          textAlign: 'left',
-                          transition: 'background 0.1s ease',
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(168,130,255,0.12)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; }}
-                      >
-                        <span style={{ flexShrink: 0 }}>{cm.icon}</span>
-                        <span style={{ flex: 1 }}>{ent.display_name || ent.entity}</span>
-                        <span style={{
-                          fontSize: '0.6rem',
-                          color: 'var(--text-muted)',
-                          textTransform: 'uppercase',
-                          flexShrink: 0,
-                        }}>
-                          {ent.class?.slice(0, 3)}
-                        </span>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            )}
-          </div>
-        )}
+
       </div>
     </div>
   );

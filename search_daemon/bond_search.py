@@ -1,0 +1,673 @@
+"""
+BOND Search Daemon — Local Paragraph-Level Search Engine
+Phase 1: TF-IDF + Contrastive Anchors (ported from warm_restore SectionCorpus)
+
+Standalone process that:
+  - Watches doctrine/ and state/ for changes
+  - Derives scope from active_entity.json + link graph
+  - Indexes entity .md files at paragraph level
+  - Serves search queries via HTTP on port 3003
+
+Usage:
+    python bond_search.py                # start daemon
+    python bond_search.py --port 3004    # custom port
+    python bond_search.py --once "query" # one-shot query, no server
+
+Endpoints:
+    GET /search?q=backflow+prevention          # query the index
+    GET /search?q=pressure&scope=all           # search all entities
+    GET /search?q=pressure&entity=P11-Plumber  # local valve: single entity
+    GET /status                                # index stats, scope, health
+    GET /reindex                               # force rebuild
+"""
+
+import sys, os, re, json, math, time, threading
+from pathlib import Path
+from collections import defaultdict
+from http.server import HTTPServer, BaseHTTPRequestHandler
+from urllib.parse import urlparse, parse_qs
+
+# ─── Config ────────────────────────────────────────────────
+
+BOND_ROOT = os.environ.get('BOND_ROOT', str(Path(__file__).parent.parent))
+DOCTRINE_PATH = os.path.join(BOND_ROOT, 'doctrine')
+STATE_PATH = os.path.join(BOND_ROOT, 'state')
+DEFAULT_PORT = 3003
+WATCH_INTERVAL = 2.0  # seconds between file change checks
+MIN_PARAGRAPH_LENGTH = 20  # characters — skip tiny fragments
+
+# ─── Text Processing (from warm_restore.py) ────────────────
+
+SUFFIXES = ['ation','tion','sion','ness','ment','able','ible','ful','ous','ing','ed','ly','s']
+STEM_EXCEPTIONS = {
+    'this','his','its','was','has','does','is','as','us','yes','thus','plus','minus','status','focus',
+    'process','express','access','address','unless','less','loss','boss','miss','pass','class',
+    'across','always','perhaps','besides','sometimes','series','species','indices','becomes','parties',
+    'used','based','need','seed','speed','feed','shared','said','paid','red','bed','led','bounded',
+    'being','thing','nothing','something','everything','string','bring','during','morning','feeling','meaning',
+    'binding','mapping','working','building','only','early','likely','family','really','finally',
+    'apply','supply','reply','rely','silently','other','another','either','neither','whether',
+    'never','ever','over','under','after','rather','layer','player','server','container','counter',
+    'sidecar','however','together','whatever','trigger','buffer','cluster','register',
+    'between','even','means','sometimes','collaborative','speculative','performing','observations',
+}
+STOP_WORDS = {
+    'the','be','to','of','and','in','that','have','it','for','on','with','he','as','you','do','at',
+    'this','but','his','by','from','they','we','say','her','she','or','an','will','my','one','all',
+    'would','there','their','what','so','up','out','if','about','who','get','which','go','me','when',
+    'make','can','like','no','just','him','know','take','how','could','them','see','than','been','had',
+    'its','was','has','does','are','were','did','am','is','not','don','also','ll','re','ve','won',
+    'didn','isn','aren','doesn','some','any','much','more','most','such','very','too','own','same',
+    'other','each','every','both','few','many','may','might','shall','should','a','i',
+}
+
+def light_stem(word):
+    if word in STEM_EXCEPTIONS:
+        return word
+    for s in SUFFIXES:
+        if word.endswith(s) and len(word) - len(s) >= 4:
+            return word[:-len(s)]
+    return word
+
+def tokenize(text):
+    expanded = text.lower().replace('_', ' ')
+    raw = re.findall(r"[a-zA-Z0-9'-]+", expanded)
+    return [light_stem(c) for w in raw for c in [w.strip("'-").lower()] if len(c) > 1]
+
+def content_stems(text):
+    return [s for s in tokenize(text) if s not in STOP_WORDS and len(s) > 2]
+
+
+# ─── Scope Derivation ─────────────────────────────────────
+
+def get_active_scope():
+    """Read active_entity.json + follow link graph to determine search scope."""
+    state_file = Path(STATE_PATH) / 'active_entity.json'
+    scope = {
+        'active_entity': None,
+        'active_class': None,
+        'entities': [],
+        'mode': 'all',
+    }
+
+    try:
+        state = json.loads(state_file.read_text(encoding='utf-8'))
+        if state.get('entity'):
+            scope['active_entity'] = state['entity']
+            scope['active_class'] = state.get('class', 'unknown')
+            scope['mode'] = 'active'
+            scope['entities'].append(state['entity'])
+            try:
+                config_path = Path(DOCTRINE_PATH) / state['entity'] / 'entity.json'
+                config = json.loads(config_path.read_text(encoding='utf-8'))
+                for link in config.get('links', []):
+                    if link not in scope['entities']:
+                        scope['entities'].append(link)
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    if not scope['entities']:
+        scope['mode'] = 'all'
+        try:
+            for entry in Path(DOCTRINE_PATH).iterdir():
+                if entry.is_dir():
+                    scope['entities'].append(entry.name)
+        except Exception:
+            pass
+
+    return scope
+
+
+# ─── Paragraph Extractor ──────────────────────────────────
+
+def extract_paragraphs(filepath):
+    """Split a markdown file into paragraphs with metadata."""
+    try:
+        text = Path(filepath).read_text(encoding='utf-8')
+    except Exception:
+        return []
+
+    paragraphs = []
+    current_heading = None
+    current_lines = []
+    filename = Path(filepath).name
+    entity = Path(filepath).parent.name
+
+    for line in text.split('\n'):
+        hm = re.match(r'^(#{1,3})\s+(.+)$', line)
+        if hm:
+            if current_lines:
+                content = '\n'.join(current_lines).strip()
+                if len(content) >= MIN_PARAGRAPH_LENGTH:
+                    paragraphs.append({
+                        'entity': entity, 'file': filename,
+                        'heading': current_heading, 'text': content,
+                    })
+                current_lines = []
+            current_heading = hm.group(2).strip()
+            continue
+
+        if not line.strip():
+            if current_lines:
+                content = '\n'.join(current_lines).strip()
+                if len(content) >= MIN_PARAGRAPH_LENGTH:
+                    paragraphs.append({
+                        'entity': entity, 'file': filename,
+                        'heading': current_heading, 'text': content,
+                    })
+                current_lines = []
+            continue
+
+        if line.strip() in ('---', '```') or line.strip().startswith('<!--'):
+            continue
+
+        current_lines.append(line)
+
+    if current_lines:
+        content = '\n'.join(current_lines).strip()
+        if len(content) >= MIN_PARAGRAPH_LENGTH:
+            paragraphs.append({
+                'entity': entity, 'file': filename,
+                'heading': current_heading, 'text': content,
+            })
+
+    return paragraphs
+
+
+# ─── Search Index ──────────────────────────────────────────
+
+class SearchIndex:
+    """TF-IDF + Contrastive Anchor index over paragraphs."""
+
+    def __init__(self, anchor_k=5, confuser_k=3):
+        self.anchor_k = anchor_k
+        self.confuser_k = confuser_k
+        self.paragraphs = []
+        self.tokens = []
+        self.vocab = set()
+        self.df = defaultdict(int)
+        self.idf = {}
+        self.anchors = []
+        self.n = 0
+        self.scope = {}
+        self.built_at = None
+        self.build_time_ms = 0
+        self._lock = threading.Lock()
+
+    def build(self, scope=None, force_scope=None):
+        """Build index from entity files. Thread-safe."""
+        start = time.time()
+
+        if force_scope:
+            scope_info = {
+                'active_entity': None, 'active_class': None,
+                'entities': force_scope if isinstance(force_scope, list) else [force_scope],
+                'mode': 'explicit',
+            }
+        else:
+            scope_info = scope or get_active_scope()
+
+        all_paragraphs = []
+        for entity_name in scope_info['entities']:
+            entity_dir = Path(DOCTRINE_PATH) / entity_name
+            if not entity_dir.is_dir():
+                continue
+            for md_file in entity_dir.glob('*.md'):
+                all_paragraphs.extend(extract_paragraphs(md_file))
+
+        def searchable_text(p):
+            parts = []
+            if p.get('heading'):
+                parts.append(p['heading'])
+            parts.append(p['file'].replace('.md', '').replace('-', ' '))
+            parts.append(p['text'])
+            return ' '.join(parts)
+
+        tokens_list = [content_stems(searchable_text(p)) for p in all_paragraphs]
+        vocab = set(s for pt in tokens_list for s in pt)
+        n = len(all_paragraphs)
+
+        df = defaultdict(int)
+        for pt in tokens_list:
+            for w in set(pt):
+                df[w] += 1
+
+        idf = {}
+        for w in vocab:
+            if df[w] > 0:
+                idf[w] = math.log(n / df[w]) if n > 0 else 0.0
+
+        anchors = []
+        if n <= 500:
+            anchors = self._build_anchors(n, tokens_list, idf)
+        else:
+            for i in range(n):
+                scores = {w: idf.get(w, 0) for w in set(tokens_list[i])}
+                ranked = sorted(scores.items(), key=lambda x: -x[1])[:self.anchor_k]
+                anchors.append({w: s for w, s in ranked})
+
+        elapsed = (time.time() - start) * 1000
+
+        with self._lock:
+            self.paragraphs = all_paragraphs
+            self.tokens = tokens_list
+            self.vocab = vocab
+            self.df = df
+            self.idf = idf
+            self.anchors = anchors
+            self.n = n
+            self.scope = scope_info
+            self.built_at = time.strftime('%Y-%m-%dT%H:%M:%S')
+            self.build_time_ms = round(elapsed)
+
+        return {
+            'paragraphs': n, 'entities': len(scope_info['entities']),
+            'vocab': len(vocab), 'build_time_ms': round(elapsed),
+            'scope_mode': scope_info['mode'],
+        }
+
+    def _build_anchors(self, n, tokens_list, idf):
+        """Contrastive anchors — words that distinguish each paragraph from its neighbors."""
+        anchors = []
+        for i in range(n):
+            sims = []
+            for j in range(n):
+                if j == i:
+                    continue
+                sims.append((j, self._cosine(tokens_list[i], tokens_list[j], idf)))
+            sims.sort(key=lambda x: -x[1])
+            confusers = [idx for idx, _ in sims[:self.confuser_k]]
+
+            scores = {}
+            for w in set(tokens_list[i]):
+                presence = sum(1 for ci in confusers if w in set(tokens_list[ci])) / max(len(confusers), 1)
+                scores[w] = idf.get(w, 0) * (1.0 - presence)
+
+            ranked = sorted(scores.items(), key=lambda x: -x[1])[:self.anchor_k]
+            anchors.append({w: s for w, s in ranked})
+        return anchors
+
+    def _cosine(self, a, b, idf):
+        sa, sb = set(a), set(b)
+        overlap = sa & sb
+        if not overlap:
+            return 0.0
+        dot = sum(idf.get(w, 0) ** 2 for w in overlap)
+        ma = math.sqrt(sum(idf.get(w, 0) ** 2 for w in sa))
+        mb = math.sqrt(sum(idf.get(w, 0) ** 2 for w in sb))
+        return dot / (ma * mb) if ma and mb else 0.0
+
+    def _bm25(self, tf, df, dl, avgdl, k1=1.5, b=0.75):
+        idf = math.log((self.n - df + 0.5) / (df + 0.5) + 1.0)
+        tf_norm = (tf * (k1 + 1)) / (tf + k1 * (1 - b + b * (dl / avgdl)))
+        return idf * tf_norm
+
+    def _phrase_proximity(self, tokens, q_stems):
+        if len(q_stems) < 2:
+            return 0.0
+        positions = {}
+        for i, t in enumerate(tokens):
+            if t in q_stems:
+                if t not in positions:
+                    positions[t] = []
+                positions[t].append(i)
+        if len(positions) < 2:
+            return 0.0
+        all_pos = []
+        for stem, pos_list in positions.items():
+            for p in pos_list:
+                all_pos.append((p, stem))
+        all_pos.sort()
+        min_span = float('inf')
+        for i in range(len(all_pos)):
+            for j in range(i + 1, len(all_pos)):
+                if all_pos[j][1] != all_pos[i][1]:
+                    span = all_pos[j][0] - all_pos[i][0]
+                    min_span = min(min_span, span)
+                    break
+        if min_span == float('inf'):
+            return 0.0
+        return 1.0 / min_span
+
+    def search(self, query_text, top_n=10, anchor_weight=15, entity_boost=1.3, entity_filter=None):
+        """Search with BM25 + phrase proximity + entity boost + type weighting + dedup."""
+        with self._lock:
+            if self.n == 0:
+                return {'results': [], 'margin': 0.0, 'query': query_text, 'indexed': 0}
+
+            q_stems = content_stems(query_text)
+            q_unique = set(q_stems)
+            if not q_unique:
+                return {'results': [], 'margin': 0.0, 'query': query_text, 'indexed': self.n}
+
+            avgdl = sum(len(pt) for pt in self.tokens) / max(self.n, 1)
+
+            boosted_entities = set()
+            active = self.scope.get('active_entity')
+            if active:
+                boosted_entities.add(active)
+                for ent in self.scope.get('entities', []):
+                    boosted_entities.add(ent)
+
+            qs = max(len(q_unique), 1)
+            scores = []
+            for i, pt in enumerate(self.tokens):
+                p = self.paragraphs[i]
+
+                if entity_filter and p['entity'] != entity_filter:
+                    continue
+
+                overlap = q_unique & set(pt)
+                if not overlap:
+                    scores.append((i, 0.0, overlap))
+                    continue
+
+                dl = len(pt)
+                bm25_score = 0.0
+                for w in overlap:
+                    tf = pt.count(w)
+                    df = self.df.get(w, 1)
+                    bm25_score += self._bm25(tf, df, dl, avgdl)
+
+                coverage = len(overlap) / qs
+                score = bm25_score * (1.0 + coverage * 0.5)
+
+                proximity = self._phrase_proximity(pt, q_unique)
+                score *= (1.0 + proximity * 0.5)
+
+                # Document type weighting
+                fname = p['file']
+                if fname.startswith('ROOT-') or fname.startswith('ROOT_'):
+                    score *= 1.5
+                elif fname.startswith('G-pruned-') or fname.startswith('_pruned_'):
+                    score *= 0.5
+
+                if boosted_entities and p['entity'] in boosted_entities:
+                    score *= entity_boost
+
+                scores.append((i, score, overlap))
+
+            scores.sort(key=lambda x: -x[1])
+
+            # Dedup
+            seen_groups = {}
+            deduped = []
+            for idx, sc, overlap in scores:
+                if sc == 0:
+                    continue
+                p = self.paragraphs[idx]
+                group_key = (p['entity'], p['file'], p['heading'] or '')
+
+                if group_key in seen_groups:
+                    seen_groups[group_key][1] += 1
+                    continue
+
+                anchor_hits = []
+                if idx < len(self.anchors):
+                    anchor_hits = [w for w in self.anchors[idx] if w in q_unique]
+
+                result = {
+                    'entity': p['entity'], 'file': p['file'],
+                    'heading': p['heading'], 'text': p['text'],
+                    'score': round(sc, 4), 'overlap': list(overlap),
+                    'anchor_hits': anchor_hits, 'siblings': 0,
+                }
+                seen_groups[group_key] = [result, 1]
+                deduped.append(group_key)
+
+                if len(deduped) >= top_n:
+                    break
+
+            results = []
+            for key in deduped:
+                r, count = seen_groups[key]
+                r['siblings'] = count - 1
+                results.append(r)
+
+            if len(results) >= 2:
+                raw = (results[0]['score'] - results[1]['score']) / max(results[0]['score'], 1e-10) * 100
+                ad = len(results[0].get('anchor_hits', [])) - len(results[1].get('anchor_hits', []))
+                margin = min(max(raw + anchor_weight * ad, 0.1), 100.0)
+            elif len(results) == 1:
+                margin = 100.0
+            else:
+                margin = 0.0
+
+            top_score = results[0]['score'] if results else 0.0
+            for r in results:
+                if top_score == 0:
+                    r['confidence'] = 'LOW'
+                else:
+                    ratio = r['score'] / top_score
+                    if ratio >= 0.7:
+                        r['confidence'] = 'HIGH'
+                    elif ratio >= 0.35:
+                        r['confidence'] = 'MED'
+                    else:
+                        r['confidence'] = 'LOW'
+
+            return {
+                'results': results, 'margin': round(margin, 1),
+                'query': query_text, 'indexed': self.n,
+                'scope': self.scope.get('mode', 'unknown'),
+                'active_entity': self.scope.get('active_entity'),
+            }
+
+    def status(self):
+        with self._lock:
+            return {
+                'paragraphs': self.n,
+                'entities': self.scope.get('entities', []),
+                'entity_count': len(self.scope.get('entities', [])),
+                'vocab_size': len(self.vocab),
+                'scope_mode': self.scope.get('mode', 'none'),
+                'active_entity': self.scope.get('active_entity'),
+                'built_at': self.built_at,
+                'build_time_ms': self.build_time_ms,
+                'anchors': len(self.anchors),
+            }
+
+
+# ─── File Watcher ──────────────────────────────────────────
+
+class FileWatcher:
+    def __init__(self, index, interval=WATCH_INTERVAL):
+        self.index = index
+        self.interval = interval
+        self._signatures = {}
+        self._running = False
+        self._thread = None
+
+    def _snapshot(self):
+        sigs = {}
+        state_file = Path(STATE_PATH) / 'active_entity.json'
+        try:
+            sigs['__state__'] = state_file.stat().st_mtime
+        except Exception:
+            pass
+
+        scope = get_active_scope()
+        for entity_name in scope['entities']:
+            entity_dir = Path(DOCTRINE_PATH) / entity_name
+            if not entity_dir.is_dir():
+                continue
+            for md_file in entity_dir.glob('*.md'):
+                try:
+                    sigs[str(md_file)] = md_file.stat().st_mtime
+                except Exception:
+                    pass
+        return sigs, scope
+
+    def _watch_loop(self):
+        while self._running:
+            try:
+                new_sigs, scope = self._snapshot()
+                if new_sigs != self._signatures:
+                    self._signatures = new_sigs
+                    stats = self.index.build(scope=scope)
+                    ts = time.strftime('%H:%M:%S')
+                    print(f"  [{ts}] Reindexed: {stats['paragraphs']} paragraphs from {stats['entities']} entities ({stats['build_time_ms']}ms)")
+            except Exception as e:
+                print(f"  Watch error: {e}", file=sys.stderr)
+            time.sleep(self.interval)
+
+    def start(self):
+        self._running = True
+        sigs, scope = self._snapshot()
+        self._signatures = sigs
+        stats = self.index.build(scope=scope)
+        print(f"  Initial index: {stats['paragraphs']} paragraphs, {stats['vocab']} vocab, {stats['entities']} entities ({stats['build_time_ms']}ms)")
+        self._thread = threading.Thread(target=self._watch_loop, daemon=True)
+        self._thread.start()
+
+    def stop(self):
+        self._running = False
+
+
+# ─── HTTP Server ───────────────────────────────────────────
+
+index = SearchIndex()
+watcher = FileWatcher(index)
+
+
+class SearchHandler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        parsed = urlparse(self.path)
+        path = parsed.path.rstrip('/')
+        params = parse_qs(parsed.query)
+
+        if path == '/search':
+            query = params.get('q', [''])[0]
+            if not query:
+                self._json(400, {'error': 'Missing ?q= parameter'})
+                return
+            top_n = int(params.get('top', ['10'])[0])
+            scope_override = params.get('scope', [None])[0]
+            entity_filter = params.get('entity', [None])[0]
+
+            if scope_override == 'all':
+                all_entities = []
+                try:
+                    for entry in Path(DOCTRINE_PATH).iterdir():
+                        if entry.is_dir():
+                            all_entities.append(entry.name)
+                except Exception:
+                    pass
+                temp = SearchIndex()
+                temp.build(force_scope=all_entities)
+                result = temp.search(query, top_n=top_n, entity_filter=entity_filter)
+            else:
+                result = index.search(query, top_n=top_n, entity_filter=entity_filter)
+
+            self._json(200, result)
+
+        elif path == '/status':
+            self._json(200, index.status())
+
+        elif path == '/reindex':
+            stats = index.build()
+            self._json(200, {'reindexed': True, **stats})
+
+        else:
+            self._json(404, {'error': 'Not found. Endpoints: /search?q=, /status, /reindex'})
+
+    def _json(self, code, data):
+        body = json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8')
+        self.send_response(code)
+        self.send_header('Content-Type', 'application/json; charset=utf-8')
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format, *args):
+        if args and '404' in str(args[0]):
+            super().log_message(format, *args)
+
+
+# ─── CLI Entry Point ──────────────────────────────────────
+
+def write_results_file(results, output_path=None):
+    if not output_path:
+        output_path = os.path.join(STATE_PATH, 'search_results.md')
+
+    lines = [f"# Search Results", f"_Query: {results['query']}_", '']
+
+    if not results['results']:
+        lines.append('No results found.')
+    else:
+        lines.append(f"**{len(results['results'])} results** | Scope: {results.get('scope', 'unknown')} | Margin: {results.get('margin', 0)}%")
+        lines.append('')
+        for i, r in enumerate(results['results'], 1):
+            conf = {'HIGH': '🟢', 'MED': '🟡', 'LOW': '🔴'}.get(r.get('confidence', 'LOW'), '⚪')
+            heading = f" > {r['heading']}" if r.get('heading') else ''
+            sibling_tag = f" (+{r['siblings']} more)" if r.get('siblings', 0) > 0 else ''
+            lines.append(f"### {conf} {i}. {r['entity']}/{r['file']}{heading}{sibling_tag}")
+            lines.append(f"Score: {r['score']} | Overlap: {', '.join(r.get('overlap', []))} | Anchors: {', '.join(r.get('anchor_hits', []))}")
+            lines.append('')
+            text = r['text']
+            if len(text) > 500:
+                text = text[:500] + '...'
+            lines.append(text)
+            lines.append('')
+
+    Path(output_path).write_text('\n'.join(lines), encoding='utf-8')
+    return output_path
+
+
+if __name__ == '__main__':
+    port = DEFAULT_PORT
+
+    if '--port' in sys.argv:
+        pi = sys.argv.index('--port')
+        if pi + 1 < len(sys.argv):
+            port = int(sys.argv[pi + 1])
+
+    if '--once' in sys.argv:
+        qi = sys.argv.index('--once')
+        if qi + 1 >= len(sys.argv):
+            print('Usage: python bond_search.py --once "your query"')
+            sys.exit(1)
+        query = sys.argv[qi + 1]
+        stats = index.build()
+        print(f"Indexed {stats['paragraphs']} paragraphs from {stats['entities']} entities ({stats['build_time_ms']}ms)")
+        results = index.search(query)
+        path = write_results_file(results)
+        print(f"\nQuery: {query}")
+        print(f"Results: {len(results['results'])} | Margin: {results['margin']}%")
+        for r in results['results']:
+            conf = {'HIGH': '🟢', 'MED': '🟡', 'LOW': '🔴'}.get(r.get('confidence'), '⚪')
+            sib = f" (+{r['siblings']})" if r.get('siblings', 0) > 0 else ''
+            print(f"  {conf} {r['entity']}/{r['file']} — {r['score']} — {r.get('heading', '')}{sib}")
+        print(f"\nResults written to: {path}")
+        sys.exit(0)
+
+    # Daemon mode
+    print(f"🔍 BOND Search Daemon starting on port {port}")
+    print(f"   BOND_ROOT: {BOND_ROOT}")
+    print(f"   Doctrine:  {DOCTRINE_PATH}")
+    print(f"   State:     {STATE_PATH}")
+    print()
+
+    watcher.start()
+    print()
+    print(f"   Endpoints:")
+    print(f"     GET http://localhost:{port}/search?q=your+query")
+    print(f"     GET http://localhost:{port}/search?q=query&scope=all")
+    print(f"     GET http://localhost:{port}/search?q=query&entity=P11-Plumber")
+    print(f"     GET http://localhost:{port}/status")
+    print(f"     GET http://localhost:{port}/reindex")
+    print()
+
+    try:
+        server = HTTPServer(('127.0.0.1', port), SearchHandler)
+        print(f"🔥 Search daemon listening on http://localhost:{port}")
+        print(f"   Watching for file changes every {WATCH_INTERVAL}s")
+        print()
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\n🛑 Search daemon stopped")
+        watcher.stop()
+        sys.exit(0)

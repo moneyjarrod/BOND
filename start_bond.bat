@@ -1,5 +1,5 @@
 @echo off
-echo Starting BOND...
+echo Starting BOND Control Panel...
 echo.
 
 cd /d "%~dp0panel"
@@ -13,50 +13,62 @@ if "%1"=="--rebuild" (
   echo.
 )
 
-:: Start Express sidecar
-start "BOND Sidecar" /min cmd /c "node server.js"
-echo [OK] Sidecar starting on http://localhost:3000
-
-:: Build dist/ if missing
-if not exist dist\index.html (
+:: Check if dist/ exists
+if not exist dist (
   echo [!] No dist/ found — building panel...
   call npx vite build
   echo.
 )
 
-:: Check if production build exists
-if exist "dist\index.html" (
-    echo [OK] Serving production build from dist/
-    timeout /t 2 /nobreak >nul
-    start http://localhost:3000
+:: Start Express sidecar (serves API + dist/)
+start "BOND Sidecar" /min cmd /c "node server.js"
+echo [OK] Sidecar starting on http://localhost:3000
+
+:: Start Search Daemon (requires Python)
+where python >nul 2>&1
+if %errorlevel%==0 (
+  start "BOND Search" /min cmd /c "python "%~dp0search_daemon\bond_search.py""
+  echo [OK] Search daemon starting on http://localhost:3003
 ) else (
-    :: Dev mode — start Vite
-    start "BOND Panel" /min cmd /c "npx vite"
-    echo [OK] Dev server starting on http://localhost:5173
-    timeout /t 3 /nobreak >nul
-    start http://localhost:5173
+  echo [WARN] Python not found — search daemon disabled
+  echo        Install Python 3.8+ and add to PATH to enable search
 )
 
-:: Launch Counter + Clipboard Bridge (if AHK installed)
-set "AHK_SCRIPT=%~dp0Counter\BOND_v8.ahk"
-if exist "%AHK_SCRIPT%" (
-    where autohotkey >nul 2>nul && (
-        start "" "%AHK_SCRIPT%"
-        echo [OK] Counter + clipboard bridge launched
-    ) || (
-        echo [WARN] AutoHotkey not found — counter won't run.
-        echo        Install from https://www.autohotkey.com
-        echo        Then run Counter\BOND_v8.ahk manually.
-    )
+:: Dev mode: pass --dev to also launch Vite HMR
+if "%1"=="--dev" (
+  start "BOND Vite Dev" /min cmd /c "npx vite"
+  echo [OK] Vite dev server on http://localhost:5173
+  set PANEL_URL=http://localhost:5173
 ) else (
-    echo [WARN] Counter script not found at Counter\BOND_v8.ahk
+  set PANEL_URL=http://localhost:3000
 )
+
+:: Wait for server to be ready
+timeout /t 3 /nobreak >nul
+
+:: Open browser
+start %PANEL_URL%
+echo [OK] Browser opened — %PANEL_URL%
 
 echo.
 echo ========================================
-echo    BOND is running.
-echo    Close this window anytime — servers
+echo    BOND Control Panel is running.
+echo    Close this window anytime - servers
 echo    run in their own windows (minimized).
+echo    Panel:  http://localhost:3000
+echo    Search: http://localhost:3003
 echo ========================================
+echo.
+if "%1"=="--dev" (
+  echo    Mode: DEVELOPMENT (Vite HMR active)
+  echo    Caution: rapid file edits may cause
+  echo    browser instability.
+) else (
+  echo    Mode: PRODUCTION (serving dist/)
+  echo    Run with --dev for hot reload.
+)
+echo.
+echo Optional: Double-click bridge\BOND_v8.ahk
+echo for counter + command bridge.
 echo.
 pause
