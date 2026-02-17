@@ -4,7 +4,7 @@
 
 import { useState, useCallback } from 'react';
 import { useEntityFiles, useFileContent } from '../hooks/useDoctrine';
-import SearchPanel from './SearchPanel';
+// SearchPanel removed S119 — SLA panel search cut, SPECTRA handles search server-side
 
 // Framework entities — files are read-only
 const FRAMEWORK_ENTITIES = ['BOND_MASTER', 'PROJECT_MASTER'];
@@ -25,10 +25,9 @@ export default function DoctrineViewer({
   linkedEntities,
   entityType,
   entityCore,
-  search,
 }) {
   const [selectedFile, setSelectedFile] = useState(null);
-  const [showSearch, setShowSearch] = useState(false);
+
   const [editing, setEditing] = useState(false);
   const [editContent, setEditContent] = useState('');
   const [saving, setSaving] = useState(false);
@@ -137,44 +136,12 @@ export default function DoctrineViewer({
           {isLinked && !isActive && <span className="badge badge-linked" style={{ background: 'rgba(96,165,250,0.15)', color: '#60a5fa', border: '1px solid rgba(96,165,250,0.3)' }}>LINKED</span>}
         </div>
         <div style={{ display: 'flex', gap: 6 }}>
-          {search && (
-            <button
-              onClick={() => {
-                setShowSearch(s => {
-                  if (!s && search.requestBuild) search.requestBuild();
-                  return !s;
-                });
-              }}
-              style={{
-                padding: '4px 12px',
-                fontSize: '0.75rem',
-                fontFamily: 'var(--font-mono)',
-                background: showSearch ? 'var(--accent)' : 'var(--bg-elevated)',
-                color: showSearch ? '#fff' : 'var(--text-secondary)',
-                border: `1px solid ${showSearch ? 'var(--accent)' : 'var(--border)'}`,
-                borderRadius: 'var(--radius-sm)',
-                cursor: 'pointer',
-              }}
-            >
-              🔍 Search
-            </button>
-          )}
+
           {saveMsg && (
             <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>{saveMsg}</span>
           )}
         </div>
       </div>
-
-      {/* Search panel (collapsible) */}
-      {showSearch && search && (
-        <div style={{
-          padding: '8px 0 12px',
-          borderBottom: '1px solid var(--border)',
-          marginBottom: 12,
-        }}>
-          <SearchPanel {...search} />
-        </div>
-      )}
 
       {/* Main content area */}
       <div style={{ display: 'flex', flex: 1, gap: 12, minHeight: 0 }}>

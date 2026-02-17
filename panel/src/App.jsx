@@ -16,7 +16,8 @@ import HandoffGenerator from './components/HandoffGenerator';
 import { useEntities } from './hooks/useDoctrine';
 // useBridge removed S85 (Dead Code Audit) — clipboard is native in App.jsx
 import { useModules } from './hooks/useModules';
-import { useSearch } from './hooks/useSearch';
+// SLA panel search removed S119 — SPECTRA handles search server-side
+// import { useSearch } from './hooks/useSearch';
 import { WebSocketProvider, WebSocketContext } from './context/WebSocketContext';
 import './styles/bond.css';
 
@@ -51,7 +52,7 @@ function AppInner() {
 
   const { entities, loading, error, refresh } = useEntities();
   const { modules } = useModules();
-  const search = useSearch(activeEntity?.name, linkedEntities);
+  // SLA panel search removed S119 — SPECTRA handles search server-side
 
   // Load active entity state + config from server on mount + tab focus
   const refreshState = useCallback(() => {
@@ -521,7 +522,7 @@ function AppInner() {
             linkedEntities={linkedEntities}
             entityType={entities.find(e => e.name === viewerTarget)?.type}
             entityCore={entities.find(e => e.name === viewerTarget)?.core}
-            search={search}
+
           />
         )}
       </main>
