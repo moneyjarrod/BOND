@@ -59,7 +59,7 @@ export function useSearch(activeEntityName, linkedEntities = []) {
           const fileList = listData.files || [];
 
           // Fetch each file's content (S118: expanded to .md, .txt, .pdf, .docx)
-          const SEARCHABLE_EXT = ['.md', '.txt', '.pdf', '.docx'];
+          const SEARCHABLE_EXT = ['.md', '.txt', '.pdf', '.docx', '.html'];
           for (const f of fileList) {
             if (ctrl.abort) return;
             if (!SEARCHABLE_EXT.some(ext => f.name.toLowerCase().endsWith(ext))) continue;

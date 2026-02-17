@@ -19,7 +19,7 @@ app.use(cors());
 app.use(express.json());
 
 // ─── Searchable File Types (S118: Expanded Search) ────────
-const SEARCHABLE_EXTENSIONS = ['.md', '.txt', '.pdf', '.docx'];
+const SEARCHABLE_EXTENSIONS = ['.md', '.txt', '.pdf', '.docx', '.html'];
 function isSearchable(filename) {
   return SEARCHABLE_EXTENSIONS.some(ext => filename.toLowerCase().endsWith(ext));
 }
