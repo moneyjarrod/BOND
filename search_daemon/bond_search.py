@@ -14,9 +14,17 @@ Usage:
     python bond_search.py --once "query" # one-shot query, no server
 
 Endpoints:
-    GET /search?q=backflow+prevention          # query the index
+    GET /search?q=backflow+prevention          # query the index (explore mode)
+    GET /search?q=the+lord+is+my+shepherd&mode=retrieve  # SLA v2 retrieval
     GET /search?q=pressure&scope=all           # search all entities
     GET /search?q=pressure&entity=P11-Plumber  # local valve: single entity
+    GET /duplicates                            # find similar paragraphs
+    GET /duplicates?threshold=0.6              # lower = more results
+    GET /duplicates?exclude_shared=true        # skip shared framework files
+    GET /orphans                               # find isolated paragraphs
+    GET /orphans?max_sim=0.3                   # higher = more results
+    GET /coverage?entity=P11-Plumber           # seed-to-ROOT resonance map
+    GET /similarity                            # entity vocabulary overlap
     GET /status                                # index stats, scope, health
     GET /reindex                               # force rebuild
 """
@@ -25,18 +33,15 @@ import sys, os, re, json, math, time, threading
 from pathlib import Path
 from collections import defaultdict
 from http.server import HTTPServer, BaseHTTPRequestHandler
+from socketserver import ThreadingMixIn
 from urllib.parse import urlparse, parse_qs
-
-# ─── Config ────────────────────────────────────────────────
 
 BOND_ROOT = os.environ.get('BOND_ROOT', str(Path(__file__).parent.parent))
 DOCTRINE_PATH = os.path.join(BOND_ROOT, 'doctrine')
 STATE_PATH = os.path.join(BOND_ROOT, 'state')
 DEFAULT_PORT = 3003
-WATCH_INTERVAL = 2.0  # seconds between file change checks
-MIN_PARAGRAPH_LENGTH = 20  # characters — skip tiny fragments
-
-# ─── Text Processing (from warm_restore.py) ────────────────
+WATCH_INTERVAL = 2.0
+MIN_PARAGRAPH_LENGTH = 20
 
 SUFFIXES = ['ation','tion','sion','ness','ment','able','ible','ful','ous','ing','ed','ly','s']
 STEM_EXCEPTIONS = {
@@ -77,19 +82,9 @@ def tokenize(text):
 def content_stems(text):
     return [s for s in tokenize(text) if s not in STOP_WORDS and len(s) > 2]
 
-
-# ─── Scope Derivation ─────────────────────────────────────
-
 def get_active_scope():
-    """Read active_entity.json + follow link graph to determine search scope."""
     state_file = Path(STATE_PATH) / 'active_entity.json'
-    scope = {
-        'active_entity': None,
-        'active_class': None,
-        'entities': [],
-        'mode': 'all',
-    }
-
+    scope = {'active_entity': None, 'active_class': None, 'entities': [], 'mode': 'all'}
     try:
         state = json.loads(state_file.read_text(encoding='utf-8'))
         if state.get('entity'):
@@ -107,7 +102,6 @@ def get_active_scope():
                 pass
     except Exception:
         pass
-
     if not scope['entities']:
         scope['mode'] = 'all'
         try:
@@ -116,71 +110,46 @@ def get_active_scope():
                     scope['entities'].append(entry.name)
         except Exception:
             pass
-
     return scope
 
-
-# ─── Paragraph Extractor ──────────────────────────────────
-
 def extract_paragraphs(filepath):
-    """Split a markdown file into paragraphs with metadata."""
     try:
         text = Path(filepath).read_text(encoding='utf-8')
     except Exception:
         return []
-
     paragraphs = []
     current_heading = None
     current_lines = []
     filename = Path(filepath).name
     entity = Path(filepath).parent.name
-
     for line in text.split('\n'):
         hm = re.match(r'^(#{1,3})\s+(.+)$', line)
         if hm:
             if current_lines:
                 content = '\n'.join(current_lines).strip()
                 if len(content) >= MIN_PARAGRAPH_LENGTH:
-                    paragraphs.append({
-                        'entity': entity, 'file': filename,
-                        'heading': current_heading, 'text': content,
-                    })
+                    paragraphs.append({'entity': entity, 'file': filename, 'heading': current_heading, 'text': content})
                 current_lines = []
             current_heading = hm.group(2).strip()
             continue
-
         if not line.strip():
             if current_lines:
                 content = '\n'.join(current_lines).strip()
                 if len(content) >= MIN_PARAGRAPH_LENGTH:
-                    paragraphs.append({
-                        'entity': entity, 'file': filename,
-                        'heading': current_heading, 'text': content,
-                    })
+                    paragraphs.append({'entity': entity, 'file': filename, 'heading': current_heading, 'text': content})
                 current_lines = []
             continue
-
         if line.strip() in ('---', '```') or line.strip().startswith('<!--'):
             continue
-
         current_lines.append(line)
-
     if current_lines:
         content = '\n'.join(current_lines).strip()
         if len(content) >= MIN_PARAGRAPH_LENGTH:
-            paragraphs.append({
-                'entity': entity, 'file': filename,
-                'heading': current_heading, 'text': content,
-            })
-
+            paragraphs.append({'entity': entity, 'file': filename, 'heading': current_heading, 'text': content})
     return paragraphs
 
 
-# ─── Search Index ──────────────────────────────────────────
-
 class SearchIndex:
-    """TF-IDF + Contrastive Anchor index over paragraphs."""
-
     def __init__(self, anchor_k=5, confuser_k=3):
         self.anchor_k = anchor_k
         self.confuser_k = confuser_k
@@ -197,18 +166,12 @@ class SearchIndex:
         self._lock = threading.Lock()
 
     def build(self, scope=None, force_scope=None):
-        """Build index from entity files. Thread-safe."""
         start = time.time()
-
         if force_scope:
-            scope_info = {
-                'active_entity': None, 'active_class': None,
-                'entities': force_scope if isinstance(force_scope, list) else [force_scope],
-                'mode': 'explicit',
-            }
+            scope_info = {'active_entity': None, 'active_class': None,
+                          'entities': force_scope if isinstance(force_scope, list) else [force_scope], 'mode': 'explicit'}
         else:
             scope_info = scope or get_active_scope()
-
         all_paragraphs = []
         for entity_name in scope_info['entities']:
             entity_dir = Path(DOCTRINE_PATH) / entity_name
@@ -216,7 +179,6 @@ class SearchIndex:
                 continue
             for md_file in entity_dir.glob('*.md'):
                 all_paragraphs.extend(extract_paragraphs(md_file))
-
         def searchable_text(p):
             parts = []
             if p.get('heading'):
@@ -224,21 +186,17 @@ class SearchIndex:
             parts.append(p['file'].replace('.md', '').replace('-', ' '))
             parts.append(p['text'])
             return ' '.join(parts)
-
         tokens_list = [content_stems(searchable_text(p)) for p in all_paragraphs]
         vocab = set(s for pt in tokens_list for s in pt)
         n = len(all_paragraphs)
-
         df = defaultdict(int)
         for pt in tokens_list:
             for w in set(pt):
                 df[w] += 1
-
         idf = {}
         for w in vocab:
             if df[w] > 0:
                 idf[w] = math.log(n / df[w]) if n > 0 else 0.0
-
         anchors = []
         if n <= 500:
             anchors = self._build_anchors(n, tokens_list, idf)
@@ -247,9 +205,7 @@ class SearchIndex:
                 scores = {w: idf.get(w, 0) for w in set(tokens_list[i])}
                 ranked = sorted(scores.items(), key=lambda x: -x[1])[:self.anchor_k]
                 anchors.append({w: s for w, s in ranked})
-
         elapsed = (time.time() - start) * 1000
-
         with self._lock:
             self.paragraphs = all_paragraphs
             self.tokens = tokens_list
@@ -261,15 +217,10 @@ class SearchIndex:
             self.scope = scope_info
             self.built_at = time.strftime('%Y-%m-%dT%H:%M:%S')
             self.build_time_ms = round(elapsed)
-
-        return {
-            'paragraphs': n, 'entities': len(scope_info['entities']),
-            'vocab': len(vocab), 'build_time_ms': round(elapsed),
-            'scope_mode': scope_info['mode'],
-        }
+        return {'paragraphs': n, 'entities': len(scope_info['entities']),
+                'vocab': len(vocab), 'build_time_ms': round(elapsed), 'scope_mode': scope_info['mode']}
 
     def _build_anchors(self, n, tokens_list, idf):
-        """Contrastive anchors — words that distinguish each paragraph from its neighbors."""
         anchors = []
         for i in range(n):
             sims = []
@@ -279,12 +230,10 @@ class SearchIndex:
                 sims.append((j, self._cosine(tokens_list[i], tokens_list[j], idf)))
             sims.sort(key=lambda x: -x[1])
             confusers = [idx for idx, _ in sims[:self.confuser_k]]
-
             scores = {}
             for w in set(tokens_list[i]):
                 presence = sum(1 for ci in confusers if w in set(tokens_list[ci])) / max(len(confusers), 1)
                 scores[w] = idf.get(w, 0) * (1.0 - presence)
-
             ranked = sorted(scores.items(), key=lambda x: -x[1])[:self.anchor_k]
             anchors.append({w: s for w, s in ranked})
         return anchors
@@ -331,66 +280,78 @@ class SearchIndex:
             return 0.0
         return 1.0 / min_span
 
-    def search(self, query_text, top_n=10, anchor_weight=15, entity_boost=1.3, entity_filter=None):
-        """Search with BM25 + phrase proximity + entity boost + type weighting + dedup."""
+    def _neighborhood_resonance(self, idx, q_unique):
+        """Average IDF overlap of a paragraph's sequential neighbors with query."""
+        p = self.paragraphs[idx]
+        neighbors = []
+        for j in range(max(0, idx - 2), min(self.n, idx + 3)):
+            if j == idx:
+                continue
+            pj = self.paragraphs[j]
+            if pj['entity'] == p['entity'] and pj['file'] == p['file']:
+                neighbors.append(j)
+        if not neighbors:
+            return 0.0
+        total = 0.0
+        for ni in neighbors:
+            overlap = q_unique & set(self.tokens[ni])
+            total += sum(self.idf.get(w, 0) for w in overlap)
+        return total / len(neighbors)
+
+    def search(self, query_text, top_n=10, anchor_weight=15, nbr_weight=10,
+               entity_boost=1.3, entity_filter=None, mode='explore'):
+        """Search the index.
+
+        mode='explore' — editorial weights in score (doctrine browsing)
+        mode='retrieve' — pure BM25 ranking, adjustments to margin only (SLA v2)
+        """
         with self._lock:
             if self.n == 0:
                 return {'results': [], 'margin': 0.0, 'query': query_text, 'indexed': 0}
-
             q_stems = content_stems(query_text)
             q_unique = set(q_stems)
             if not q_unique:
                 return {'results': [], 'margin': 0.0, 'query': query_text, 'indexed': self.n}
-
             avgdl = sum(len(pt) for pt in self.tokens) / max(self.n, 1)
-
             boosted_entities = set()
             active = self.scope.get('active_entity')
             if active:
                 boosted_entities.add(active)
                 for ent in self.scope.get('entities', []):
                     boosted_entities.add(ent)
-
             qs = max(len(q_unique), 1)
             scores = []
             for i, pt in enumerate(self.tokens):
                 p = self.paragraphs[i]
-
                 if entity_filter and p['entity'] != entity_filter:
                     continue
-
                 overlap = q_unique & set(pt)
                 if not overlap:
                     scores.append((i, 0.0, overlap))
                     continue
-
                 dl = len(pt)
+                # BM25 scoring — immutable ranking signal
                 bm25_score = 0.0
                 for w in overlap:
                     tf = pt.count(w)
                     df = self.df.get(w, 1)
                     bm25_score += self._bm25(tf, df, dl, avgdl)
-
                 coverage = len(overlap) / qs
                 score = bm25_score * (1.0 + coverage * 0.5)
-
                 proximity = self._phrase_proximity(pt, q_unique)
                 score *= (1.0 + proximity * 0.5)
-
-                # Document type weighting
-                fname = p['file']
-                if fname.startswith('ROOT-') or fname.startswith('ROOT_'):
-                    score *= 1.5
-                elif fname.startswith('G-pruned-') or fname.startswith('_pruned_'):
-                    score *= 0.5
-
-                if boosted_entities and p['entity'] in boosted_entities:
-                    score *= entity_boost
-
+                # === Mode-dependent scoring ===
+                if mode == 'explore':
+                    fname = p['file']
+                    if fname.startswith('ROOT-') or fname.startswith('ROOT_'):
+                        score *= 1.5
+                    elif fname.startswith('G-pruned-') or fname.startswith('_pruned_'):
+                        score *= 0.5
+                    if boosted_entities and p['entity'] in boosted_entities:
+                        score *= entity_boost
+                # mode='retrieve': score stays pure. SLA v2.
                 scores.append((i, score, overlap))
-
             scores.sort(key=lambda x: -x[1])
-
             # Dedup
             seen_groups = {}
             deduped = []
@@ -399,78 +360,212 @@ class SearchIndex:
                     continue
                 p = self.paragraphs[idx]
                 group_key = (p['entity'], p['file'], p['heading'] or '')
-
                 if group_key in seen_groups:
-                    seen_groups[group_key][1] += 1
+                    seen_groups[group_key][2] += 1
                     continue
-
                 anchor_hits = []
                 if idx < len(self.anchors):
                     anchor_hits = [w for w in self.anchors[idx] if w in q_unique]
-
                 result = {
-                    'entity': p['entity'], 'file': p['file'],
-                    'heading': p['heading'], 'text': p['text'],
-                    'score': round(sc, 4), 'overlap': list(overlap),
-                    'anchor_hits': anchor_hits, 'siblings': 0,
+                    'entity': p['entity'], 'file': p['file'], 'heading': p['heading'],
+                    'text': p['text'], 'score': round(sc, 4),
+                    'overlap': list(overlap), 'anchor_hits': anchor_hits, 'siblings': 0,
                 }
-                seen_groups[group_key] = [result, 1]
+                seen_groups[group_key] = [result, idx, 1]
                 deduped.append(group_key)
-
                 if len(deduped) >= top_n:
                     break
-
             results = []
+            result_indices = []
             for key in deduped:
-                r, count = seen_groups[key]
+                r, idx, count = seen_groups[key]
                 r['siblings'] = count - 1
                 results.append(r)
-
+                result_indices.append(idx)
+            # === Margin calculation ===
             if len(results) >= 2:
                 raw = (results[0]['score'] - results[1]['score']) / max(results[0]['score'], 1e-10) * 100
                 ad = len(results[0].get('anchor_hits', [])) - len(results[1].get('anchor_hits', []))
-                margin = min(max(raw + anchor_weight * ad, 0.1), 100.0)
+                anchor_adj = anchor_weight * ad
+                if mode == 'retrieve':
+                    top_nbr = self._neighborhood_resonance(result_indices[0], q_unique)
+                    run_nbr = self._neighborhood_resonance(result_indices[1], q_unique)
+                    if max(top_nbr, run_nbr) > 0:
+                        nbr_diff = (top_nbr - run_nbr) / max(top_nbr, run_nbr)
+                    else:
+                        nbr_diff = 0.0
+                    nbr_adj = nbr_weight * nbr_diff
+                    type_adj = 0.0
+                    for ri, r in enumerate(results[:2]):
+                        fname = r['file']
+                        sign = 1.0 if ri == 0 else -1.0
+                        if fname.startswith('ROOT-') or fname.startswith('ROOT_'):
+                            type_adj += sign * 5.0
+                        elif fname.startswith('G-pruned-') or fname.startswith('_pruned_'):
+                            type_adj -= sign * 5.0
+                    margin = min(max(raw + anchor_adj + nbr_adj + type_adj, 0.1), 100.0)
+                else:
+                    margin = min(max(raw + anchor_adj, 0.1), 100.0)
             elif len(results) == 1:
                 margin = 100.0
             else:
                 margin = 0.0
-
-            top_score = results[0]['score'] if results else 0.0
-            for r in results:
-                if top_score == 0:
-                    r['confidence'] = 'LOW'
+            # Confidence gate — SLA Layer 4
+            if mode == 'retrieve':
+                if margin > 50:
+                    gate = 'HIGH'
+                elif margin > 15:
+                    gate = 'MED'
                 else:
-                    ratio = r['score'] / top_score
-                    if ratio >= 0.7:
-                        r['confidence'] = 'HIGH'
-                    elif ratio >= 0.35:
-                        r['confidence'] = 'MED'
-                    else:
+                    gate = 'LOW'
+                for r in results:
+                    r['confidence'] = gate
+            else:
+                top_score = results[0]['score'] if results else 0.0
+                for r in results:
+                    if top_score == 0:
                         r['confidence'] = 'LOW'
-
+                    else:
+                        ratio = r['score'] / top_score
+                        if ratio >= 0.7:
+                            r['confidence'] = 'HIGH'
+                        elif ratio >= 0.35:
+                            r['confidence'] = 'MED'
+                        else:
+                            r['confidence'] = 'LOW'
             return {
-                'results': results, 'margin': round(margin, 1),
-                'query': query_text, 'indexed': self.n,
+                'results': results, 'margin': round(margin, 1), 'query': query_text,
+                'mode': mode, 'indexed': self.n,
                 'scope': self.scope.get('mode', 'unknown'),
                 'active_entity': self.scope.get('active_entity'),
             }
 
+    def find_duplicates(self, threshold=0.75, top_n=20, exclude_shared=False):
+        with self._lock:
+            if self.n == 0:
+                return {'duplicates': [], 'scanned': 0}
+            pairs = []
+            for i in range(self.n):
+                for j in range(i + 1, self.n):
+                    pi, pj = self.paragraphs[i], self.paragraphs[j]
+                    if pi['entity'] == pj['entity'] and pi['file'] == pj['file']:
+                        continue
+                    if exclude_shared and pi['file'] == pj['file'] and pi['entity'] != pj['entity']:
+                        continue
+                    sim = self._cosine(self.tokens[i], self.tokens[j], self.idf)
+                    if sim >= threshold:
+                        pairs.append({
+                            'similarity': round(sim, 4),
+                            'a': {'entity': pi['entity'], 'file': pi['file'], 'heading': pi['heading'], 'text': pi['text'][:200]},
+                            'b': {'entity': pj['entity'], 'file': pj['file'], 'heading': pj['heading'], 'text': pj['text'][:200]},
+                        })
+            pairs.sort(key=lambda x: -x['similarity'])
+            return {'duplicates': pairs[:top_n], 'total_found': len(pairs),
+                    'threshold': threshold, 'exclude_shared': exclude_shared, 'scanned': self.n}
+
+    def find_orphans(self, max_sim=0.25, top_n=20):
+        with self._lock:
+            if self.n == 0:
+                return {'orphans': [], 'scanned': 0}
+            isolation_scores = []
+            for i in range(self.n):
+                if not self.tokens[i]:
+                    continue
+                max_cosine = 0.0
+                for j in range(self.n):
+                    if j == i:
+                        continue
+                    sim = self._cosine(self.tokens[i], self.tokens[j], self.idf)
+                    if sim > max_cosine:
+                        max_cosine = sim
+                p = self.paragraphs[i]
+                if max_cosine <= max_sim:
+                    fname = p['file']
+                    if fname.startswith('ROOT-') or fname.startswith('ROOT_'):
+                        doc_type = 'root'
+                    elif fname.startswith('G-pruned-') or fname.startswith('_pruned_'):
+                        doc_type = 'pruned'
+                    elif fname.startswith('CORE') or fname == 'entity.json':
+                        doc_type = 'core'
+                    else:
+                        doc_type = 'seed'
+                    isolation_scores.append({
+                        'max_similarity': round(max_cosine, 4), 'entity': p['entity'],
+                        'file': p['file'], 'heading': p['heading'],
+                        'doc_type': doc_type, 'text': p['text'][:200],
+                    })
+            isolation_scores.sort(key=lambda x: x['max_similarity'])
+            return {'orphans': isolation_scores[:top_n], 'total_found': len(isolation_scores),
+                    'max_sim_threshold': max_sim, 'scanned': self.n}
+
+    def seed_coverage(self, entity_name):
+        with self._lock:
+            if self.n == 0:
+                return {'error': 'Index empty'}
+            root_indices = []
+            seed_indices = []
+            for i, p in enumerate(self.paragraphs):
+                if p['entity'] != entity_name:
+                    continue
+                fname = p['file']
+                if fname.startswith('ROOT-') or fname.startswith('ROOT_'):
+                    root_indices.append(i)
+                elif not fname.startswith('G-pruned-') and not fname.startswith('_pruned_'):
+                    seed_indices.append(i)
+            if not root_indices:
+                return {'entity': entity_name, 'error': 'No ROOTs found', 'roots': 0, 'seeds': 0}
+            if not seed_indices:
+                return {'entity': entity_name, 'error': 'No seeds found', 'roots': len(root_indices), 'seeds': 0}
+            coverage = []
+            for si in seed_indices:
+                best_root_sim = 0.0
+                best_root = None
+                for ri in root_indices:
+                    sim = self._cosine(self.tokens[si], self.tokens[ri], self.idf)
+                    if sim > best_root_sim:
+                        best_root_sim = sim
+                        best_root = self.paragraphs[ri]['file']
+                sp = self.paragraphs[si]
+                coverage.append({'file': sp['file'], 'heading': sp['heading'],
+                                 'best_root': best_root, 'root_similarity': round(best_root_sim, 4)})
+            coverage.sort(key=lambda x: -x['root_similarity'])
+            avg_sim = sum(c['root_similarity'] for c in coverage) / len(coverage) if coverage else 0
+            weak = [c for c in coverage if c['root_similarity'] < 0.1]
+            return {'entity': entity_name, 'roots': len(set(self.paragraphs[i]['file'] for i in root_indices)),
+                    'seeds': len(set(self.paragraphs[i]['file'] for i in seed_indices)),
+                    'avg_root_similarity': round(avg_sim, 4), 'weak_seeds': len(weak), 'coverage': coverage}
+
+    def entity_similarity(self):
+        with self._lock:
+            if self.n == 0:
+                return {'pairs': [], 'entities': 0}
+            entity_tokens = defaultdict(set)
+            for i, p in enumerate(self.paragraphs):
+                entity_tokens[p['entity']].update(set(self.tokens[i]))
+            entities = sorted(entity_tokens.keys())
+            pairs = []
+            for i in range(len(entities)):
+                for j in range(i + 1, len(entities)):
+                    ea, eb = entities[i], entities[j]
+                    sa, sb = entity_tokens[ea], entity_tokens[eb]
+                    overlap = sa & sb
+                    sim = len(overlap) / len(sa | sb) if overlap else 0.0
+                    pairs.append({'a': ea, 'b': eb, 'similarity': round(sim, 4),
+                                  'shared_terms': len(overlap), 'a_terms': len(sa), 'b_terms': len(sb)})
+            pairs.sort(key=lambda x: -x['similarity'])
+            return {'pairs': pairs, 'entities': len(entities)}
+
     def status(self):
         with self._lock:
             return {
-                'paragraphs': self.n,
-                'entities': self.scope.get('entities', []),
+                'paragraphs': self.n, 'entities': self.scope.get('entities', []),
                 'entity_count': len(self.scope.get('entities', [])),
-                'vocab_size': len(self.vocab),
-                'scope_mode': self.scope.get('mode', 'none'),
+                'vocab_size': len(self.vocab), 'scope_mode': self.scope.get('mode', 'none'),
                 'active_entity': self.scope.get('active_entity'),
-                'built_at': self.built_at,
-                'build_time_ms': self.build_time_ms,
+                'built_at': self.built_at, 'build_time_ms': self.build_time_ms,
                 'anchors': len(self.anchors),
             }
 
-
-# ─── File Watcher ──────────────────────────────────────────
 
 class FileWatcher:
     def __init__(self, index, interval=WATCH_INTERVAL):
@@ -487,7 +582,6 @@ class FileWatcher:
             sigs['__state__'] = state_file.stat().st_mtime
         except Exception:
             pass
-
         scope = get_active_scope()
         for entity_name in scope['entities']:
             entity_dir = Path(DOCTRINE_PATH) / entity_name
@@ -526,8 +620,6 @@ class FileWatcher:
         self._running = False
 
 
-# ─── HTTP Server ───────────────────────────────────────────
-
 index = SearchIndex()
 watcher = FileWatcher(index)
 
@@ -546,7 +638,9 @@ class SearchHandler(BaseHTTPRequestHandler):
             top_n = int(params.get('top', ['10'])[0])
             scope_override = params.get('scope', [None])[0]
             entity_filter = params.get('entity', [None])[0]
-
+            mode = params.get('mode', ['explore'])[0]
+            if mode not in ('explore', 'retrieve'):
+                mode = 'explore'
             if scope_override == 'all':
                 all_entities = []
                 try:
@@ -557,21 +651,39 @@ class SearchHandler(BaseHTTPRequestHandler):
                     pass
                 temp = SearchIndex()
                 temp.build(force_scope=all_entities)
-                result = temp.search(query, top_n=top_n, entity_filter=entity_filter)
+                result = temp.search(query, top_n=top_n, entity_filter=entity_filter, mode=mode)
             else:
-                result = index.search(query, top_n=top_n, entity_filter=entity_filter)
-
+                result = index.search(query, top_n=top_n, entity_filter=entity_filter, mode=mode)
             self._json(200, result)
 
         elif path == '/status':
             self._json(200, index.status())
-
         elif path == '/reindex':
             stats = index.build()
             self._json(200, {'reindexed': True, **stats})
-
+        elif path == '/duplicates':
+            threshold = float(params.get('threshold', ['0.75'])[0])
+            top_n = int(params.get('top', ['20'])[0])
+            exclude_shared = params.get('exclude_shared', ['false'])[0].lower() == 'true'
+            result = index.find_duplicates(threshold=threshold, top_n=top_n, exclude_shared=exclude_shared)
+            self._json(200, result)
+        elif path == '/orphans':
+            max_sim = float(params.get('max_sim', ['0.25'])[0])
+            top_n = int(params.get('top', ['20'])[0])
+            result = index.find_orphans(max_sim=max_sim, top_n=top_n)
+            self._json(200, result)
+        elif path == '/coverage':
+            entity = params.get('entity', [None])[0]
+            if not entity:
+                self._json(400, {'error': 'Missing ?entity= parameter'})
+                return
+            result = index.seed_coverage(entity)
+            self._json(200, result)
+        elif path == '/similarity':
+            result = index.entity_similarity()
+            self._json(200, result)
         else:
-            self._json(404, {'error': 'Not found. Endpoints: /search?q=, /status, /reindex'})
+            self._json(404, {'error': 'Endpoints: /search, /duplicates, /orphans, /coverage, /similarity, /status, /reindex'})
 
     def _json(self, code, data):
         body = json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8')
@@ -587,14 +699,10 @@ class SearchHandler(BaseHTTPRequestHandler):
             super().log_message(format, *args)
 
 
-# ─── CLI Entry Point ──────────────────────────────────────
-
 def write_results_file(results, output_path=None):
     if not output_path:
         output_path = os.path.join(STATE_PATH, 'search_results.md')
-
     lines = [f"# Search Results", f"_Query: {results['query']}_", '']
-
     if not results['results']:
         lines.append('No results found.')
     else:
@@ -612,19 +720,16 @@ def write_results_file(results, output_path=None):
                 text = text[:500] + '...'
             lines.append(text)
             lines.append('')
-
     Path(output_path).write_text('\n'.join(lines), encoding='utf-8')
     return output_path
 
 
 if __name__ == '__main__':
     port = DEFAULT_PORT
-
     if '--port' in sys.argv:
         pi = sys.argv.index('--port')
         if pi + 1 < len(sys.argv):
             port = int(sys.argv[pi + 1])
-
     if '--once' in sys.argv:
         qi = sys.argv.index('--once')
         if qi + 1 >= len(sys.argv):
@@ -644,25 +749,31 @@ if __name__ == '__main__':
         print(f"\nResults written to: {path}")
         sys.exit(0)
 
-    # Daemon mode
     print(f"🔍 BOND Search Daemon starting on port {port}")
     print(f"   BOND_ROOT: {BOND_ROOT}")
     print(f"   Doctrine:  {DOCTRINE_PATH}")
     print(f"   State:     {STATE_PATH}")
     print()
-
     watcher.start()
     print()
     print(f"   Endpoints:")
     print(f"     GET http://localhost:{port}/search?q=your+query")
+    print(f"     GET http://localhost:{port}/search?q=query&mode=retrieve")
     print(f"     GET http://localhost:{port}/search?q=query&scope=all")
     print(f"     GET http://localhost:{port}/search?q=query&entity=P11-Plumber")
+    print(f"     GET http://localhost:{port}/duplicates")
+    print(f"     GET http://localhost:{port}/orphans")
+    print(f"     GET http://localhost:{port}/coverage?entity=P11-Plumber")
+    print(f"     GET http://localhost:{port}/similarity")
     print(f"     GET http://localhost:{port}/status")
     print(f"     GET http://localhost:{port}/reindex")
     print()
 
+    class ThreadedServer(ThreadingMixIn, HTTPServer):
+        daemon_threads = True
+
     try:
-        server = HTTPServer(('127.0.0.1', port), SearchHandler)
+        server = ThreadedServer(('127.0.0.1', port), SearchHandler)
         print(f"🔥 Search daemon listening on http://localhost:{port}")
         print(f"   Watching for file changes every {WATCH_INTERVAL}s")
         print()
