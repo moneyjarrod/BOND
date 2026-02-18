@@ -8,6 +8,7 @@ const CLASS_COLORS = {
 };
 
 import { useState, useEffect, useRef } from 'react';
+import DaemonStatus from './DaemonStatus';
 
 export default function Header({
   activeEntity = null,
@@ -137,6 +138,8 @@ export default function Header({
             boxShadow: wsConnected ? '0 0 4px rgba(63,185,80,0.5)' : 'none',
           }} />
         </span>
+        <Sep />
+        <DaemonStatus />
         <Sep />
         <StatusItem label="Sys" value={`${activeCount}/${modules.length}`} className={activeCount > 0 ? 'active' : ''} />
         <Sep />

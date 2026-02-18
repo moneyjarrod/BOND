@@ -122,7 +122,7 @@ Commands are parsed by **core keyword**, not exact string match. When Claude enc
 1. Project SKILL.md
 2. OPS/MASTER state file
 3. state/active_entity.json — if entity set, read all files at path; if null, skip
-4. Seed check — Scan doctrine/ for perspective entities with `"seeding": true` in entity.json. For each armed perspective, collect seed file titles and run `qais_passthrough` against recent conversation context. Report any hits. If no armed seeders, skip silently.
+4. Seed check — **Gate: read armed_seeders from /sync-payload or scan entity.json files. If armed_seeders = 0, skip entirely — no vine pass, no exposure increment, no tracker writes.** For each armed perspective, collect seed file titles and run `qais_passthrough` against recent conversation context. Report any hits. Disarmed perspectives are invisible to {Sync}.
 5. Reset counter
 
 {Full Restore} = {Sync} + full depth read of all referenced files + bond_gate(trigger="restore").

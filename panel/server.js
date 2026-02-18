@@ -68,6 +68,7 @@ const STATE_PATH = resolve(process.env.STATE_PATH
   || join(BOND_ROOT, 'state'));
 const PORT = process.env.PORT || 3000;
 const MCP_URL = process.env.MCP_URL || 'http://localhost:3002';
+const DAEMON_URL = process.env.DAEMON_URL || 'http://localhost:3003';
 
 // ─── Framework Entities (S92: Immutable) ──────────────────
 const FRAMEWORK_ENTITIES = {
@@ -684,6 +685,29 @@ app.post('/api/state/unlink', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+app.get('/api/state/consultable', async (req, res) => {
+  try {
+    let state;
+    try { state = JSON.parse(await readFile(STATE_FILE, 'utf-8')); } catch { return res.json({ consultable: [], reason: 'No active entity' }); }
+    if (!state.entity) return res.json({ consultable: [], reason: 'No active entity' });
+    let activeConfig = {};
+    try { activeConfig = JSON.parse(await readFile(join(DOCTRINE_PATH, state.entity, 'entity.json'), 'utf-8')); } catch {}
+    if (activeConfig.class !== 'project') return res.json({ consultable: [], reason: 'Consult only available for project-class entities' });
+    const links = activeConfig.links || [];
+    const consultable = [];
+    for (const linkName of links) {
+      try {
+        const config = JSON.parse(await readFile(join(DOCTRINE_PATH, linkName, 'entity.json'), 'utf-8'));
+        const entClass = config.class || 'library';
+        if (entClass === 'perspective' || entClass === 'doctrine') {
+          consultable.push({ entity: linkName, class: entClass, display_name: config.display_name || null });
+        }
+      } catch {}
+    }
+    res.json({ consultable, active_entity: state.entity });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
 app.get('/api/state/linkable', async (req, res) => {
   try {
     let state;
@@ -1100,8 +1124,8 @@ app.get('/api/project-tick/:entity', async (req, res) => {
     tick.links = config.links || [];
 
     // Write tick output for Claude to read
-    const lines = [`# Project Tick \u2014 ${entity}`, `_${tick.timestamp}_`, '',
-      `**CORE:** ${tick.core?.initialized ? '\u2705 initialized' : '\u26a0\ufe0f not initialized'} (${tick.core?.file})`,
+    const lines = [`# Project Tick — ${entity}`, `_${tick.timestamp}_`, '',
+      `**CORE:** ${tick.core?.initialized ? '✅ initialized' : '⚠️ not initialized'} (${tick.core?.file})`,
       `**Crystal:** ${tick.crystal?.count || 0} sessions`,
       `**Handoffs:** ${tick.handoffs?.count || 0} local${tick.handoffs?.latest ? ` (latest: ${tick.handoffs.latest})` : ''}`,
       `**Doctrine:** ${tick.doctrine?.file_count || 0} files`,
@@ -1118,7 +1142,7 @@ app.get('/api/project-tick/:entity', async (req, res) => {
     const tickPath = join(STATE_PATH, 'project_tick_output.md');
     await verifiedWrite(tickPath, lines.join('\n'), `project-tick:${entity}`);
 
-    console.log(`\u26a1 Project Tick: ${entity}`);
+    console.log(`⚡ Project Tick: ${entity}`);
     res.json(tick);
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
@@ -1204,6 +1228,61 @@ app.post('/api/project-handoff/write/:entity', async (req, res) => {
 
 // ─── Bridge ───────────────────────────────────────────────
 // Clipboard-only. Panel writes "BOND:{cmd}" -> AHK OnClipboardChange.
+
+// ─── Search Daemon API (S120) ─────────────────────────────
+// CM insight: The daemon's response IS its health. No separate /health endpoint.
+// P11 insight: Launcher script is transition fitting between Node and Python.
+
+const DAEMON_LAUNCHER = process.platform === 'win32'
+  ? join(BOND_ROOT, 'start_daemon.bat')
+  : join(BOND_ROOT, 'start_daemon.sh');
+
+app.get('/api/daemon/status', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
+    const response = await fetch(`${DAEMON_URL}/sync-payload`, { signal: controller.signal });
+    clearTimeout(timeout);
+    if (response.ok) {
+      const data = await response.json();
+      res.json({ online: true, active_entity: data.active_entity || null, capabilities: data.capabilities || null, timestamp: new Date().toISOString() });
+    } else {
+      res.json({ online: false, error: `Daemon returned ${response.status}`, timestamp: new Date().toISOString() });
+    }
+  } catch (err) {
+    res.json({ online: false, error: err.name === 'AbortError' ? 'Timeout (3s)' : err.message, timestamp: new Date().toISOString() });
+  }
+});
+
+app.post('/api/daemon/start', async (req, res) => {
+  try {
+    if (!existsSync(DAEMON_LAUNCHER)) {
+      return res.status(404).json({ started: false, error: `Launcher not found: ${DAEMON_LAUNCHER}` });
+    }
+    const cmd = process.platform === 'win32' ? 'cmd' : 'bash';
+    const args = process.platform === 'win32' ? ['/c', DAEMON_LAUNCHER] : [DAEMON_LAUNCHER];
+    execFile(cmd, args, { cwd: BOND_ROOT, timeout: 10000 }, () => {});
+    // Wait 2s then ping to confirm
+    await new Promise(r => setTimeout(r, 2000));
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 3000);
+      const response = await fetch(`${DAEMON_URL}/sync-payload`, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (response.ok) {
+        console.log('🔍 Daemon started successfully');
+        res.json({ started: true, online: true, timestamp: new Date().toISOString() });
+      } else {
+        res.json({ started: true, online: false, note: 'Launcher ran but daemon not responding yet', timestamp: new Date().toISOString() });
+      }
+    } catch {
+      res.json({ started: true, online: false, note: 'Launcher ran but daemon not responding yet — may need a few more seconds', timestamp: new Date().toISOString() });
+    }
+  } catch (err) {
+    res.status(500).json({ started: false, error: err.message });
+  }
+});
 
 // ─── AHK Status API (S114) ────────────────────────────────
 const AHK_STATUS_FILE = join(STATE_PATH, 'ahk_status.json');
@@ -1297,6 +1376,7 @@ bootstrapFrameworkEntities().then(async () => {
     console.log(`🔥🌊 BOND Panel sidecar on http://localhost:${PORT}`);
     console.log(`   Doctrine path: ${DOCTRINE_PATH}`);
     console.log(`   MCP target:    ${MCP_URL}`);
+    console.log(`   Daemon:        ${DAEMON_URL}`);
     console.log(`   WebSocket:     ws://localhost:${PORT}`);
     console.log(`   Version:       ${versionCache.local || 'unknown'}${versionCache.updateAvailable ? ` (→ ${versionCache.remote} available)` : ''}`);
   });
