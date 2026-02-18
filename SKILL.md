@@ -52,10 +52,10 @@ Lost count: recommend {Sync}.
   See: doctrine/BOND_MASTER/WARM_RESTORE.md for full architecture.
 {Handoff}: Auto-combining session record. Always reads before writing.
   1) Check for existing handoffs/HANDOFF_S{N}.md for this session.
-  2) Check state/session_chunks.md for accumulated chunks.
+  2) Check entity-local state/session_chunks.md for accumulated chunks (doctrine/{entity}/state/ if entity active, else global state/).
   3) Synthesize: previous handoff + new chunks + current context → WORK, DECISIONS, THREADS, FILES sections.
-  4) Write to handoffs/HANDOFF_S{N}.md (overwrite if exists).
-  5) Clear state/session_chunks.md.
+  4) Write to handoffs/HANDOFF_S{N}.md (overwrite if exists). Also write entity-local state/handoff.md (doctrine/{entity}/state/ if entity active, else global state/).
+  5) Clear entity-local state/session_chunks.md.
   Consecutive calls auto-combine. Each write is richer. Last write = most complete. No "mid" or "final" labels.
   Output format: code block with ===SECTION=== delimiters (preserves markdown through clipboard).
   Panel pre-fills CONTEXT + STATE. Claude drafts the four content sections.
@@ -72,6 +72,9 @@ Lost count: recommend {Sync}.
   Panel: 🔭 Consult button on active project cards → dropdown from GET /api/state/consultable.
   No counter reset.
 
+## LOCAL STATE ROUTING
+All session state commands ({Chunk}, {Handoff}, {Tick}) route output to the active entity's local state/ subdirectory. If no entity active, route to global state/. Path resolution: entity active → doctrine/{entity}/state/{file}. No entity → state/{file}. Auto-create state/ subdirectory on first write. active_entity.json and config.json always remain global.
+
 ## COMPACTION RECOVERY
 When Claude detects a compaction note at the top of context ("[NOTE: This conversation was successfully compacted...]" block), this is an obligation trigger:
 1) Read the transcript path from the compaction note for reference (do not read full transcript unless needed)
@@ -83,7 +86,7 @@ Compaction = context was lost. QAIS retrieval is non-optional. This is an Armed=
 
 ## COMMANDS
 Commands are keyword-driven, not exact-match. `{Sync}`, `{Project Sync}`, `{Sync} GSG` all fire Sync. Additional words = parameters/context. Case insensitive. Multiple commands per message processed left-to-right.
-{Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (Layer 1: last handoff, Layer 2: archive query with confidence badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot → append to state/session_chunks.md (timestamped, 10-20 lines). Chunks are ingredients for {Handoff}, not standalone. Compaction insurance + handoff enrichment | {Tick} quick status + obligation audit (GET /api/sync-health) | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Consult ENTITY} read-only lens: read entity ROOTs/docs, speak through lens, no entity switch, no lifecycle triggers. Requires active project + entity linked to project. One-shot default | {Relational} arch re-anchor | {Drift?} self-check
+{Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (Layer 1: last handoff, Layer 2: archive query with confidence badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot → append to entity-local state/session_chunks.md (doctrine/{entity}/state/ if entity active, else global state/) (timestamped, 10-20 lines). Chunks are ingredients for {Handoff}, not standalone. Compaction insurance + handoff enrichment | {Tick} quick status + obligation audit (GET /api/sync-health) | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Consult ENTITY} read-only lens: read entity ROOTs/docs, speak through lens, no entity switch, no lifecycle triggers. Requires active project + entity linked to project. One-shot default | {Relational} arch re-anchor | {Drift?} self-check
 
 ## TOOL WIRING
 Command tools (fire on command, respect class boundaries):
@@ -91,7 +94,7 @@ Command tools (fire on command, respect class boundaries):
 {Warm Restore} → read state/warm_restore_output.md (pre-computed by panel endpoint /api/warm-restore), heatmap_hot(top_k=3) for signal boost. Panel runs SPECTRA, writes badges to file, Claude reads result.
 {Crystal} → iss_analyze on chunk text, crystal to QAIS, heatmap_chunk snapshot
 {Chunk} → heatmap_chunk snapshot. If crystal blocked by class matrix, Chunk still executes as conversational summary. Crystal adds persistence, doesn't gate the action.
-{Tick} → Panel button hits /api/sync-health, writes state/tick_output.md. Claude reads the file for server-generated obligations, then adds Layer 1 session report (work completed, vine health, open threads) + heatmap_hot(top_k=3) for warm concepts. Three layers: (1) Claude session report, (2) Server obligation audit from tick_output.md, (3) Project health from project_tick_output.md if project active. Phase 1: structured self-report against server-generated checklist.
+{Tick} → Panel button hits /api/sync-health, writes entity-local state/tick_output.md (doctrine/{entity}/state/ if entity active, else global state/). Claude reads the file for server-generated obligations, then adds Layer 1 session report (work completed, vine health, open threads) + heatmap_hot(top_k=3) for warm concepts. Three layers: (1) Claude session report, (2) Server obligation audit from tick_output.md, (3) Project health from project_tick_output.md if project active. Phase 1: structured self-report against server-generated checklist.
 {Save} → after write, qais_store binding (entity|role=save|fact=what was saved)
 Seed tools (framework-level, bypass class boundaries when seeders armed):
 perspective_store — write seed content into perspective's isolated .npz field (auto-seed + bootstrap). Optional: reason, session → auto-logs to seed_decisions.jsonl.
