@@ -384,12 +384,12 @@ def _triangle_color(results, margin):
 
 
 def _triangle_badge(color):
-    """Triangle header badge."""
+    """Confidence header badge — colored circle matching state."""
     return {
-        'GREEN': '\U0001f7e2\U0001f53a',    # green + triangle
-        'YELLOW': '\U0001f7e1\U0001f53a',   # yellow + triangle
-        'RED': '\U0001f534\U0001f53a',       # red + triangle
-    }.get(color, '\U0001f53a')
+        'GREEN': '\U0001f7e2',     # green circle
+        'YELLOW': '\U0001f7e1',    # yellow circle
+        'RED': '\U0001f534',       # red circle
+    }.get(color, '\U0001f534')
 
 
 def format_restore_output(layer1_handoff, layer2_results, layer2_margin, query_used):
