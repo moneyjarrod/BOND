@@ -25,6 +25,7 @@ User Scripts/
 /doctrine/*
 !/doctrine/BOND_MASTER/
 !/doctrine/PROJECT_MASTER/
+!/doctrine/P11-Plumber/
 
 # State: auto-generated at runtime
 /state/

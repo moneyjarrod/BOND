@@ -1,0 +1,13 @@
+{
+  "class": "perspective",
+  "tools": {
+    "filesystem": true,
+    "qais": true,
+    "heatmap": true,
+    "crystal": true
+  },
+  "display_name": "P11-The Plumber",
+  "seeding": false,
+  "prune_window": 10,
+  "seed_threshold": 0.04
+}
