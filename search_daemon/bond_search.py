@@ -14,7 +14,7 @@ Usage:
     python bond_search.py --port 3004    # custom port
     python bond_search.py --once "query" # one-shot query, no server
 
-Endpoints:
+Search Endpoints (Hot Water — SLA pipeline):
     GET /search?q=backflow+prevention          # query the index (auto mode)
     GET /search?q=query&mode=explore             # force editorial weights
     GET /search?q=the+lord+is+my+shepherd&mode=retrieve  # force SLA v2 retrieval
@@ -32,6 +32,15 @@ Endpoints:
     GET /similarity                            # entity vocabulary overlap
     GET /status                                # index stats, scope, health
     GET /reindex                               # force rebuild
+
+File Ops Endpoints (Cold Water — verbatim, no processing):
+    GET  /manifest                             # all files with entity, class, size
+    GET  /manifest?entity=P11-Plumber          # single entity manifest
+    GET  /read?path=doctrine/P11/ROOT-x.md     # read file verbatim
+    POST /write  {"path": "...", "content": "..."}  # write file verbatim
+    GET  /copy?from=...&to=...                 # copy file verbatim
+    GET  /export                               # full doctrine export to state/export.md
+    GET  /export?entity=P11-Plumber            # single entity export
 """
 
 import sys, os, re, json, math, time, threading
@@ -239,11 +248,6 @@ class SearchIndex:
         self._lock = threading.Lock()
 
     def build(self, scope=None, force_scope=None, corpus_origin='doctrine'):
-        """Build index from doctrine entity files. Thread-safe.
-
-        corpus_origin: 'doctrine' (default) or 'external'
-        Set at ingest time — determines auto mode routing.
-        """
         start = time.time()
         if force_scope:
             scope_info = {
@@ -254,7 +258,6 @@ class SearchIndex:
         else:
             scope_info = scope or get_active_scope()
             scope_info['corpus_origin'] = 'doctrine'
-
         all_paragraphs = []
         for entity_name in scope_info['entities']:
             entity_dir = Path(DOCTRINE_PATH) / entity_name
@@ -262,34 +265,25 @@ class SearchIndex:
                 continue
             for md_file in entity_dir.glob('*.md'):
                 all_paragraphs.extend(extract_paragraphs(md_file))
-
         stats = self._index_paragraphs(all_paragraphs, scope_info, start)
         return stats
 
     def build_external(self, path, corpus_name=None):
-        """Build index from an external file or directory. Sets corpus_origin='external'.
-
-        This is the ingest path for alien corpora (Psalms, etc).
-        Auto mode will resolve to 'retrieve' for all searches.
-        """
         start = time.time()
         paragraphs, name, file_count = load_external_corpus(path, corpus_name)
         if not paragraphs:
             return {'error': f'No paragraphs found at {path}', 'paragraphs': 0, 'files': 0}
-
         scope_info = {
             'active_entity': None, 'active_class': None,
             'entities': [name], 'mode': 'external',
             'corpus_origin': 'external', 'source_path': str(path),
         }
-
         stats = self._index_paragraphs(paragraphs, scope_info, start)
         stats['corpus_name'] = name
         stats['files'] = file_count
         return stats
 
     def _index_paragraphs(self, all_paragraphs, scope_info, start):
-        """Shared indexing logic for both doctrine and external builds."""
         def searchable_text(p):
             parts = []
             if p.get('heading'):
@@ -297,21 +291,17 @@ class SearchIndex:
             parts.append(p['file'].replace('.md', '').replace('.txt', '').replace('-', ' '))
             parts.append(p['text'])
             return ' '.join(parts)
-
         tokens_list = [content_stems(searchable_text(p)) for p in all_paragraphs]
         vocab = set(s for pt in tokens_list for s in pt)
         n = len(all_paragraphs)
-
         df = defaultdict(int)
         for pt in tokens_list:
             for w in set(pt):
                 df[w] += 1
-
         idf = {}
         for w in vocab:
             if df[w] > 0:
                 idf[w] = math.log(n / df[w]) if n > 0 else 0.0
-
         anchors = []
         if n <= 500:
             anchors = self._build_anchors(n, tokens_list, idf)
@@ -320,9 +310,7 @@ class SearchIndex:
                 scores = {w: idf.get(w, 0) for w in set(tokens_list[i])}
                 ranked = sorted(scores.items(), key=lambda x: -x[1])[:self.anchor_k]
                 anchors.append({w: s for w, s in ranked})
-
         elapsed = (time.time() - start) * 1000
-
         with self._lock:
             self.paragraphs = all_paragraphs
             self.tokens = tokens_list
@@ -334,7 +322,6 @@ class SearchIndex:
             self.scope = scope_info
             self.built_at = time.strftime('%Y-%m-%dT%H:%M:%S')
             self.build_time_ms = round(elapsed)
-
         return {
             'paragraphs': n, 'entities': len(scope_info['entities']),
             'vocab': len(vocab), 'build_time_ms': round(elapsed),
@@ -342,13 +329,11 @@ class SearchIndex:
         }
 
     def _build_anchors(self, n, tokens_list, idf):
-        """Contrastive anchors — words that distinguish each paragraph from its neighbors."""
         anchors = []
         for i in range(n):
             sims = []
             for j in range(n):
-                if j == i:
-                    continue
+                if j == i: continue
                 sims.append((j, self._cosine(tokens_list[i], tokens_list[j], idf)))
             sims.sort(key=lambda x: -x[1])
             confusers = [idx for idx, _ in sims[:self.confuser_k]]
@@ -363,8 +348,7 @@ class SearchIndex:
     def _cosine(self, a, b, idf):
         sa, sb = set(a), set(b)
         overlap = sa & sb
-        if not overlap:
-            return 0.0
+        if not overlap: return 0.0
         dot = sum(idf.get(w, 0) ** 2 for w in overlap)
         ma = math.sqrt(sum(idf.get(w, 0) ** 2 for w in sa))
         mb = math.sqrt(sum(idf.get(w, 0) ** 2 for w in sb))
@@ -376,20 +360,16 @@ class SearchIndex:
         return idf * tf_norm
 
     def _phrase_proximity(self, tokens, q_stems):
-        if len(q_stems) < 2:
-            return 0.0
+        if len(q_stems) < 2: return 0.0
         positions = {}
         for i, t in enumerate(tokens):
             if t in q_stems:
-                if t not in positions:
-                    positions[t] = []
+                if t not in positions: positions[t] = []
                 positions[t].append(i)
-        if len(positions) < 2:
-            return 0.0
+        if len(positions) < 2: return 0.0
         all_pos = []
         for stem, pos_list in positions.items():
-            for p in pos_list:
-                all_pos.append((p, stem))
+            for p in pos_list: all_pos.append((p, stem))
         all_pos.sort()
         min_span = float('inf')
         for i in range(len(all_pos)):
@@ -398,22 +378,18 @@ class SearchIndex:
                     span = all_pos[j][0] - all_pos[i][0]
                     min_span = min(min_span, span)
                     break
-        if min_span == float('inf'):
-            return 0.0
+        if min_span == float('inf'): return 0.0
         return 1.0 / min_span
 
     def _neighborhood_resonance(self, idx, q_unique):
-        """Average IDF overlap of a paragraph's sequential neighbors with query."""
         p = self.paragraphs[idx]
         neighbors = []
         for j in range(max(0, idx - 2), min(self.n, idx + 3)):
-            if j == idx:
-                continue
+            if j == idx: continue
             pj = self.paragraphs[j]
             if pj['entity'] == p['entity'] and pj['file'] == p['file']:
                 neighbors.append(j)
-        if not neighbors:
-            return 0.0
+        if not neighbors: return 0.0
         total = 0.0
         for ni in neighbors:
             overlap = q_unique & set(self.tokens[ni])
@@ -421,52 +397,32 @@ class SearchIndex:
         return total / len(neighbors)
 
     def _resolve_mode(self, mode):
-        """Auto-resolve search mode from context.
-
-        corpus_origin is authoritative — set when the index is built,
-        not guessed from file naming conventions.
-        """
-        if mode != 'auto':
-            return mode
+        if mode != 'auto': return mode
         origin = self.scope.get('corpus_origin', 'doctrine')
-        if origin == 'external':
-            return 'retrieve'
+        if origin == 'external': return 'retrieve'
         return 'explore'
 
     def search(self, query_text, top_n=10, anchor_weight=15, nbr_weight=10,
                entity_boost=1.3, entity_filter=None, mode='auto'):
-        """Search the index.
-
-        mode='auto'     — daemon decides from context (default)
-        mode='explore'  — editorial weights in score (doctrine browsing)
-        mode='retrieve' — pure BM25 ranking, adjustments to margin only (SLA v2)
-        """
         with self._lock:
             if self.n == 0:
                 return {'results': [], 'margin': 0.0, 'query': query_text, 'indexed': 0}
-
             mode = self._resolve_mode(mode)
-
             q_stems = content_stems(query_text)
             q_unique = set(q_stems)
             if not q_unique:
                 return {'results': [], 'margin': 0.0, 'query': query_text, 'indexed': self.n}
-
             avgdl = sum(len(pt) for pt in self.tokens) / max(self.n, 1)
-
             boosted_entities = set()
             active = self.scope.get('active_entity')
             if active:
                 boosted_entities.add(active)
-                for ent in self.scope.get('entities', []):
-                    boosted_entities.add(ent)
-
+                for ent in self.scope.get('entities', []): boosted_entities.add(ent)
             qs = max(len(q_unique), 1)
             scores = []
             for i, pt in enumerate(self.tokens):
                 p = self.paragraphs[i]
-                if entity_filter and p['entity'] != entity_filter:
-                    continue
+                if entity_filter and p['entity'] != entity_filter: continue
                 overlap = q_unique & set(pt)
                 if not overlap:
                     scores.append((i, 0.0, overlap))
@@ -481,25 +437,17 @@ class SearchIndex:
                 score = bm25_score * (1.0 + coverage * 0.5)
                 proximity = self._phrase_proximity(pt, q_unique)
                 score *= (1.0 + proximity * 0.5)
-                # Mode-dependent scoring
                 if mode == 'explore':
                     fname = p['file']
-                    if fname.startswith('ROOT-') or fname.startswith('ROOT_'):
-                        score *= 1.5
-                    elif fname.startswith('G-pruned-') or fname.startswith('_pruned_'):
-                        score *= 0.5
-                    if boosted_entities and p['entity'] in boosted_entities:
-                        score *= entity_boost
+                    if fname.startswith('ROOT-') or fname.startswith('ROOT_'): score *= 1.5
+                    elif fname.startswith('G-pruned-') or fname.startswith('_pruned_'): score *= 0.5
+                    if boosted_entities and p['entity'] in boosted_entities: score *= entity_boost
                 scores.append((i, score, overlap))
-
             scores.sort(key=lambda x: -x[1])
-
-            # Dedup
             seen_groups = {}
             deduped = []
             for idx, sc, overlap in scores:
-                if sc == 0:
-                    continue
+                if sc == 0: continue
                 p = self.paragraphs[idx]
                 group_key = (p['entity'], p['file'], p['heading'] or '')
                 if group_key in seen_groups:
@@ -515,9 +463,7 @@ class SearchIndex:
                 }
                 seen_groups[group_key] = [result, idx, 1]
                 deduped.append(group_key)
-                if len(deduped) >= top_n:
-                    break
-
+                if len(deduped) >= top_n: break
             results = []
             result_indices = []
             for key in deduped:
@@ -525,8 +471,6 @@ class SearchIndex:
                 r['siblings'] = count - 1
                 results.append(r)
                 result_indices.append(idx)
-
-            # Margin calculation
             if len(results) >= 2:
                 raw = (results[0]['score'] - results[1]['score']) / max(results[0]['score'], 1e-10) * 100
                 ad = len(results[0].get('anchor_hits', [])) - len(results[1].get('anchor_hits', []))
@@ -536,49 +480,29 @@ class SearchIndex:
                     run_nbr = self._neighborhood_resonance(result_indices[1], q_unique)
                     if max(top_nbr, run_nbr) > 0:
                         nbr_diff = (top_nbr - run_nbr) / max(top_nbr, run_nbr)
-                    else:
-                        nbr_diff = 0.0
+                    else: nbr_diff = 0.0
                     nbr_adj = nbr_weight * nbr_diff
                     type_adj = 0.0
                     for ri, r in enumerate(results[:2]):
                         fname = r['file']
                         sign = 1.0 if ri == 0 else -1.0
-                        if fname.startswith('ROOT-') or fname.startswith('ROOT_'):
-                            type_adj += sign * 5.0
-                        elif fname.startswith('G-pruned-') or fname.startswith('_pruned_'):
-                            type_adj -= sign * 5.0
+                        if fname.startswith('ROOT-') or fname.startswith('ROOT_'): type_adj += sign * 5.0
+                        elif fname.startswith('G-pruned-') or fname.startswith('_pruned_'): type_adj -= sign * 5.0
                     margin = min(max(raw + anchor_adj + nbr_adj + type_adj, 0.1), 100.0)
                 else:
                     margin = min(max(raw + anchor_adj, 0.1), 100.0)
-            elif len(results) == 1:
-                margin = 100.0
-            else:
-                margin = 0.0
-
-            # Confidence gate — SLA Layer 4
+            elif len(results) == 1: margin = 100.0
+            else: margin = 0.0
             if mode == 'retrieve':
-                if margin > 50:
-                    gate = 'HIGH'
-                elif margin > 15:
-                    gate = 'MED'
-                else:
-                    gate = 'LOW'
-                for r in results:
-                    r['confidence'] = gate
+                gate = 'HIGH' if margin > 50 else 'MED' if margin > 15 else 'LOW'
+                for r in results: r['confidence'] = gate
             else:
                 top_score = results[0]['score'] if results else 0.0
                 for r in results:
-                    if top_score == 0:
-                        r['confidence'] = 'LOW'
+                    if top_score == 0: r['confidence'] = 'LOW'
                     else:
                         ratio = r['score'] / top_score
-                        if ratio >= 0.7:
-                            r['confidence'] = 'HIGH'
-                        elif ratio >= 0.35:
-                            r['confidence'] = 'MED'
-                        else:
-                            r['confidence'] = 'LOW'
-
+                        r['confidence'] = 'HIGH' if ratio >= 0.7 else 'MED' if ratio >= 0.35 else 'LOW'
             return {
                 'results': results, 'margin': round(margin, 1), 'query': query_text,
                 'mode': mode, 'indexed': self.n,
@@ -588,16 +512,13 @@ class SearchIndex:
 
     def find_duplicates(self, threshold=0.75, top_n=20, exclude_shared=False):
         with self._lock:
-            if self.n == 0:
-                return {'duplicates': [], 'scanned': 0}
+            if self.n == 0: return {'duplicates': [], 'scanned': 0}
             pairs = []
             for i in range(self.n):
                 for j in range(i + 1, self.n):
                     pi, pj = self.paragraphs[i], self.paragraphs[j]
-                    if pi['entity'] == pj['entity'] and pi['file'] == pj['file']:
-                        continue
-                    if exclude_shared and pi['file'] == pj['file'] and pi['entity'] != pj['entity']:
-                        continue
+                    if pi['entity'] == pj['entity'] and pi['file'] == pj['file']: continue
+                    if exclude_shared and pi['file'] == pj['file'] and pi['entity'] != pj['entity']: continue
                     sim = self._cosine(self.tokens[i], self.tokens[j], self.idf)
                     if sim >= threshold:
                         pairs.append({
@@ -611,30 +532,22 @@ class SearchIndex:
 
     def find_orphans(self, max_sim=0.25, top_n=20):
         with self._lock:
-            if self.n == 0:
-                return {'orphans': [], 'scanned': 0}
+            if self.n == 0: return {'orphans': [], 'scanned': 0}
             isolation_scores = []
             for i in range(self.n):
-                if not self.tokens[i]:
-                    continue
+                if not self.tokens[i]: continue
                 max_cosine = 0.0
                 for j in range(self.n):
-                    if j == i:
-                        continue
+                    if j == i: continue
                     sim = self._cosine(self.tokens[i], self.tokens[j], self.idf)
-                    if sim > max_cosine:
-                        max_cosine = sim
+                    if sim > max_cosine: max_cosine = sim
                 p = self.paragraphs[i]
                 if max_cosine <= max_sim:
                     fname = p['file']
-                    if fname.startswith('ROOT-') or fname.startswith('ROOT_'):
-                        doc_type = 'root'
-                    elif fname.startswith('G-pruned-') or fname.startswith('_pruned_'):
-                        doc_type = 'pruned'
-                    elif fname.startswith('CORE') or fname == 'entity.json':
-                        doc_type = 'core'
-                    else:
-                        doc_type = 'seed'
+                    if fname.startswith('ROOT-') or fname.startswith('ROOT_'): doc_type = 'root'
+                    elif fname.startswith('G-pruned-') or fname.startswith('_pruned_'): doc_type = 'pruned'
+                    elif fname.startswith('CORE') or fname == 'entity.json': doc_type = 'core'
+                    else: doc_type = 'seed'
                     isolation_scores.append({
                         'max_similarity': round(max_cosine, 4), 'entity': p['entity'],
                         'file': p['file'], 'heading': p['heading'],
@@ -646,22 +559,16 @@ class SearchIndex:
 
     def seed_coverage(self, entity_name):
         with self._lock:
-            if self.n == 0:
-                return {'error': 'Index empty'}
+            if self.n == 0: return {'error': 'Index empty'}
             root_indices = []
             seed_indices = []
             for i, p in enumerate(self.paragraphs):
-                if p['entity'] != entity_name:
-                    continue
+                if p['entity'] != entity_name: continue
                 fname = p['file']
-                if fname.startswith('ROOT-') or fname.startswith('ROOT_'):
-                    root_indices.append(i)
-                elif not fname.startswith('G-pruned-') and not fname.startswith('_pruned_'):
-                    seed_indices.append(i)
-            if not root_indices:
-                return {'entity': entity_name, 'error': 'No ROOTs found', 'roots': 0, 'seeds': 0}
-            if not seed_indices:
-                return {'entity': entity_name, 'error': 'No seeds found', 'roots': len(root_indices), 'seeds': 0}
+                if fname.startswith('ROOT-') or fname.startswith('ROOT_'): root_indices.append(i)
+                elif not fname.startswith('G-pruned-') and not fname.startswith('_pruned_'): seed_indices.append(i)
+            if not root_indices: return {'entity': entity_name, 'error': 'No ROOTs found', 'roots': 0, 'seeds': 0}
+            if not seed_indices: return {'entity': entity_name, 'error': 'No seeds found', 'roots': len(root_indices), 'seeds': 0}
             coverage = []
             for si in seed_indices:
                 best_root_sim = 0.0
@@ -683,8 +590,7 @@ class SearchIndex:
 
     def entity_similarity(self):
         with self._lock:
-            if self.n == 0:
-                return {'pairs': [], 'entities': 0}
+            if self.n == 0: return {'pairs': [], 'entities': 0}
             entity_tokens = defaultdict(set)
             for i, p in enumerate(self.paragraphs):
                 entity_tokens[p['entity']].update(set(self.tokens[i]))
@@ -718,8 +624,6 @@ class SearchIndex:
 # ─── File Watcher ──────────────────────────────────────────
 
 class FileWatcher:
-    """Polls for file changes and triggers reindex."""
-
     def __init__(self, index, interval=WATCH_INTERVAL):
         self.index = index
         self.interval = interval
@@ -731,20 +635,15 @@ class FileWatcher:
     def _snapshot(self):
         sigs = {}
         state_file = Path(STATE_PATH) / 'active_entity.json'
-        try:
-            sigs['__state__'] = state_file.stat().st_mtime
-        except Exception:
-            pass
+        try: sigs['__state__'] = state_file.stat().st_mtime
+        except Exception: pass
         scope = get_active_scope()
         for entity_name in scope['entities']:
             entity_dir = Path(DOCTRINE_PATH) / entity_name
-            if not entity_dir.is_dir():
-                continue
+            if not entity_dir.is_dir(): continue
             for md_file in entity_dir.glob('*.md'):
-                try:
-                    sigs[str(md_file)] = md_file.stat().st_mtime
-                except Exception:
-                    pass
+                try: sigs[str(md_file)] = md_file.stat().st_mtime
+                except Exception: pass
         return sigs, scope
 
     def _watch_loop(self):
@@ -774,13 +673,177 @@ class FileWatcher:
         self._running = False
 
     def pause(self):
-        """Pause watching — used when external corpus is loaded."""
         self._paused = True
 
     def resume(self):
-        """Resume watching and rebuild doctrine index."""
         self._paused = False
         self._signatures = {}
+
+
+# ─── File Operations (Cold Water) ──────────────────────────
+# Raw read/write/copy/export — no SLA pipeline, no tokenization.
+# All paths scoped to BOND_ROOT. Write ops logged.
+
+class FileOps:
+    """Verbatim file operations within BOND_ROOT. No processing."""
+
+    def __init__(self, bond_root, state_path, doctrine_path):
+        self.bond_root = Path(bond_root).resolve()
+        self.state_path = Path(state_path)
+        self.doctrine_path = Path(doctrine_path)
+        self.log_path = self.state_path / 'file_ops.log'
+
+    def _safe_path(self, rel_path):
+        """Resolve path and verify it's within BOND_ROOT."""
+        resolved = (self.bond_root / rel_path).resolve()
+        if not str(resolved).startswith(str(self.bond_root)):
+            return None, 'Path escapes BOND_ROOT boundary'
+        return resolved, None
+
+    def _log(self, op, path, detail=''):
+        """Append-only write log for auditability."""
+        ts = time.strftime('%Y-%m-%dT%H:%M:%S')
+        entry = f"[{ts}] {op}: {path}"
+        if detail: entry += f" | {detail}"
+        try:
+            os.makedirs(self.state_path, exist_ok=True)
+            with open(self.log_path, 'a', encoding='utf-8') as f:
+                f.write(entry + '\n')
+        except Exception: pass
+
+    def manifest(self, entity_filter=None):
+        """List all files with metadata. Computed on call, never cached."""
+        files = []
+        if not self.doctrine_path.is_dir():
+            return {'files': files, 'entities': 0, 'total_size': 0}
+        entities_found = set()
+        for entity_dir in sorted(self.doctrine_path.iterdir()):
+            if not entity_dir.is_dir(): continue
+            entity_name = entity_dir.name
+            if entity_filter and entity_name != entity_filter: continue
+            entities_found.add(entity_name)
+            entity_class = 'unknown'
+            try:
+                ej = json.loads((entity_dir / 'entity.json').read_text(encoding='utf-8'))
+                entity_class = ej.get('class', 'unknown')
+            except Exception: pass
+            for f in sorted(entity_dir.iterdir()):
+                if f.is_dir():
+                    for sf in sorted(f.iterdir()):
+                        if sf.is_file():
+                            stat = sf.stat()
+                            files.append({
+                                'entity': entity_name, 'class': entity_class,
+                                'path': str(sf.relative_to(self.bond_root)),
+                                'file': f"{f.name}/{sf.name}", 'size': stat.st_size,
+                                'modified': time.strftime('%Y-%m-%dT%H:%M:%S', time.localtime(stat.st_mtime)),
+                            })
+                elif f.is_file():
+                    stat = f.stat()
+                    files.append({
+                        'entity': entity_name, 'class': entity_class,
+                        'path': str(f.relative_to(self.bond_root)),
+                        'file': f.name, 'size': stat.st_size,
+                        'modified': time.strftime('%Y-%m-%dT%H:%M:%S', time.localtime(stat.st_mtime)),
+                    })
+        total_size = sum(f['size'] for f in files)
+        return {'files': files, 'entities': len(entities_found), 'total_size': total_size, 'file_count': len(files)}
+
+    def read(self, rel_path):
+        """Read file verbatim. Returns raw content."""
+        resolved, err = self._safe_path(rel_path)
+        if err: return {'error': err}
+        if not resolved.is_file(): return {'error': f'Not a file: {rel_path}'}
+        try:
+            content = resolved.read_text(encoding='utf-8')
+            return {'path': rel_path, 'content': content, 'size': len(content), 'lines': content.count('\n') + 1}
+        except Exception as e:
+            return {'error': f'Read failed: {e}'}
+
+    def write(self, rel_path, content):
+        """Write content verbatim to file."""
+        resolved, err = self._safe_path(rel_path)
+        if err: return {'error': err}
+        try:
+            os.makedirs(resolved.parent, exist_ok=True)
+            existed = resolved.is_file()
+            resolved.write_text(content, encoding='utf-8')
+            op = 'OVERWRITE' if existed else 'CREATE'
+            self._log(op, rel_path, f"{len(content)} bytes")
+            return {'path': rel_path, 'operation': op.lower(), 'size': len(content), 'lines': content.count('\n') + 1}
+        except Exception as e:
+            return {'error': f'Write failed: {e}'}
+
+    def copy(self, from_rel, to_rel):
+        """Copy file verbatim from one path to another."""
+        from_resolved, err = self._safe_path(from_rel)
+        if err: return {'error': f'Source: {err}'}
+        to_resolved, err = self._safe_path(to_rel)
+        if err: return {'error': f'Destination: {err}'}
+        if not from_resolved.is_file(): return {'error': f'Source not found: {from_rel}'}
+        try:
+            content = from_resolved.read_text(encoding='utf-8')
+            os.makedirs(to_resolved.parent, exist_ok=True)
+            existed = to_resolved.is_file()
+            to_resolved.write_text(content, encoding='utf-8')
+            op = 'COPY_OVER' if existed else 'COPY_NEW'
+            self._log(op, f"{from_rel} -> {to_rel}", f"{len(content)} bytes")
+            return {'from': from_rel, 'to': to_rel, 'operation': op.lower(), 'size': len(content)}
+        except Exception as e:
+            return {'error': f'Copy failed: {e}'}
+
+    def export(self, entity_filter=None, output_path=None):
+        """Assemble all doctrine files into a single markdown document, verbatim."""
+        if not output_path: output_path = self.state_path / 'export.md'
+        else: output_path = Path(output_path)
+        lines = ['# BOND Doctrine Export']
+        lines.append(f"_Generated: {time.strftime('%Y-%m-%dT%H:%M:%S')}_")
+        lines.append('')
+        file_count = 0
+        total_chars = 0
+        entities_exported = set()
+        for entity_dir in sorted(self.doctrine_path.iterdir()):
+            if not entity_dir.is_dir(): continue
+            entity_name = entity_dir.name
+            if entity_filter and entity_name != entity_filter: continue
+            entity_class = 'unknown'
+            try:
+                ej = json.loads((entity_dir / 'entity.json').read_text(encoding='utf-8'))
+                entity_class = ej.get('class', 'unknown')
+            except Exception: pass
+            entities_exported.add(entity_name)
+            lines.append(f"---")
+            lines.append(f"## {entity_name} ({entity_class})")
+            lines.append('')
+            for f in sorted(entity_dir.iterdir()):
+                if not f.is_file(): continue
+                try:
+                    content = f.read_text(encoding='utf-8')
+                    lines.append(f"### {f.name}")
+                    lines.append(f"<!-- {len(content)} chars -->")
+                    lines.append('')
+                    lines.append(content)
+                    lines.append('')
+                    file_count += 1
+                    total_chars += len(content)
+                except Exception:
+                    lines.append(f"### {f.name}")
+                    lines.append('_[read error]_')
+                    lines.append('')
+        lines.append('---')
+        lines.append(f"_Export complete: {file_count} files from {len(entities_exported)} entities, ~{total_chars} chars_")
+        output_text = '\n'.join(lines)
+        os.makedirs(output_path.parent, exist_ok=True)
+        output_path.write_text(output_text, encoding='utf-8')
+        self._log('EXPORT', str(output_path), f"{file_count} files, {len(entities_exported)} entities")
+        return {
+            'output_path': str(output_path), 'entities': len(entities_exported),
+            'files': file_count, 'total_chars': total_chars,
+            'token_estimate': int(total_chars * 0.25),
+        }
+
+
+file_ops = FileOps(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
 
 
 # ─── HTTP Server ───────────────────────────────────────────
@@ -805,16 +868,13 @@ class SearchHandler(BaseHTTPRequestHandler):
             scope_override = params.get('scope', [None])[0]
             entity_filter = params.get('entity', [None])[0]
             mode = params.get('mode', ['auto'])[0]
-            if mode not in ('auto', 'explore', 'retrieve'):
-                mode = 'auto'
+            if mode not in ('auto', 'explore', 'retrieve'): mode = 'auto'
             if scope_override == 'all':
                 all_entities = []
                 try:
                     for entry in Path(DOCTRINE_PATH).iterdir():
-                        if entry.is_dir():
-                            all_entities.append(entry.name)
-                except Exception:
-                    pass
+                        if entry.is_dir(): all_entities.append(entry.name)
+                except Exception: pass
                 temp = SearchIndex()
                 temp.build(force_scope=all_entities)
                 result = temp.search(query, top_n=top_n, entity_filter=entity_filter, mode=mode)
@@ -871,8 +931,69 @@ class SearchHandler(BaseHTTPRequestHandler):
         elif path == '/similarity':
             result = index.entity_similarity()
             self._json(200, result)
+
+        # ── File Operations (Cold Water) ──
+        elif path == '/manifest':
+            entity = params.get('entity', [None])[0]
+            result = file_ops.manifest(entity_filter=entity)
+            self._json(200, result)
+
+        elif path == '/read':
+            file_path = params.get('path', [''])[0]
+            if not file_path:
+                self._json(400, {'error': 'Missing ?path= parameter'})
+                return
+            file_path = unquote(file_path)
+            result = file_ops.read(file_path)
+            if 'error' in result: self._json(400, result)
+            else: self._json(200, result)
+
+        elif path == '/copy':
+            from_path = params.get('from', [''])[0]
+            to_path = params.get('to', [''])[0]
+            if not from_path or not to_path:
+                self._json(400, {'error': 'Missing ?from= and ?to= parameters'})
+                return
+            from_path = unquote(from_path)
+            to_path = unquote(to_path)
+            result = file_ops.copy(from_path, to_path)
+            if 'error' in result: self._json(400, result)
+            else: self._json(200, result)
+
+        elif path == '/export':
+            entity = params.get('entity', [None])[0]
+            output = params.get('output', [None])[0]
+            if output: output = unquote(output)
+            result = file_ops.export(entity_filter=entity, output_path=output)
+            if 'error' in result: self._json(400, result)
+            else: self._json(200, result)
+
         else:
-            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /status, /reindex'})
+            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /status, /reindex, /manifest, /read, /write, /copy, /export'})
+
+    def do_POST(self):
+        parsed = urlparse(self.path)
+        path = parsed.path.rstrip('/')
+        if path == '/write':
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(length).decode('utf-8'))
+            except Exception as e:
+                self._json(400, {'error': f'Invalid JSON body: {e}'})
+                return
+            file_path = body.get('path', '')
+            content = body.get('content', '')
+            if not file_path:
+                self._json(400, {'error': 'Missing "path" in body'})
+                return
+            if content is None:
+                self._json(400, {'error': 'Missing "content" in body'})
+                return
+            result = file_ops.write(file_path, content)
+            if 'error' in result: self._json(400, result)
+            else: self._json(200, result)
+        else:
+            self._json(404, {'error': 'POST endpoints: /write'})
 
     def _json(self, code, data):
         body = json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8')
@@ -907,8 +1028,7 @@ def write_results_file(results, output_path=None):
             lines.append(f"Score: {r['score']} | Overlap: {', '.join(r.get('overlap', []))} | Anchors: {', '.join(r.get('anchor_hits', []))}")
             lines.append('')
             text = r['text']
-            if len(text) > 500:
-                text = text[:500] + '...'
+            if len(text) > 500: text = text[:500] + '...'
             lines.append(text)
             lines.append('')
     Path(output_path).write_text('\n'.join(lines), encoding='utf-8')
@@ -919,8 +1039,7 @@ if __name__ == '__main__':
     port = DEFAULT_PORT
     if '--port' in sys.argv:
         pi = sys.argv.index('--port')
-        if pi + 1 < len(sys.argv):
-            port = int(sys.argv[pi + 1])
+        if pi + 1 < len(sys.argv): port = int(sys.argv[pi + 1])
     if '--once' in sys.argv:
         qi = sys.argv.index('--once')
         if qi + 1 >= len(sys.argv):
@@ -947,7 +1066,7 @@ if __name__ == '__main__':
     print()
     watcher.start()
     print()
-    print(f"   Endpoints:")
+    print(f"   Search (Hot Water):")
     print(f"     GET http://localhost:{port}/search?q=your+query")
     print(f"     GET http://localhost:{port}/search?q=query&mode=retrieve")
     print(f"     GET http://localhost:{port}/search?q=query&scope=all")
@@ -959,6 +1078,15 @@ if __name__ == '__main__':
     print(f"     GET http://localhost:{port}/similarity")
     print(f"     GET http://localhost:{port}/status")
     print(f"     GET http://localhost:{port}/reindex")
+    print()
+    print(f"   File Ops (Cold Water):")
+    print(f"     GET  http://localhost:{port}/manifest")
+    print(f"     GET  http://localhost:{port}/manifest?entity=P11-Plumber")
+    print(f"     GET  http://localhost:{port}/read?path=doctrine/P11-Plumber/ROOT-build-for-access.md")
+    print(f"     POST http://localhost:{port}/write  body: {{\"path\": \"...\", \"content\": \"...\"}}")
+    print(f"     GET  http://localhost:{port}/copy?from=...&to=...")
+    print(f"     GET  http://localhost:{port}/export")
+    print(f"     GET  http://localhost:{port}/export?entity=P11-Plumber")
     print()
 
     class ThreadedServer(ThreadingMixIn, HTTPServer):
