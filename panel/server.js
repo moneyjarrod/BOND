@@ -1372,13 +1372,31 @@ bootstrapFrameworkEntities().then(async () => {
   await healUniversalRoots();
   await checkForUpdate();
   setInterval(checkForUpdate, 60 * 60 * 1000);
-  server.listen(PORT, () => {
+  server.listen(PORT, async () => {
     console.log(`🔥🌊 BOND Panel sidecar on http://localhost:${PORT}`);
     console.log(`   Doctrine path: ${DOCTRINE_PATH}`);
     console.log(`   MCP target:    ${MCP_URL}`);
     console.log(`   Daemon:        ${DAEMON_URL}`);
     console.log(`   WebSocket:     ws://localhost:${PORT}`);
     console.log(`   Version:       ${versionCache.local || 'unknown'}${versionCache.updateAvailable ? ` (→ ${versionCache.remote} available)` : ''}`);
+
+    // Auto-start daemon if not already running
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 2000);
+      await fetch(`${DAEMON_URL}/sync-payload`, { signal: controller.signal });
+      clearTimeout(timeout);
+      console.log(`   🟢 Daemon already running`);
+    } catch {
+      if (existsSync(DAEMON_LAUNCHER)) {
+        const cmd = process.platform === 'win32' ? 'cmd' : 'bash';
+        const args = process.platform === 'win32' ? ['/c', DAEMON_LAUNCHER] : [DAEMON_LAUNCHER];
+        execFile(cmd, args, { cwd: BOND_ROOT, timeout: 10000 }, () => {});
+        console.log(`   🚀 Daemon auto-started via ${DAEMON_LAUNCHER}`);
+      } else {
+        console.log(`   ⚪ Daemon launcher not found — skipping auto-start`);
+      }
+    }
   });
 }).catch(err => { console.error('❌ Bootstrap failed:', err); process.exit(1); });
 
