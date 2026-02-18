@@ -66,6 +66,15 @@ def limbic_stats():
         "genome": "v2.0 evolved"
     }
 
+def gate_stats():
+    """Bond Gate routing status."""
+    return {
+        "status": "active",
+        "mode": "lean",
+        "triggers": "relational, recall, architecture",
+        "version": "1.0"
+    }
+
 def perspective_crystal_stats(perspective_name):
     """Read crystal count from perspective's local crystal field."""
     field_path = os.path.join(BOND_ROOT, 'data', 'perspectives', f"{perspective_name}_crystal.npz")
@@ -87,6 +96,7 @@ def main():
         "iss": iss_stats,
         "eap": eap_stats,
         "limbic": limbic_stats,
+        "gate": gate_stats,
     }
     
     if system == "perspective_crystal":

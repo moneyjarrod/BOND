@@ -76,7 +76,7 @@ Seed tools (`perspective_store`, `perspective_check`, `perspective_remove`) oper
 - Class tool matrix is unchanged — no entity absorbs QAIS through seed check
 - This bypass applies ONLY to Sync step 5 vine lifecycle
 
-## Seed Tracker
+## Seed Tracker (S118 Format)
 
 Each perspective maintains `seed_tracker.json` in its folder:
 ```json
@@ -85,10 +85,18 @@ Each perspective maintains `seed_tracker.json` in its folder:
     "planted": "2026-02-11",
     "exposures": 0,
     "hits": 0,
-    "last_hit": null
+    "rain": 0,
+    "last_hit": null,
+    "last_rain": null,
+    "collapsed_from": []
   }
 }
 ```
+
+- `rain` — ambient nourishment events (score in rain band but below hit threshold)
+- `last_rain` — timestamp of most recent rain event
+- `collapsed_from` — which other perspectives carried uncollapsed resonance when this seed was planted (CM-MELODY superposition tracking)
+- `effective_health = hits + (rain × 0.25)` — seeds need health >= 1.0 to clear prune floor
 
 Default tuning (set on perspective creation):
 - `seed_threshold: 0.04` — wide net, lets the entity catch patterns we wouldn't expect

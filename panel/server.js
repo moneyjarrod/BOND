@@ -76,6 +76,7 @@ const FRAMEWORK_ENTITIES = {
     config: {
       class: 'doctrine',
       display_name: 'BOND Master',
+      public: true,
       tools: { filesystem: true, iss: true },
       links: ['PROJECT_MASTER'],
     },
@@ -111,6 +112,7 @@ BOND_MASTER IS NOT:
     config: {
       class: 'doctrine',
       display_name: 'Project Master',
+      public: true,
       tools: { filesystem: true, iss: true },
       links: [],
     },

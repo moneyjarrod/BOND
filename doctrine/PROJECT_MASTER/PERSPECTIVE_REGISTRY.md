@@ -18,7 +18,7 @@ PM does not enforce these links. The class matrix already prevents invalid conne
 
 ## Registry
 
-Add perspectives here as your system grows.
+Add perspectives here as they prove useful to the project ecosystem.
 
 | Perspective | Lens | When to Link |
 |---|---|---|

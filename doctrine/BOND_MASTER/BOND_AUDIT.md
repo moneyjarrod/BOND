@@ -25,11 +25,11 @@ Check for code that is no longer used or was replaced by a newer approach.
 Check for absolute paths that should be relative or env-configured.
 
 **What to look for:**
-- Absolute paths hardcoded in server.js or other JS
+- `C:\Projects\BOND_private` hardcoded in server.js or other JS
 - Absolute paths in Python scripts that should use config
 - Path separators that assume Windows (`\\` instead of `path.join`)
 
-**Violation:** Path works only on one machine.
+**Violation:** Path works only on J-Dub's machine.
 **Fix:** Use relative paths, env vars, or `.env` config.
 
 ### 3. Truth Hierarchy Violations
@@ -149,6 +149,24 @@ When entered via `{Enter BOND_MASTER}`, Claude should:
 5. Run joint checks at layer boundaries.
 6. Report: ✅ PASS or ❌ VIOLATION with file + line + description.
 7. Propose fixes for violations (but don't write without {Save}).
+
+## Known Violations (S85 Handoff)
+
+These were identified in S84. Status updated S85:
+
+1. ✅ Dead: `/api/bridge/send` endpoint — REMOVED S85
+2. ✅ Dead: `/api/bridge/pending` endpoint — REMOVED S85
+3. ✅ Dead: `/api/bridge/status` endpoint — REMOVED S85
+4. ✅ Dead: `commandQueue` and `lastPoll` variables — REMOVED S85
+5. ✅ Dead: `commandQueue.push()` calls in Enter/Exit — REMOVED S85
+6. ✅ Dead: `useBridge.js` hook — TOMBSTONED S85
+7. ✅ Dead: `bridgeConnected` prop threading — REMOVED S85
+8. ✅ Dead: Empty `services/` directory — already clean
+9. ✅ Hardcoded: Paths in server.js — switched to relative cwd() defaults S85
+10. ✅ Installer: `.env.example` created S85
+11. ✅ Installer: `start_panel.bat` created S85
+12. ✅ Installer: Production static serving — auto-detects dist/ S85
+13. ✅ Bridge: Header indicator — replaced with static clipboard badge S85
 
 ## Mantra
 

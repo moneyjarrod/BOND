@@ -7,7 +7,6 @@ Subordinate to BOND_MASTER. General behavioral rules for how Claude operates dur
 - **Right tool for the job.** Filesystem MCP tools for file operations. bash_tool for system tasks (package installs, script execution, process management). Don't use one where the other belongs.
 - **Execute, don't display.** When making code changes, use tools directly. Don't paste code into chat unless debugging or the user asks to see it. Chat explains intent — tools do the work.
 - **Batch when possible.** If reading multiple files, use `read_multiple_files`. If checking multiple directories, plan the scan before executing. Fewer tool calls = faster sessions.
-- **Daemon channel (localhost:3003).** The search daemon has file ops endpoints: `/manifest`, `/read`, `/write`, `/copy`, `/export`. When a browser channel is available (Chrome extension, Claude Code curl, etc.), prefer daemon over individual file reads for bulk operations — one `/export` replaces dozens of file reads, one `/manifest` replaces directory walking. Single files: direct file tools are fine. Structural maps or bulk content: daemon saves tokens. Falls back to filesystem tools when no channel is available.
 
 ## Session Awareness
 

@@ -16,7 +16,7 @@
 - IS: Self-auditable. ISS validates code against IS statements.
 - IS NOT: Growable. Doctrine doesn't learn — it defines.
 - Tools: Filesystem (read doctrine files) + ISS (audit/validate).
-- Example: BOND_MASTER, PROJECT_MASTER, your doctrine entities.
+- Example: BOND_MASTER, Calendar Master, ROSETTA.
 
 ### Project
 - IS: A bounded workspace with a mission.
@@ -25,7 +25,7 @@
 - IS NOT: Open-ended. CORE constrains scope.
 - Tools: Files + QAIS + Heatmap + Crystal + ISS.
 - CORE file: Loaded once, refreshed on {Sync}. Counter cycle IS the refresh timer.
-- Example: Your project entity.
+- Example: GSG (Gnome Sweet Gnome).
 
 ### Perspective
 - IS: An unbounded knowledge domain that grows through conversation.
@@ -36,7 +36,7 @@
 - Tools: Files + QAIS + Heatmap + Crystal.
 - Local Field: Two .npz files per perspective, created automatically. Seed field (`{entity}.npz`) for vine lifecycle. Crystal field (`{entity}_crystal.npz`) for narrative continuity. Entity Warm Restore queries crystal field. Global Warm Restore does not touch perspective fields. Exclusive routing: perspective active → crystal writes local only (S116).
 - Field Isolation: Perspective fields are independent. Linked perspectives share seed resonance through the vine lifecycle but do not access each other's local fields.
-- Example: User-created perspectives (P1, P2, etc.).
+- Example: User-created perspectives (P11+).
 
 ### Library
 - IS: A reference shelf. Static knowledge for lookup.
@@ -105,7 +105,7 @@ Every entity lives in `doctrine/ENTITY_NAME/` and contains:
 {
   "entity": "CM",
   "class": "doctrine",
-  "path": "...",
+  "path": "C:\\Projects\\BOND_private\\doctrine\\CM",
   "entered": "2026-02-07T..."
 }
 ```
@@ -117,7 +117,7 @@ Every entity lives in `doctrine/ENTITY_NAME/` and contains:
 ## Naming
 
 - Doctrine/Project: Descriptive names (BOND_MASTER, CM)
-- Perspectives: User-created via + button (auto-numbered P1, P2, etc.)
+- Perspectives: User-created (P11+ for J-Dub's instance, new installs start at P1)
 - Library: Descriptive names
 - Files within: `[ENTITY]_[topic].md` pattern
 

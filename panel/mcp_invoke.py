@@ -299,7 +299,7 @@ TOOLS = {
 
 def main():
     if len(sys.argv) < 3:
-        print(json.dumps({"error": "Usage: mcp_invoke.py <s> <tool> [input]"}))
+        print(json.dumps({"error": "Usage: mcp_invoke.py <system> <tool> [input]"}))
         return
 
     system = sys.argv[1]

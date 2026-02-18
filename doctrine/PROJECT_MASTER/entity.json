@@ -1,6 +1,7 @@
 {
   "class": "doctrine",
   "display_name": "Project Master",
+  "public": true,
   "tools": {
     "filesystem": true,
     "iss": true

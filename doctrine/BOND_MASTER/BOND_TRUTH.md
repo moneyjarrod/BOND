@@ -25,7 +25,7 @@ it means the code needs to be fixed to match doctrine.
 
 ## Derive, Not Store
 
-This is BOND's foundational data principle:
+This is BOND's foundational data principle, inherited from GSG:
 
 - Redundant state is debt.
 - If a value can be computed from source, don't store it separately.
@@ -41,7 +41,7 @@ This is BOND's foundational data principle:
 ## Both Agree
 
 No unilateral writes. The save protocol requires:
-1. Both operators (user and Claude) agree the work is proven.
+1. Both operators (J-Dub and Claude) agree the work is proven.
 2. Evidence exists — screenshot, test output, or explicit confirmation.
 3. The target file and exact change are identified before writing.
 

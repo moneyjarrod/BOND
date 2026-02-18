@@ -58,6 +58,19 @@ BOND maintains a `CHANGELOG.md` in the repository root following the [Keep a Cha
 | **Deprecated** | Features marked for future removal |
 | **Security** | Vulnerability patches |
 
+### Format
+
+```markdown
+## [1.1.0] - 2026-XX-XX
+
+### Added
+- Project creation wizard in panel
+- Auto-detect existing BOND installs
+
+### Fixed
+- Counter emoji not echoing on fresh sessions
+```
+
 ### Principles
 
 - **Write for humans.** Not commit hashes. Not PR numbers. Plain language that a structural engineer or a writer can understand.
@@ -72,20 +85,20 @@ BOND maintains a `CHANGELOG.md` in the repository root following the [Keep a Cha
 ### How Users Learn About Updates
 
 1. **CHANGELOG.md** — The canonical record. Always current, always in the repo root.
-2. **GitHub Releases** — Each tagged version gets a GitHub Release with the changelog entry copied in.
+2. **GitHub Releases** — Each tagged version gets a GitHub Release with the changelog entry copied in. This shows on the repo's main page.
 3. **Panel notification** (future) — A subtle indicator in the panel header when a new version is available. Non-intrusive. No popups.
 4. **README badge** — Version badge at the top of README showing current stable version.
 
 ### How Users Update
 
-Re-run the installer — it detects existing installs and pulls latest. Or:
-
-```
+```powershell
 cd C:\BOND
 git pull
 cd panel
 npm install
 ```
+
+Or re-run the installer — it detects existing installs and pulls latest.
 
 ---
 
@@ -100,6 +113,7 @@ Before tagging any release:
 - [ ] {Sync} initializes successfully
 - [ ] Skill file reflects any new commands or changes
 - [ ] GitHub Release created with changelog entry
+- [ ] README version badge updated (if applicable)
 
 ---
 
@@ -114,3 +128,18 @@ Every release, every update, every communication passes through this filter:
 - **Does the update path require zero new knowledge?**
 
 If the answer to any of these is "no," the release isn't ready.
+
+---
+
+## In-Panel Help
+
+BOND includes a Help button in the panel that opens a Getting Started guide directly in the interface. Users never need to leave the panel to learn how BOND works.
+
+The guide covers:
+- What BOND is (one paragraph)
+- What they're looking at (panel layout)
+- How to start working (type {Sync})
+- How to update (git pull or re-run installer)
+- Where to get help (GitHub Issues)
+
+This guide lives at `docs/GETTING_STARTED.md` and is rendered in-panel via the Help button.

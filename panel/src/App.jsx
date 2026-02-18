@@ -89,7 +89,7 @@ function AppInner() {
     const poll = () => {
       fetch('/api/ahk-status').then(r => r.json()).then(s => {
         setAhkRunning(s.running ?? false);
-        if (s.running) setAhkDismissed(false); // reset dismiss when AHK comes back
+        if (s.running) setAhkDismissed(false);
       }).catch(() => setAhkRunning(false));
     };
     poll();

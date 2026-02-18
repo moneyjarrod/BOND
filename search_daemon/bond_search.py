@@ -47,9 +47,14 @@ Composite Payloads (Data Assembly Layer — one call replaces many):
     GET /enter-payload?entity=BOND_MASTER      # {Enter} in one call: entity files + linked files
     GET /vine-data?perspective=P11-Plumber     # vine lifecycle: tracker, roots, seeds, pruned
     GET /obligations                           # derived obligations + warnings from state
+
+Repository Sync (Private→Public):
+    GET /repo-sync                             # dry-run: report what would sync (default)
+    GET /repo-sync?dry=false                   # execute: copy files to target
+    GET /repo-sync?execute=true                # same as dry=false
 """
 
-import sys, os, re, json, math, time, threading
+import sys, os, re, json, math, time, threading, shutil, fnmatch
 from pathlib import Path
 from collections import defaultdict
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -1019,6 +1024,314 @@ class FileOps:
 file_ops = FileOps(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
 
 
+# ─── RepoSync (Private→Public Sync Engine) ────────────────
+# P11: Eliminates Claude context window as file transport joint.
+# CM: Derive sync scope from entity flags + manifest, not prose.
+# BM: Daemon IS amendment — operates within BOND_ROOT and configured sync targets.
+
+class RepoSync:
+    """Binary-safe repository sync from BOND_private to BOND_github.
+    
+    One-way valve: reads source, writes target. Never reads target content.
+    Dry-run default. Entity self-declaration via 'public' flag in entity.json.
+    All ops logged to state/file_ops.log.
+    """
+
+    # Text extensions for type-aware reporting
+    TEXT_EXTS = {'.md', '.json', '.py', '.js', '.jsx', '.ts', '.tsx', '.css',
+                 '.html', '.bat', '.sh', '.txt', '.yml', '.yaml', '.toml',
+                 '.cfg', '.ini', '.env', '.gitignore', '.gitattributes'}
+
+    def __init__(self, bond_root, state_path, doctrine_path):
+        self.bond_root = Path(bond_root).resolve()
+        self.state_path = Path(state_path)
+        self.doctrine_path = Path(doctrine_path)
+        self.log_path = self.state_path / 'file_ops.log'
+        self.manifest_path = self.state_path / 'sync_manifest.json'
+
+    def _log(self, op, detail=''):
+        ts = time.strftime('%Y-%m-%dT%H:%M:%S')
+        entry = f"[{ts}] REPO-SYNC {op}"
+        if detail:
+            entry += f" | {detail}"
+        try:
+            os.makedirs(self.state_path, exist_ok=True)
+            with open(self.log_path, 'a', encoding='utf-8') as f:
+                f.write(entry + '\n')
+        except Exception:
+            pass
+
+    def _load_manifest(self):
+        """Load sync_manifest.json. Returns config dict or error."""
+        try:
+            return json.loads(self.manifest_path.read_text(encoding='utf-8')), None
+        except FileNotFoundError:
+            return None, 'sync_manifest.json not found in state/'
+        except json.JSONDecodeError as e:
+            return None, f'sync_manifest.json parse error: {e}'
+
+    def _is_blocked_dir(self, rel_parts, manifest):
+        """Check if any path component matches blocked_dirs."""
+        blocked = manifest.get('blocked_dirs', [])
+        # Check each path prefix
+        for i in range(len(rel_parts)):
+            partial = '/'.join(rel_parts[:i+1])
+            if partial in blocked:
+                return True
+            # Also check individual directory names
+            if rel_parts[i] in blocked:
+                return True
+        return False
+
+    def _is_blocked_file(self, filename, manifest):
+        """Check if filename matches blocked_files or blocked_patterns."""
+        if filename in manifest.get('blocked_files', []):
+            return True
+        for pattern in manifest.get('blocked_patterns', []):
+            if fnmatch.fnmatch(filename, pattern):
+                return True
+        return False
+
+    def _is_doctrine_public(self, entity_name):
+        """Check entity.json public flag. Default: False (safe)."""
+        try:
+            config_path = self.doctrine_path / entity_name / 'entity.json'
+            config = json.loads(config_path.read_text(encoding='utf-8'))
+            return config.get('public', False)
+        except Exception:
+            return False
+
+    def _classify_file(self, filepath):
+        """Return 'text' or 'binary' based on extension."""
+        return 'text' if filepath.suffix.lower() in self.TEXT_EXTS else 'binary'
+
+    def _file_meta(self, filepath):
+        """Get mtime + size for diff comparison."""
+        try:
+            st = filepath.stat()
+            return st.st_mtime, st.st_size
+        except Exception:
+            return None, None
+
+    def _collect_syncable(self, manifest):
+        """Walk source tree, apply filters, return list of syncable files.
+        
+        Returns: (syncable_files, personal_flags)
+        syncable_files: list of {'rel_path': str, 'abs_path': Path, 'type': str, 'size': int}
+        personal_flags: list of {'path': str, 'reason': str}
+        """
+        target = Path(manifest['target']).resolve()
+        syncable = []
+        personal = []
+        uses_entity_flags = manifest.get('doctrine_uses_entity_flags', True)
+        state_defaults_only = manifest.get('state_defaults_only', True)
+
+        for root, dirs, files in os.walk(self.bond_root):
+            root_path = Path(root)
+            rel_root = root_path.relative_to(self.bond_root)
+            rel_parts = list(rel_root.parts) if str(rel_root) != '.' else []
+
+            # Skip blocked directories (prune walk)
+            dirs[:] = [d for d in dirs if not self._is_blocked_dir(rel_parts + [d], manifest)]
+
+            # Doctrine entity filtering via public flag
+            if rel_parts and rel_parts[0] == 'doctrine' and len(rel_parts) >= 2:
+                entity_name = rel_parts[1]
+                if uses_entity_flags and not self._is_doctrine_public(entity_name):
+                    personal.append({
+                        'path': str(rel_root),
+                        'reason': f'entity.json: public=false ({entity_name})',
+                    })
+                    dirs[:] = []  # prune this entity's subdirectories
+                    continue
+                # Block entity-local state/ subdirectories (runtime data)
+                if len(rel_parts) >= 3 and rel_parts[2] == 'state':
+                    for f in files:
+                        personal.append({
+                            'path': str(rel_root / f).replace('\\', '/'),
+                            'reason': f'entity-local state: runtime data ({entity_name}/state/)',
+                        })
+                    dirs[:] = []
+                    continue
+
+            # State directory: allowlist mode when state_defaults_only=true
+            # Only explicitly allowed files sync. Everything else is runtime data.
+            if rel_parts and rel_parts[0] == 'state' and state_defaults_only:
+                allowed = set(manifest.get('state_allowed_files', ['.gitkeep']))
+                for f in files:
+                    filepath = root_path / f
+                    rel_path = str(rel_root / f).replace('\\', '/')
+                    if f in allowed and not self._is_blocked_file(f, manifest):
+                        syncable.append({
+                            'rel_path': rel_path,
+                            'abs_path': filepath,
+                            'type': self._classify_file(filepath),
+                            'size': filepath.stat().st_size,
+                        })
+                    else:
+                        personal.append({
+                            'path': rel_path,
+                            'reason': 'state_defaults_only: runtime data (not in state_allowed_files)',
+                        })
+                continue
+
+            for f in files:
+                if self._is_blocked_file(f, manifest):
+                    continue
+                filepath = root_path / f
+                rel_path = str(rel_root / f).replace('\\', '/') if rel_parts else f
+                syncable.append({
+                    'rel_path': rel_path,
+                    'abs_path': filepath,
+                    'type': self._classify_file(filepath),
+                    'size': filepath.stat().st_size,
+                })
+
+        return syncable, personal
+
+    def _diff_against_target(self, syncable, target_path):
+        """Compare syncable files against target. Returns categorized lists."""
+        new_files = []
+        updated_files = []
+        unchanged_files = []
+
+        for entry in syncable:
+            target_file = target_path / entry['rel_path']
+            if not target_file.exists():
+                new_files.append(entry)
+            else:
+                src_mtime, src_size = self._file_meta(entry['abs_path'])
+                tgt_mtime, tgt_size = self._file_meta(target_file)
+                if src_size != tgt_size or (src_mtime and tgt_mtime and src_mtime > tgt_mtime):
+                    updated_files.append(entry)
+                else:
+                    unchanged_files.append(entry)
+
+        return new_files, updated_files, unchanged_files
+
+    def _format_size(self, size):
+        if size < 1024:
+            return f"{size}B"
+        elif size < 1024 * 1024:
+            return f"{size/1024:.1f}KB"
+        else:
+            return f"{size/(1024*1024):.1f}MB"
+
+    def sync(self, dry_run=True):
+        """Execute repository sync. Dry-run by default.
+        
+        Returns structured report suitable for Claude to present.
+        """
+        manifest, err = self._load_manifest()
+        if err:
+            return {'error': err}
+
+        target_str = manifest.get('target')
+        if not target_str:
+            return {'error': 'No target defined in sync_manifest.json'}
+
+        target_path = Path(target_str).resolve()
+
+        # Validate target has .git (safety check)
+        if not (target_path / '.git').is_dir():
+            return {'error': f'Target has no .git directory: {target_str}. Refusing to sync to non-repo.'}
+
+        # Validate target doesn't escape to unexpected locations
+        target_str_resolved = str(target_path)
+        if self.bond_root == target_path:
+            return {'error': 'Target cannot be the same as source (BOND_ROOT)'}
+
+        # Collect syncable files
+        syncable, personal_flags = self._collect_syncable(manifest)
+
+        # Diff against target
+        new_files, updated_files, unchanged_files = self._diff_against_target(syncable, target_path)
+
+        to_sync = new_files + updated_files
+
+        # Type breakdown
+        text_count = sum(1 for f in to_sync if f['type'] == 'text')
+        binary_count = sum(1 for f in to_sync if f['type'] == 'binary')
+
+        # Build report
+        report = {
+            'dry_run': dry_run,
+            'source': str(self.bond_root),
+            'target': target_str,
+            'authority': manifest.get('authority', 'unknown'),
+            'personal_flags': personal_flags,
+            'summary': {
+                'total_syncable': len(syncable),
+                'new': len(new_files),
+                'updated': len(updated_files),
+                'unchanged': len(unchanged_files),
+                'to_sync': len(to_sync),
+                'text': text_count,
+                'binary': binary_count,
+            },
+            'files_to_sync': [
+                {
+                    'action': 'NEW' if f in new_files else 'UPDATE',
+                    'path': f['rel_path'],
+                    'type': f['type'],
+                    'size': self._format_size(f['size']),
+                }
+                for f in to_sync
+            ],
+            'gitignore_parity': self._check_gitignore(target_path),
+            'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
+        }
+
+        # Execute if not dry run
+        if not dry_run and to_sync:
+            copied = 0
+            errors = []
+            for entry in to_sync:
+                dest = target_path / entry['rel_path']
+                try:
+                    os.makedirs(dest.parent, exist_ok=True)
+                    shutil.copy2(str(entry['abs_path']), str(dest))
+                    copied += 1
+                    self._log('COPY', f"{entry['rel_path']} ({self._format_size(entry['size'])})")
+                except Exception as e:
+                    errors.append({'path': entry['rel_path'], 'error': str(e)})
+                    self._log('ERROR', f"{entry['rel_path']}: {e}")
+
+            report['execution'] = {
+                'copied': copied,
+                'errors': errors,
+                'status': 'complete' if not errors else 'partial',
+            }
+            self._log('SYNC_COMPLETE', f"{copied} files synced, {len(errors)} errors")
+        elif not dry_run and not to_sync:
+            report['execution'] = {'copied': 0, 'errors': [], 'status': 'nothing_to_sync'}
+
+        # Human-readable summary line
+        s = report['summary']
+        report['summary_line'] = (
+            f"{s['to_sync']} files to sync "
+            f"({s['new']} new, {s['updated']} updated, {s['unchanged']} unchanged) "
+            f"| {s['text']} text, {s['binary']} binary"
+        )
+
+        return report
+
+    def _check_gitignore(self, target_path):
+        """Check if target .gitignore exists and report basic parity."""
+        gi_path = target_path / '.gitignore'
+        if not gi_path.is_file():
+            return {'exists': False, 'note': 'No .gitignore in target'}
+        try:
+            content = gi_path.read_text(encoding='utf-8')
+            lines = [l.strip() for l in content.split('\n') if l.strip() and not l.startswith('#')]
+            return {'exists': True, 'entries': len(lines)}
+        except Exception:
+            return {'exists': True, 'entries': 'unknown'}
+
+
+repo_sync = RepoSync(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
+
+
 # ─── Composite Payloads (Data Assembly Layer) ──────────────
 # One call replaces 5-15 individual file reads.
 # The daemon's response IS its health — no separate /health endpoint.
@@ -1039,6 +1352,7 @@ class PayloadAssembler:
         'analysis': ['GET /duplicates', 'GET /orphans', 'GET /coverage?entity=', 'GET /similarity'],
         'corpus': ['GET /load?path=', 'GET /unload'],
         'composite': ['GET /sync-payload', 'GET /enter-payload?entity=', 'GET /vine-data?perspective=', 'GET /obligations'],
+        'repo_sync': ['GET /repo-sync', 'GET /repo-sync?execute=true'],
     }
 
     def __init__(self, bond_root, state_path, doctrine_path):
@@ -1455,8 +1769,20 @@ class SearchHandler(BaseHTTPRequestHandler):
             result = payloads.obligations()
             self._json(200, result)
 
+        # ── RepoSync (Private→Public) ──
+        elif path == '/repo-sync':
+            dry = params.get('dry', ['true'])[0].lower() != 'false'
+            execute = params.get('execute', ['false'])[0].lower() == 'true'
+            if execute:
+                dry = False
+            result = repo_sync.sync(dry_run=dry)
+            if 'error' in result:
+                self._json(400, result)
+            else:
+                self._json(200, result)
+
         else:
-            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /status, /reindex, /manifest, /read, /write, /copy, /export, /sync-payload, /enter-payload, /vine-data, /obligations'})
+            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /status, /reindex, /manifest, /read, /write, /copy, /export, /sync-payload, /enter-payload, /vine-data, /obligations, /repo-sync'})
 
     def do_POST(self):
         parsed = urlparse(self.path)
@@ -1585,6 +1911,10 @@ if __name__ == '__main__':
     print(f"     GET http://localhost:{port}/enter-payload?entity=BOND_MASTER")
     print(f"     GET http://localhost:{port}/vine-data?perspective=P11-Plumber")
     print(f"     GET http://localhost:{port}/obligations")
+    print()
+    print(f"   Repository Sync (Private\u2192Public):")
+    print(f"     GET http://localhost:{port}/repo-sync              (dry-run, default)")
+    print(f"     GET http://localhost:{port}/repo-sync?execute=true  (execute)")
     print()
 
     class ThreadedServer(ThreadingMixIn, HTTPServer):

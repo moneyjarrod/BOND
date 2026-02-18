@@ -1,158 +1,165 @@
-# Getting Started with BOND
+# BOND — Getting Started
 
-## What is BOND?
+You installed BOND. Here's what you have and how to use it.
 
-BOND is a governed runtime for persistent human-AI collaboration. It gives Claude structured memory, entity-based context management, and a visual control panel — so your work carries forward across sessions instead of starting from scratch every time.
+---
 
-## Platform
-
-> ⚠️ **Windows 10/11 required.** Full BOND — panel, counter, clipboard bridge, installer — currently runs on Windows only. The core engine (Node.js server, Python MCP servers, React frontend) is cross-platform, but the startup scripts and AutoHotkey counter/bridge have no Linux or macOS equivalents yet. If you're on Linux or Mac and want to build platform-native tooling around the architecture, contributions are welcome — credit J-Dub and Claude for the fundamental architecture.
-
-## After Install
-
-If you ran the installer, you should have:
-- **Control Panel** — React dashboard at http://localhost:3000
-- **Counter + Bridge** — AutoHotkey script running in your system tray
-- **MCP Servers** — QAIS (memory) and ISS (analysis) ready to configure
-
-> ⚠️ **IMPORTANT: Launch the counter before using the panel.** Run `Counter/BOND_v8.ahk` (requires [AutoHotkey v2](https://www.autohotkey.com/)). The counter does two jobs: it tracks context freshness (the `«tN/L emoji»` tags on your messages) and it acts as the **clipboard bridge** between the panel and Claude. When you click a panel button like Sync or Save, the panel copies a command to your clipboard — the AHK script detects it and types it into Claude's chat window. **Without the counter running, panel buttons will appear to do nothing.** The panel isn't broken — the bridge just isn't connected. [Read why the counter matters →](docs/COUNTER.md)
-
-## First Session Setup
-
-### 1. Add the BOND Skill to Claude
-
-In Claude, create a new Project. Add `skills/bond/SKILL.md` as Project Knowledge. This is BOND's identity file — it tells Claude how to behave as a BOND operator.
-
-### 2. Configure MCP Servers
-
-Add QAIS, ISS, and the filesystem server to your Claude MCP settings. The full config with copy-paste JSON is in **[docs/MCP_SETUP.md](docs/MCP_SETUP.md)**. In short, you need three servers in your `claude_desktop_config.json`:
-- **Filesystem** — gives Claude access to read and write BOND files
-- **QAIS** — resonance-based memory (hyperdimensional vectors)
-- **ISS** — semantic force measurement (text analysis)
-
-### 3. Type `{Sync}` in Claude
-
-This is the initialization command. Claude reads the BOND doctrine, checks for active entities, loads configuration, and resets the counter. You should see Claude acknowledge the framework and report its state.
-
-If you're using the counter (you should be), your message will be tagged automatically: `«t1/10 🗒️»`. This is normal — it's the counter tracking your conversation freshness.
-
-## The Counter
-
-Every message you send gets a tag like `«t3/10 🗒️»`. This tells you and Claude how far you are from the last grounding point.
-
-- **🗒️** (messages 1-10) — Fresh. Work normally.
-- **🟡** (messages 11+) — Due for sync. Type `{Sync}`.
-- **🟠** (messages 15+) — Overdue. Sync now.
-- **🔴** (messages 20+) — Critical. Context is unreliable.
-
-**Why this matters:** Claude's grounding in doctrine and entity files degrades over conversation length. Without regular sync, Claude drifts — losing entity awareness, skipping obligations, making decisions from stale context. The counter is the immune system. [Full explanation →](docs/COUNTER.md)
-
-## The Panel
-
-The **Control Panel** is your command center:
-
-- **Header** — WebSocket status (green dot = connected), version badge, save confirmation toggle
-- **Entity Cards** — Your entities with class badges, tool indicators, and seeding toggles
-- **Command Bar** — Bottom row of buttons: Sync, Save, Tick, Handoff, and more. Clicking a command copies it to clipboard → the AHK bridge types it into Claude.
-- **Module Bay** — Status cards for QAIS, ISS, and other MCP servers
-- **Doctrine Viewer** — Read entity documents directly in the panel
-
-For annotated screenshots of every panel element, see the [Visual Guide](docs/visual_guide/VISUAL_GUIDE.md).
-
-### Framework Entities
-
-Two entities exist on first run:
-- **BOND_MASTER** — The framework constitution. Governs protocol, entity classes, tool boundaries.
-- **PROJECT_MASTER** — Governs project lifecycle. How projects are created, structured, and maintained.
-
-These are framework entities — immutable and always present.
-
-## Daily Workflow
+## What Just Happened
 
 ```
-Launch:     start_bond.bat (starts panel + counter + server)
-Begin:      {Sync} in Claude (or {Full Restore} for a cold boot)
-Work:       Counter tracks freshness → sync every ~10 messages
-Save:       {Save} when both you and Claude agree work is proven
-End:        {Handoff} to preserve session context for next time
-Shutdown:   stop_bond.bat (or close the windows)
+✅ Panel         → http://localhost:3000 (your command center)
+✅ MCP Servers   → QAIS + ISS (Claude's perception tools)
+✅ SKILL.md      → Claude reads this automatically (the protocol)
+✅ Doctrine      → BOND_MASTER + PROJECT_MASTER (framework rules)
+✅ State          → Tracks what entity you're in
 ```
 
-## Creating Your First Entity
+BOND is a protocol that gives Claude persistent memory, structured entities, and growth over time. You talk to Claude normally. BOND makes those conversations accumulate into something.
 
-Click the **+** button on the panel to create a new entity. Choose a class:
+---
 
-- **Project** — for bounded work with a clear goal (a game, a report, an app)
-- **Perspective** — for an evolving lens that learns from conversation
-- **Library** — for reference material Claude should consult
-- **Doctrine** — for static rules and IS statements (rare — most users won't need this)
+## Your First 5 Minutes
 
-Projects get a `CORE.md` on creation. Claude will guide you through populating it on first entry — define what the project is, what "done" looks like, and what constraints matter.
+**1. Open Claude and say:**
+```
+{Sync}
+```
+That's it. Claude reads BOND's state, loads your entities, and tells you where you are. This is your home command. Lost? `{Sync}`.
 
-## Key Commands
+**2. Look at your panel** → `http://localhost:3000`
 
-| Command | What It Does |
-|---|---|
-| `{Sync}` | Re-read all doctrine and entity files. Reset counter. |
-| `{Full Restore}` | Complete cold boot — reads everything from scratch. |
-| `{Save}` | Write proven work. Both you and Claude must agree. |
-| `{Handoff}` | Draft end-of-session summary for the next session. |
-| `{Tick}` | Quick status check — are all obligations met? |
-| `{Enter ENTITY}` | Switch to an entity. Loads its files and tool boundaries. |
-| `{Exit}` | Leave the current entity. Drop tool boundaries. |
+You'll see entity cards. Each one is a knowledge container:
+```
+📜 Doctrine    → Rules and principles (static truth)
+📁 Project     → Bounded work with a mission (has a CORE)
+🔭 Perspective → A growing lens that learns from conversation
+📚 Library     → Reference material (read-only)
+```
 
-Full command reference: [docs/COMMANDS.md](docs/COMMANDS.md)
+**3. Enter an entity:**
+
+Click Enter on any card, or tell Claude:
+```
+{Enter BOND_MASTER}
+```
+Now Claude sees through that entity. Its files load, its tools activate, its rules apply.
+
+**4. Do some work.** Talk to Claude about anything. The conversation is the input.
+
+**5. When you're done:**
+```
+{Chunk}
+```
+Claude snapshots what happened. Your work is captured.
+
+---
+
+## The Commands You Need
+
+```
+{Sync}           → Read state, load entity, reset counter. Your anchor.
+{Chunk}          → Snapshot current work. Use at natural breakpoints.
+{Save}           → Write something to file. Both you and Claude agree first.
+{Handoff}        → End-of-session summary. Captures everything for next time.
+{Tick}           → Quick status check. Where am I? What's warm?
+{Enter ENTITY}   → Step into an entity. Load its world.
+{Exit}           → Step out. Drop the lens.
+```
+
+Advanced (you'll grow into these):
+```
+{Full Restore}   → Complete reload from scratch. Cold boot.
+{Warm Restore}   → Selective pickup. Panel prompts for context.
+{Crystal}        → Persist a chunk into QAIS memory field.
+{Drift?}         → Ask Claude to self-check for protocol drift.
+```
+
+---
 
 ## Crystal: Global vs Local
 
-The `{Crystal}` command saves a session snapshot to QAIS memory. **Where** it saves depends on context:
+`{Crystal}` saves a session snapshot to QAIS memory. **Where** it saves depends on context:
 
-- **Global crystal** — When no perspective is entered (or a non-perspective entity is active), `{Crystal}` writes to the global QAIS field. This is the shared memory space visible to all entities and sessions.
-- **Local crystal** — When a perspective is entered, `{Crystal}` writes to that perspective's isolated field. This keeps the perspective's memory separate from global context.
+- **Global** — No perspective entered (or a non-perspective entity active) → writes to the global QAIS field. Shared memory visible to all entities and sessions.
+- **Local** — Perspective entered → writes to that perspective's isolated field. Keeps perspective memory separate from global context.
 
-The **💎 Crystal** button on the EntityBar (visible when a perspective is entered) fires `{Crystal}` with visual confirmation that it routes locally. The `Q:N` badge next to the button shows how many bindings exist in the perspective's local crystal field.
+When a perspective is entered, the EntityBar shows a **💎 Crystal** button with a `Q:N` badge showing how many bindings exist in the local field. The command bar `{Crystal}` does the same routing automatically — the button makes the scoping visible.
 
-The command bar `{Crystal}` does the same routing automatically — the EntityBar button just makes the scoping visible.
+---
 
-## Customizing BOND
+## The Big Idea: Perspectives Grow
 
-### Hooks
+This is what makes BOND different.
 
-Hooks are personal workflow rules that augment BOND's framework. BOND ships with a template at `templates/hooks/EFFICIENCY_HOOKS.md` — platform-aware rules for reducing wasted tool calls.
+A **perspective** is a lens. You give it roots — identity statements that define how it sees the world. Then you turn on seeding (`SEED ON` on the card) and just... work.
 
-To use hooks:
-1. Create a library-class entity (e.g., `MY_HOOKS`)
-2. Copy the template hook into it and customize
-3. Link it to BOND_MASTER or your project
-4. Claude loads your hooks on every {Sync}
+Every `{Sync}`, BOND checks your conversation against the perspective's roots. If something resonates, a new seed gets planted automatically. Over time, seeds that keep resonating survive. Seeds that don't get pruned. What remains IS the growth.
 
-See [docs/ENTITIES.md](docs/ENTITIES.md) for details on entity classes, linking, and hooks.
-
-### Settings
-
-- **Save confirmation** — Toggle in the panel header. When ON, Claude asks before every file write.
-- **Counter limit** — Default is 10. Change via the AHK tray menu → "Set Counter..."
-- **Seeding** — Toggle per perspective on the entity card. Arms/disarms the vine lifecycle.
-
-## How to Update
-
-Re-run the install command:
-```powershell
-irm https://moneyjarrod.github.io/BOND/install.ps1 | iex
+```
+🌳 Roots  → You plant these. They define the lens.
+🌿 Seeds  → Auto-collected from conversation. Tested by exposure.
+🌱 Vine   → Roots + living seeds. The total growth.
+✂️ Pruned → Dead wood. Cut after enough exposure with no resonance.
 ```
 
-Or manually:
+You don't manage this. You just work. The vine grows or it doesn't.
+
+---
+
+## Creating Your First Perspective
+
+In the panel, click **+ New Entity** → select **Perspective**.
+
+Then tell Claude:
 ```
-cd C:\BOND
-git pull
-cd panel
-npm install
+I want this perspective to see the world like a [chef / architect / coach / whatever].
+Let's write some roots.
 ```
 
-Check `CHANGELOG.md` for what's new.
+Claude will help you write ROOT files — identity anchors that shape the lens. Once you have a few roots, toggle `SEED ON` on the card. Then just do your normal work. The perspective listens.
 
-## Need Help?
+---
 
-- **Documentation** — `docs/` folder: [MCP Setup](docs/MCP_SETUP.md), [Commands](docs/COMMANDS.md), [Entities](docs/ENTITIES.md), [Counter](docs/COUNTER.md)
-- **Examples** — `examples/` folder has sample configurations
-- **Issues** — [github.com/moneyjarrod/BOND/issues](https://github.com/moneyjarrod/BOND/issues)
+## Project Workflow
+
+Projects are bounded work. They have a **CORE** — a short definition of what the project is and when it's done.
+
+```
+1. Create project in panel (+ New Entity → Project)
+2. {Enter PROJECT_NAME}
+3. Claude will ask you to define your CORE
+4. Work normally. {Chunk} at breakpoints. {Handoff} at session end.
+5. Next session: {Sync} picks up where you left off.
+```
+
+---
+
+## What You Don't Need to Know Yet
+
+- **QAIS** — Claude's resonance memory. It works behind the scenes.
+- **ISS** — Semantic force analysis. Used for auditing and comparison.
+- **Heatmap** — Tracks what concepts are warm. Claude uses it automatically.
+- **Crystals** — Persistent memory snapshots. `{Crystal}` when you want to save something deep.
+- **SPECTRA / SLA** — The ranking and anchoring systems behind Warm Restore.
+
+These exist. They work. You'll discover them when you need them.
+
+---
+
+## Troubleshooting
+
+```
+Claude seems lost          → {Sync}
+Claude seems really lost   → {Full Restore}
+Panel not updating         → Restart: node server.js
+Counter got weird          → {Sync} resets it
+Wrong entity loaded        → {Enter CORRECT_ONE} (overwrites, no exit needed)
+```
+
+---
+
+## One More Thing
+
+BOND was built for a game called Gnome Sweet Gnome. It's shipped free because the framework is useful beyond one project. You're getting the same tools the developer uses. Nothing held back.
+
+The protocol IS the product. Welcome aboard.
