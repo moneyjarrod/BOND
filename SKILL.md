@@ -16,8 +16,23 @@ Resets: {Sync}, {Full Restore}, new conversation.
 No reset: {Save}, {Chunk}, {Warm Restore}, {Handoff}, bonfire, task completion, compaction.
 Lost count: recommend {Sync}.
 
+## DAEMON (Search Daemon — Composite Endpoints)
+The BOND search daemon runs on localhost:3003. Composite endpoints replace cascading file reads with single HTTP calls. Claude should attempt daemon first, fall back to individual file reads if unavailable.
+
+Fast path (daemon available):
+- {Sync} → GET /sync-payload (returns entity, config, files, links, armed_seeders, capabilities in one call — replaces steps 2-5 of individual reads)
+- {Enter} → GET /enter-payload?entity=NAME (returns entity files + linked files)
+- Vine pass → GET /vine-data?perspective=NAME (returns tracker, roots, seeds, pruned)
+- Obligations → GET /obligations (derived obligations + warnings from state)
+
+Fallback (daemon unavailable): individual file reads as specified below. No error, no prompt — just fall back silently.
+
+Health: The daemon's response IS its health. A successful /sync-payload = daemon alive. No separate /health endpoint.
+
+Seeding gate: /sync-payload returns armed_seeders array. If empty (length 0), skip vine lifecycle entirely — no vine pass, no exposure increment, no tracker writes. Disarmed perspectives are invisible to {Sync}.
+
 ## SYNC
-{Sync}: 1) Read project SKILL 2) Read OPS/MASTER 3) Read state/active_entity.json — if entity set, read all files at path field; then read entity's entity.json for links array, load linked entities' .md files; if null, skip 4) Read state/config.json for save_confirmation toggle 5) Vine lifecycle: GET /api/seeders — if API unavailable, fallback: scan doctrine/*/entity.json for perspective-class entities with `"seeding": true`. Armed state is verified at execution time, not inherited from prior reads. A perspective armed earlier in the conversation is not assumed armed now. If any armed perspectives found, run the full vine pass for each:
+{Sync}: 1) Read project SKILL 2) Try GET /sync-payload — if daemon responds, use its data for steps 2-5 and skip to vine gate check (armed_seeders). If daemon unavailable, fall back: Read OPS/MASTER 3) Read state/active_entity.json — if entity set, read all files at path field; then read entity's entity.json for links array, load linked entities' .md files; if null, skip 4) Read state/config.json for save_confirmation toggle 5) Vine lifecycle: GET /api/seeders — if API unavailable, fallback: scan doctrine/*/entity.json for perspective-class entities with `"seeding": true`. Armed state is verified at execution time, not inherited from prior reads. A perspective armed earlier in the conversation is not assumed armed now. If any armed perspectives found, run the full vine pass for each:
   a) RESONATE: perspective_check(perspective, text) with substantive content from recent exchanges.
   b) TRACK: Read perspective's seed_tracker.json. Increment `exposures` on ALL active seeds. Score each seed from (a):
      - Score ≥ seed_threshold → `hits += 1`, update `last_hit` (SUNSHINE)
