@@ -43,10 +43,22 @@ File Ops Endpoints (Cold Water — verbatim, no processing):
     GET  /export?entity=P11-Plumber            # single entity export
 
 Composite Payloads (Data Assembly Layer — one call replaces many):
-    GET /sync-payload                          # {Sync} in one call: entity, config, files, links, seeders, capabilities
-    GET /enter-payload?entity=BOND_MASTER      # {Enter} in one call: entity files + linked files
-    GET /vine-data?perspective=P11-Plumber     # vine lifecycle: tracker, roots, seeds, pruned
-    GET /obligations                           # derived obligations + warnings from state
+    GET  /sync-complete                        # {Sync} steps 1-5 (no vine scores)
+    POST /sync-complete {"text": "..."}        # {Sync} steps 1-5 + vine resonance scores
+    GET  /sync-payload                         # legacy: entity, config, files, links, seeders
+    GET  /enter-payload?entity=BOND_MASTER     # {Enter} in one call: entity files + linked files
+    GET  /vine-data?perspective=P11-Plumber    # vine lifecycle: tracker, roots, seeds, pruned
+    GET  /obligations                          # derived obligations + warnings from state
+
+Daemon Heat Map (bypasses class matrix):
+    GET /heatmap-touch?concepts=a,b,c&context=why         # mark concepts active
+    GET /heatmap-hot                                      # top concepts by recency
+    GET /heatmap-chunk                                    # formatted for {Chunk}
+    GET /heatmap-clear                                    # reset for new session
+
+QAIS Resonance (Daemon-local vine scoring):
+    GET /resonance-test?perspective=P11-Plumber&text=...  # single perspective
+    GET /resonance-multi?text=...                         # all armed perspectives
 
 Repository Sync (Private→Public):
     GET /repo-sync                             # dry-run: report what would sync (default)
@@ -1024,6 +1036,297 @@ class FileOps:
 file_ops = FileOps(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
 
 
+# ─── QAIS Resonance (Perspective Vine Scoring) ────────
+# Phase 2 of daemon consolidation: daemon reads perspective .npz fields
+# and computes resonance scores locally. No MCP round-trip needed.
+# Math extracted from qais_mcp_server.py text_to_vector_v5.
+# P11: daemon reads only, MCP writes only. No concurrent write risk.
+
+try:
+    import numpy as np
+    HAS_NUMPY = True
+except ImportError:
+    HAS_NUMPY = False
+
+QAIS_N = 4096
+
+QAIS_STOPWORDS = {
+    'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being', 'have', 'has',
+    'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must',
+    'shall', 'can', 'need', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'from', 'as',
+    'into', 'through', 'during', 'before', 'after', 'above', 'below', 'between', 'under', 'again',
+    'further', 'then', 'once', 'here', 'there', 'when', 'where', 'why', 'how', 'all', 'each',
+    'few', 'more', 'most', 'other', 'some', 'such', 'no', 'nor', 'not', 'only', 'own', 'same',
+    'so', 'than', 'too', 'very', 'just', 'and', 'but', 'if', 'or', 'because', 'until', 'while',
+    'this', 'that', 'these', 'those', 'it', 'its', 'i', 'me', 'my', 'we', 'our', 'you', 'your',
+    'he', 'him', 'his', 'she', 'her', 'they', 'them', 'their', 'what', 'which', 'who', 'whom',
+    'about', 'let', 'tell', 'know', 'think', 'make', 'take', 'see', 'come', 'look', 'use', 'find',
+    'give', 'got', 'get', 'put', 'said', 'say', 'like', 'also', 'well', 'back', 'much', 'way',
+    'even', 'new', 'want', 'first', 'any', 'happens', 'mean', 'work', 'works', 'things', 'thing',
+    'session', 'chunk', 'crystallization',
+}
+
+QAIS_SYNONYMS = {
+    'meter': ['m', 'meters', 'metre'], 'm': ['meter', 'meters'], 'meters': ['m', 'meter'],
+    'config': ['configuration', 'configure'], 'configuration': ['config'],
+    'params': ['parameters', 'param'], 'parameters': ['params'],
+    'derive': ['compute', 'calculate', 'derived'], 'compute': ['derive', 'calculate'],
+    'store': ['save', 'persist', 'stored'], 'save': ['store', 'persist'],
+}
+
+QAIS_UNIT_EXPANSIONS = {
+    'm': 'meter', 'ms': 'millisecond', 's': 'second', 'km': 'kilometer', 'cm': 'centimeter',
+}
+
+
+def qais_seed_to_vector(seed):
+    """Deterministic seed → bipolar vector."""
+    import hashlib
+    h = hashlib.sha512(seed.encode()).digest()
+    rng = np.random.RandomState(list(h[:4]))
+    return rng.choice([-1, 1], size=QAIS_N).astype(np.float32)
+
+
+def qais_normalize_number_units(text):
+    result = text
+    for abbrev, full in QAIS_UNIT_EXPANSIONS.items():
+        pattern = r'(\d+)' + abbrev + r'\b'
+        replacement = r'\1 ' + full
+        result = re.sub(pattern, replacement, result, flags=re.IGNORECASE)
+    return result
+
+
+def qais_expand_synonyms(keywords):
+    expanded = set(keywords)
+    for kw in keywords:
+        kw_lower = kw.lower()
+        if kw_lower in QAIS_SYNONYMS:
+            expanded.update(QAIS_SYNONYMS[kw_lower])
+    return list(expanded)
+
+
+def qais_text_to_keywords_v5(text):
+    text = qais_normalize_number_units(text)
+    words = re.findall(r'\b[a-zA-Z_][a-zA-Z0-9_]*\b', text.lower())
+    keywords = [w for w in words if len(w) > 2 and w not in QAIS_STOPWORDS]
+    keywords = qais_expand_synonyms(keywords)
+    base_words = [w for w in words if len(w) > 2 and w not in QAIS_STOPWORDS]
+    for i in range(len(base_words) - 1):
+        bigram = f"{base_words[i]}_{base_words[i+1]}"
+        keywords.append(bigram)
+    return list(set(keywords))
+
+
+def qais_text_to_vector_v5(text):
+    """Text → bundled bipolar vector via keyword extraction + synonym expansion + bigrams."""
+    keywords = qais_text_to_keywords_v5(text)
+    if not keywords:
+        return qais_seed_to_vector(text)
+    bundle = np.zeros(QAIS_N, dtype=np.float32)
+    for kw in keywords:
+        bundle += qais_seed_to_vector(kw)
+    result = np.sign(bundle)
+    result[result == 0] = 1
+    return result.astype(np.float32)
+
+
+class PerspectiveReader:
+    """Read-only access to perspective .npz fields for vine resonance scoring.
+    
+    Daemon reads, MCP writes. No concurrent write risk.
+    Loads field fresh each call (no caching) to always see latest MCP writes.
+    """
+
+    def __init__(self, bond_root):
+        self.perspectives_dir = os.path.join(bond_root, 'data', 'perspectives')
+
+    def available(self):
+        """Check if numpy is available and perspectives dir exists."""
+        return HAS_NUMPY and os.path.isdir(self.perspectives_dir)
+
+    def _load_field(self, perspective):
+        """Load perspective .npz and return stored keys. Fresh read each time."""
+        field_path = os.path.join(self.perspectives_dir, f"{perspective}.npz")
+        if not os.path.exists(field_path):
+            return None, f"No field file for {perspective}"
+        try:
+            data = np.load(field_path, allow_pickle=True)
+            stored = set(data['stored'].tolist())
+            count = int(data['count'])
+            return {'stored': stored, 'count': count}, None
+        except Exception as e:
+            return None, f"Failed to load {perspective}.npz: {e}"
+
+    def check(self, perspective, text):
+        """Score text against perspective's seed field.
+        
+        Replicates perspective_check from qais_mcp_server.py exactly.
+        Returns same format: {perspective, matches, field_count}
+        """
+        if not HAS_NUMPY:
+            return {'error': 'numpy not available'}
+
+        field_data, err = self._load_field(perspective)
+        if err:
+            return {'error': err}
+
+        if field_data['count'] == 0:
+            return {
+                'perspective': perspective,
+                'matches': [],
+                'field_count': 0,
+                'note': 'Field empty — no seeds stored yet.',
+            }
+
+        text_vec = qais_text_to_vector_v5(text)
+        matches = []
+        seen = set()
+
+        for key in field_data['stored']:
+            parts = key.split('|', 2)
+            if len(parts) == 3:
+                title, role, content = parts
+                if title in seen:
+                    continue
+                seen.add(title)
+                seed_vec = qais_text_to_vector_v5(content)
+                score = float(np.dot(text_vec, seed_vec) / QAIS_N)
+                matches.append({
+                    'seed': title,
+                    'content_preview': content[:80],
+                    'score': round(score, 4),
+                })
+
+        matches.sort(key=lambda x: -x['score'])
+        return {
+            'perspective': perspective,
+            'matches': matches,
+            'field_count': field_data['count'],
+            'source': 'daemon',
+        }
+
+    def check_multi(self, perspectives, text):
+        """Score text against multiple perspectives in one call.
+        
+        Returns dict of perspective_name → check result.
+        Used by /sync-complete for all armed seeders at once.
+        """
+        results = {}
+        for p in perspectives:
+            results[p] = self.check(p, text)
+        return results
+
+
+# Initialize reader (available even if numpy missing — graceful degradation)
+perspective_reader = PerspectiveReader(BOND_ROOT)
+
+
+# ─── Session Heat Map (Daemon-Internal) ───────────────────
+# Phase 5 of daemon consolidation: heatmap moves from MCP to daemon.
+# Bypasses class matrix entirely — works during doctrine sessions.
+# Persists to state/heatmap.json so it survives daemon restarts.
+# Session-scoped: Claude calls /heatmap-clear at session start.
+
+class DaemonHeatMap:
+    """Session heat map with disk persistence.
+    
+    Same scoring logic as MCP SessionHeatMap but:
+    - Persists to state/heatmap.json (survives daemon restart)
+    - No class matrix — works for any active entity
+    - Snapshot included in /sync-complete
+    """
+
+    def __init__(self, state_path):
+        self.state_file = os.path.join(state_path, 'heatmap.json')
+        self.concepts = {}
+        self.session_start = time.time()
+        self._load()
+
+    def _load(self):
+        try:
+            data = json.loads(Path(self.state_file).read_text(encoding='utf-8'))
+            self.concepts = data.get('concepts', {})
+            self.session_start = data.get('session_start', time.time())
+        except Exception:
+            pass
+
+    def _save(self):
+        try:
+            Path(self.state_file).write_text(json.dumps({
+                'concepts': self.concepts,
+                'session_start': self.session_start,
+            }, indent=2), encoding='utf-8')
+        except Exception:
+            pass
+
+    def touch(self, concepts, context=''):
+        now = time.time()
+        results = []
+        for concept in concepts:
+            concept = concept.lower()
+            if concept not in self.concepts:
+                self.concepts[concept] = {
+                    'count': 0, 'first': now, 'last': 0, 'contexts': [],
+                }
+            entry = self.concepts[concept]
+            entry['count'] += 1
+            entry['last'] = now
+            if context:
+                entry['contexts'].append(context)
+                entry['contexts'] = entry['contexts'][-5:]  # cap at 5
+            results.append({'concept': concept, 'count': entry['count']})
+        self._save()
+        return {'touched': len(results), 'concepts': results}
+
+    def hot(self, top_k=10):
+        now = time.time()
+        scored = []
+        for concept, entry in self.concepts.items():
+            age_minutes = (now - entry['last']) / 60
+            if age_minutes < 5:
+                recency = 2.0
+            elif age_minutes < 15:
+                recency = 1.5
+            elif age_minutes < 30:
+                recency = 1.0
+            else:
+                recency = 0.5
+            score = entry['count'] * recency
+            scored.append({
+                'concept': concept, 'count': entry['count'],
+                'score': round(score, 2),
+                'last_touch_mins': round(age_minutes, 1),
+                'contexts': entry['contexts'][-3:],
+            })
+        scored.sort(key=lambda x: -x['score'])
+        return scored[:top_k]
+
+    def for_chunk(self):
+        hot = self.hot(10)
+        now = time.time()
+        session_mins = (now - self.session_start) / 60
+        cold = [c for c, e in self.concepts.items() if (now - e['last']) / 60 > 15]
+        hot_names = [h['concept'] for h in hot[:5]]
+        return {
+            'session_minutes': round(session_mins, 1),
+            'total_concepts': len(self.concepts),
+            'total_touches': sum(e['count'] for e in self.concepts.values()),
+            'hot': [{'concept': h['concept'], 'count': h['count'], 'why': h['contexts']} for h in hot],
+            'cold': cold[:5],
+            'summary': f"{len(self.concepts)} concepts, hot: {', '.join(hot_names)}",
+        }
+
+    def clear(self):
+        count = len(self.concepts)
+        self.concepts.clear()
+        self.session_start = time.time()
+        self._save()
+        return {'cleared': count, 'status': 'reset'}
+
+
+daemon_heatmap = DaemonHeatMap(STATE_PATH)
+
+
 # ─── RepoSync (Private→Public Sync Engine) ────────────────
 # P11: Eliminates Claude context window as file transport joint.
 # CM: Derive sync scope from entity flags + manifest, not prose.
@@ -1351,7 +1654,9 @@ class PayloadAssembler:
         'file_ops': ['GET /manifest', 'GET /read?path=', 'POST /write', 'GET /copy?from=&to=', 'GET /export'],
         'analysis': ['GET /duplicates', 'GET /orphans', 'GET /coverage?entity=', 'GET /similarity'],
         'corpus': ['GET /load?path=', 'GET /unload'],
-        'composite': ['GET /sync-payload', 'GET /enter-payload?entity=', 'GET /vine-data?perspective=', 'GET /obligations'],
+        'composite': ['GET /sync-complete', 'POST /sync-complete', 'GET /sync-payload', 'GET /enter-payload?entity=', 'GET /vine-data?perspective=', 'GET /obligations'],
+        'heatmap': ['GET /heatmap-touch?concepts=', 'GET /heatmap-hot', 'GET /heatmap-chunk', 'GET /heatmap-clear'],
+        'resonance': ['GET /resonance-test?perspective=&text=', 'GET /resonance-multi?text='],
         'repo_sync': ['GET /repo-sync', 'GET /repo-sync?execute=true'],
     }
 
@@ -1409,11 +1714,73 @@ class PayloadAssembler:
                 })
         return armed
 
+    def sync_complete(self, conversation_text=None):
+        """One call replaces {Sync} steps 1-5.
+        
+        Returns everything Claude needs:
+          - Active entity + config (step 2-3)
+          - Entity files + linked files (step 3-4)
+          - Armed seeders + vine resonance scores (step 5)
+          - Seed trackers for each armed perspective
+          - Capability manifest
+        
+        If conversation_text provided, scores against all armed perspectives.
+        If not, returns armed list without scores (Claude can score later).
+        """
+        # Steps 1-4: entity state
+        active = self._read_json(self.state_path / 'active_entity.json')
+        entity_name = active.get('entity') if active else None
+        entity_class = active.get('class') if active else None
+
+        config = self._read_json(self.state_path / 'config.json') or {}
+
+        entity_files = {}
+        linked_files = {}
+        links = []
+        if entity_name:
+            entity_files = self._entity_files(entity_name)
+            links = self._linked_entities(entity_name)
+            for linked_name in links:
+                linked_files[linked_name] = self._entity_files(linked_name)
+
+        # Step 5: armed seeders + vine data
+        armed = self._armed_seeders()
+
+        vine = {}
+        for seeder in armed:
+            p_name = seeder['entity']
+            v = {
+                'config': seeder,
+                'tracker': self._read_json(
+                    self.doctrine_path / p_name / 'seed_tracker.json') or {},
+            }
+            # Resonance scores (daemon-local, no MCP)
+            if conversation_text and perspective_reader.available():
+                v['resonance'] = perspective_reader.check(p_name, conversation_text)
+            else:
+                v['resonance'] = None
+            vine[p_name] = v
+
+        return {
+            'active_entity': entity_name,
+            'active_class': entity_class,
+            'config': config,
+            'entity_files': entity_files,
+            'links': links,
+            'linked_files': linked_files,
+            'armed_seeders': armed,
+            'vine': vine,
+            'heatmap': daemon_heatmap.for_chunk(),
+            'capabilities': self.CAPABILITIES,
+            'daemon_version': '2.2.0',
+        }
+
     def sync_payload(self):
         """One call replaces {Sync} steps 1-4 + armed seeder scan.
         
         Returns: active entity, config, entity files, linked entity files,
         armed seeders, and capability manifest.
+        Kept for backward compatibility. Use sync_complete for full vine pass.
         """
         # Active entity
         active = self._read_json(self.state_path / 'active_entity.json')
@@ -1739,6 +2106,12 @@ class SearchHandler(BaseHTTPRequestHandler):
                 self._json(200, result)
 
         # ── Composite Payloads (Data Assembly Layer) ──
+        elif path == '/sync-complete':
+            # GET: entity state + armed seeders + trackers (no vine scores)
+            # POST with {"text": "..."}: adds vine resonance scores
+            result = payloads.sync_complete(conversation_text=None)
+            self._json(200, result)
+
         elif path == '/sync-payload':
             result = payloads.sync_payload()
             self._json(200, result)
@@ -1769,6 +2142,66 @@ class SearchHandler(BaseHTTPRequestHandler):
             result = payloads.obligations()
             self._json(200, result)
 
+        # ── Daemon Heat Map (bypasses class matrix) ──
+        elif path == '/heatmap-touch':
+            concepts_raw = params.get('concepts', [''])[0]
+            context = params.get('context', [''])[0]
+            if not concepts_raw:
+                self._json(400, {'error': 'Requires ?concepts=a,b,c'})
+                return
+            concepts = [c.strip() for c in unquote(concepts_raw).split(',') if c.strip()]
+            result = daemon_heatmap.touch(concepts, unquote(context) if context else '')
+            self._json(200, result)
+
+        elif path == '/heatmap-hot':
+            top_k = int(params.get('top_k', ['10'])[0])
+            result = daemon_heatmap.hot(top_k)
+            self._json(200, result)
+
+        elif path == '/heatmap-chunk':
+            result = daemon_heatmap.for_chunk()
+            self._json(200, result)
+
+        elif path == '/heatmap-clear':
+            result = daemon_heatmap.clear()
+            self._json(200, result)
+
+        # ── QAIS Resonance (Daemon-local vine scoring) ──
+        elif path == '/resonance-test':
+            perspective = params.get('perspective', [None])[0]
+            text = params.get('text', [''])[0]
+            if not perspective or not text:
+                self._json(400, {'error': 'Requires ?perspective=NAME&text=...'})
+                return
+            text = unquote(text)
+            if not perspective_reader.available():
+                self._json(500, {'error': 'numpy not available or perspectives dir missing'})
+                return
+            result = perspective_reader.check(perspective, text)
+            if 'error' in result:
+                self._json(400, result)
+            else:
+                self._json(200, result)
+
+        elif path == '/resonance-multi':
+            # Score text against all armed perspectives at once
+            text = params.get('text', [''])[0]
+            if not text:
+                self._json(400, {'error': 'Requires ?text=...'})
+                return
+            text = unquote(text)
+            if not perspective_reader.available():
+                self._json(500, {'error': 'numpy not available or perspectives dir missing'})
+                return
+            # Get armed seeders from payload assembler
+            armed = payloads._armed_seeders()
+            perspectives = [s['entity'] for s in armed]
+            if not perspectives:
+                self._json(200, {'matches': {}, 'note': 'No armed seeders found'})
+                return
+            results = perspective_reader.check_multi(perspectives, text)
+            self._json(200, {'armed': perspectives, 'results': results})
+
         # ── RepoSync (Private→Public) ──
         elif path == '/repo-sync':
             dry = params.get('dry', ['true'])[0].lower() != 'false'
@@ -1782,13 +2215,27 @@ class SearchHandler(BaseHTTPRequestHandler):
                 self._json(200, result)
 
         else:
-            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /status, /reindex, /manifest, /read, /write, /copy, /export, /sync-payload, /enter-payload, /vine-data, /obligations, /repo-sync'})
+            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /status, /reindex, /manifest, /read, /write, /copy, /export, /sync-complete, /sync-payload, /enter-payload, /vine-data, /obligations, /heatmap-touch, /heatmap-hot, /heatmap-chunk, /heatmap-clear, /resonance-test, /resonance-multi, /repo-sync'})
 
     def do_POST(self):
         parsed = urlparse(self.path)
         path = parsed.path.rstrip('/')
 
-        if path == '/write':
+        if path == '/sync-complete':
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(length).decode('utf-8'))
+            except Exception as e:
+                self._json(400, {'error': f'Invalid JSON body: {e}'})
+                return
+            text = body.get('text', '')
+            if not text:
+                self._json(400, {'error': 'Missing "text" in body (conversation context for vine scoring)'})
+                return
+            result = payloads.sync_complete(conversation_text=text)
+            self._json(200, result)
+
+        elif path == '/write':
             try:
                 length = int(self.headers.get('Content-Length', 0))
                 body = json.loads(self.rfile.read(length).decode('utf-8'))
@@ -1809,7 +2256,7 @@ class SearchHandler(BaseHTTPRequestHandler):
             else:
                 self._json(200, result)
         else:
-            self._json(404, {'error': 'POST endpoints: /write'})
+            self._json(404, {'error': 'POST endpoints: /sync-complete, /write'})
 
     def _json(self, code, data):
         body = json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8')
@@ -1907,10 +2354,25 @@ if __name__ == '__main__':
     print(f"     GET  http://localhost:{port}/export?entity=P11-Plumber")
     print()
     print(f"   Composite Payloads (Data Assembly Layer):")
-    print(f"     GET http://localhost:{port}/sync-payload")
-    print(f"     GET http://localhost:{port}/enter-payload?entity=BOND_MASTER")
-    print(f"     GET http://localhost:{port}/vine-data?perspective=P11-Plumber")
-    print(f"     GET http://localhost:{port}/obligations")
+    print(f"     GET  http://localhost:{port}/sync-complete              (steps 1-5 no scores)")
+    print(f"     POST http://localhost:{port}/sync-complete              (steps 1-5 + vine scores)")
+    print(f"     GET  http://localhost:{port}/sync-payload               (legacy)")
+    print(f"     GET  http://localhost:{port}/enter-payload?entity=BOND_MASTER")
+    print(f"     GET  http://localhost:{port}/vine-data?perspective=P11-Plumber")
+    print(f"     GET  http://localhost:{port}/obligations")
+    print()
+    print(f"   Daemon Heat Map (bypasses class matrix):")
+    print(f"     GET http://localhost:{port}/heatmap-touch?concepts=a,b,c&context=why")
+    print(f"     GET http://localhost:{port}/heatmap-hot")
+    print(f"     GET http://localhost:{port}/heatmap-chunk")
+    print(f"     GET http://localhost:{port}/heatmap-clear")
+    print()
+    print(f"   QAIS Resonance (Vine Scoring):")
+    print(f"     GET http://localhost:{port}/resonance-test?perspective=P11-Plumber&text=...")
+    print(f"     GET http://localhost:{port}/resonance-multi?text=...")
+    numpy_status = 'available' if HAS_NUMPY else 'NOT FOUND'
+    print(f"     numpy: {numpy_status}")
+    print(f"     perspectives: {perspective_reader.perspectives_dir}")
     print()
     print(f"   Repository Sync (Private\u2192Public):")
     print(f"     GET http://localhost:{port}/repo-sync              (dry-run, default)")
