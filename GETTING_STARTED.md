@@ -4,6 +4,22 @@ You installed BOND. Here's what you have and how to use it.
 
 ---
 
+## Requirements
+
+BOND needs these to run. The installer checks for them, but if you skipped one or installed manually:
+
+| Tool | Why | Check |
+|------|-----|-------|
+| **Node.js 18+** | Runs the control panel and sidecar server | `node --version` |
+| **Python 3.8+** | Runs QAIS (memory), ISS (analysis), and the search daemon. Without Python, Claude has no perception tools — no resonance, no semantic analysis, no consolidated search. BOND will start but Claude is effectively blind. | `python --version` |
+| **numpy** | Required by QAIS for hyperdimensional vectors | `python -c "import numpy"` |
+| **Git** | Clones the repo and pulls updates | `git --version` |
+| **AutoHotkey v2** | Runs the counter + clipboard bridge between panel and Claude. Panel buttons won't reach Claude without it. | [autohotkey.com](https://www.autohotkey.com/) |
+
+If any of these are missing, install them and restart BOND with `start_bond.bat`.
+
+---
+
 ## What Just Happened
 
 ```

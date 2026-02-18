@@ -30,8 +30,10 @@ if %errorlevel%==0 (
   start "BOND Search" /min cmd /c "python "%~dp0search_daemon\bond_search.py""
   echo [OK] Search daemon starting on http://localhost:3003
 ) else (
-  echo [WARN] Python not found — search daemon disabled
-  echo        Install Python 3.8+ and add to PATH to enable search
+  echo [WARN] Python not found — search daemon, QAIS, and ISS disabled
+  echo        Without Python, Claude has no memory, analysis, or search tools.
+  echo        Install Python 3.8+ from https://python.org (check 'Add to PATH')
+  echo        Then restart BOND.
 )
 
 :: Dev mode: pass --dev to also launch Vite HMR

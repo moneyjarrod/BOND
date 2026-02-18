@@ -47,7 +47,7 @@ Paste this into your `claude_desktop_config.json`. If you installed BOND to a di
 
 ## What Each Server Does
 
-**QAIS** (Quantum Approximate Identity Substrate) — Resonance-based memory. Stores identity-role-fact bindings as hyperdimensional vectors. Provides tools like `qais_store`, `qais_resonate`, `qais_passthrough`, `heatmap_*`, `crystal`, and the perspective seed tools (`perspective_store`, `perspective_check`, `perspective_remove`). Data persists in `C:\BOND\data\`.
+**QAIS** (Quantum Approximate Identity Substrate) — Resonance-based memory. Stores identity-role-fact bindings as hyperdimensional vectors. Provides tools like `qais_store`, `qais_resonate`, `qais_passthrough`, `heatmap_*`, `crystal`, `daemon_fetch` (bridge to search daemon), and the perspective seed tools (`perspective_store`, `perspective_check`, `perspective_remove`). Data persists in `C:\BOND\data\`.
 
 **ISS** (Invariant Semantic Substrate) — Text analysis. Classifies semantic forces in text (mechanistic, prescriptive, coherence) and provides limbic perception (salience, threat, gate). Tools: `iss_analyze`, `iss_compare`, `iss_limbic`, `iss_status`.
 
