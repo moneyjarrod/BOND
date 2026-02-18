@@ -590,6 +590,11 @@ TOOLS = [
      "inputSchema": {"type": "object", "properties": {
          "perspective": {"type": "string", "description": "Perspective entity name (e.g. P11-Plumber)"}
      }, "required": ["perspective"]}},
+    {"name": "daemon_fetch", "description": "Relay a request to the BOND search daemon (localhost:3003). Returns the daemon's JSON response. Supports GET (default) and POST (when body provided). Use for /sync-complete, /heatmap-*, /resonance-*, /vine-data, /obligations, etc.",
+     "inputSchema": {"type": "object", "properties": {
+         "endpoint": {"type": "string", "description": "Daemon endpoint path (e.g. '/sync-complete', '/heatmap-hot', '/resonance-multi?text=...')"},
+         "body": {"type": "object", "description": "Optional JSON body for POST requests (e.g. {'text': '...'} for /sync-complete)"}
+     }, "required": ["endpoint"]}},
 ]
 
 
@@ -703,6 +708,22 @@ def handle_request(request):
                     session_list = [{"session": sid, **data} for sid, data in sorted(sessions.items())]
                     result = {"perspective": args["perspective"], "sessions": session_list,
                              "field_count": pcf.count}
+            elif tool_name == "daemon_fetch":
+                import urllib.request
+                endpoint = args["endpoint"]
+                if not endpoint.startswith('/'):
+                    endpoint = '/' + endpoint
+                url = f"http://localhost:3003{endpoint}"
+                body_data = args.get("body")
+                if body_data:
+                    req = urllib.request.Request(url,
+                        data=json.dumps(body_data).encode('utf-8'),
+                        headers={'Content-Type': 'application/json'},
+                        method='POST')
+                else:
+                    req = urllib.request.Request(url)
+                resp = urllib.request.urlopen(req, timeout=15)
+                result = json.loads(resp.read().decode('utf-8'))
             else:
                 return {"jsonrpc": "2.0", "id": req_id, "error": {
                     "code": -32601, "message": f"Unknown tool: {tool_name}"}}

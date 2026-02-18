@@ -18,10 +18,10 @@ STATE_FILE = os.path.join(BOND_ROOT, 'state', 'active_entity.json')
 DOCTRINE_PATH = os.path.join(BOND_ROOT, 'doctrine')
 
 CLASS_TOOLS = {
-    'doctrine':    {'filesystem': True, 'iss': True,  'qais': False, 'heatmap': False, 'crystal': False},
-    'project':     {'filesystem': True, 'iss': True,  'qais': True,  'heatmap': True,  'crystal': True},
-    'perspective': {'filesystem': True, 'iss': False, 'qais': True,  'heatmap': True,  'crystal': True},
-    'library':     {'filesystem': True, 'iss': False, 'qais': False, 'heatmap': False, 'crystal': False},
+    'doctrine':    {'filesystem': True, 'iss': True,  'qais': False, 'heatmap': False, 'crystal': False, 'daemon': True},
+    'project':     {'filesystem': True, 'iss': True,  'qais': True,  'heatmap': True,  'crystal': True,  'daemon': True},
+    'perspective': {'filesystem': True, 'iss': False, 'qais': True,  'heatmap': True,  'crystal': True,  'daemon': True},
+    'library':     {'filesystem': True, 'iss': False, 'qais': False, 'heatmap': False, 'crystal': False, 'daemon': True},
 }
 
 TOOL_CAPABILITY = {
@@ -32,6 +32,7 @@ TOOL_CAPABILITY = {
     'heatmap_touch': 'heatmap', 'heatmap_hot': 'heatmap',
     'heatmap_chunk': 'heatmap', 'heatmap_clear': 'heatmap',
     'crystal': 'crystal', 'bond_gate': 'crystal',
+    'daemon_fetch': 'daemon',
 }
 
 def get_active_entity():
