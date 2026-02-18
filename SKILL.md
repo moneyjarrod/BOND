@@ -59,7 +59,7 @@ Seeding gate: /sync-payload returns armed_seeders array. If empty (length 0), sk
   Layer 1 (always): Most recent handoff. Guaranteed context.
   Layer 2 (contextual): SLA query against archive (excluding Layer 1). Entity + user message as signal. Query entered via panel prompt.
   Badges in the output file:
-    Triangle header: 🔺 GREEN (all HIGH) / YELLOW (mixed) / RED (LOW dominant).
+    Header badge: 🟢 GREEN (all HIGH) / 🟡 YELLOW (mixed) / 🔴 RED (LOW dominant).
     Per-section badges: 🟢 HIGH / 🟡 MED / 🔴 LOW / ⚪ SIBLING.
     On RED: show cautionary note explaining why confidence is low, suggest narrower query.
   Claude reads the file, echoes the badged sections, then adds a brief pickup summary and asks what to work on. Do not strip, reformat, or consolidate the badge output.
