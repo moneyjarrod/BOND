@@ -74,6 +74,14 @@ A seed needs at least 1 direct hit OR 4 rain events to clear the health floor. R
   4. Seed .md file deleted
   5. Auto-logged to seed_decisions.jsonl
 
+### Prune Reversibility
+
+Every prune is auditable and reversible:
+- **Audit trail:** G-pruned-{seed-name}.md contains ROOT lens reason, tracker stats at time of cut, and timestamp. These files are retained permanently — they are not cleaned up.
+- **QAIS reversal:** perspective_remove subtracts exact vectors. perspective_store can re-add them. The math is deterministic — same seed content produces same vectors.
+- **Re-graft path:** A pruned seed can return through the re-graft gate if it co-resonates with 2+ living seeds. The compost pile is not a grave — it is a waiting room.
+- **Manual override:** The operator can always re-plant a pruned seed by writing the .md file and calling perspective_store directly. The perspective's autonomy is self-sovereign, not irreversible.
+
 ### Germination — Seeds Become Vine (S118, Future Phase)
 - A seed that has proven itself structurally — through sustained hits, consistent rain, and co-resonance with other living seeds — is no longer a branch. It became load-bearing. The seed shell cracks and the vine emerges.
 - Germination transforms the seed's contribution into vine density in the crystal momentum field. The seed .md is retired. The pattern lives on as accumulated structural weight, not a discrete label.

@@ -65,6 +65,28 @@ When Claude identifies a problem:
 - The identification IS the authorization for execution.
 - Exception: destructive changes still require {Save} protocol.
 
+## Conflict Resolution
+
+When sources conflict across layers, resolve by conflict type:
+
+| Conflict Type | Resolution | Example |
+|---|---|---|
+| Code vs prose | Code wins (unless code is a proven bug) | Implementation differs from .md description → update prose |
+| CORE vs doctrine (project-internal) | CORE wins (B4 sovereignty) | Project defines its own naming convention |
+| CORE vs doctrine (constitutional) | Doctrine wins (B1-B3) | CORE cannot grant itself tools outside class matrix |
+| Code vs doctrine | If code is correct behavior → update prose. If code violates constitutional rule → code is bug → fix code | |
+
+## Write Classification (Identify=Execute Scope)
+
+Not all writes require Save protocol. Classification by impact:
+
+- **Non-persistent** — context-only reasoning, no file touch. No protocol needed.
+- **Corrective** — fixing a wrong path, typo, config error where the intended state is unambiguous. Identify=Execute applies. Fix now.
+- **Constructive** — new content, new files, structural changes. Save protocol. Both agree.
+- **Destructive** — file deletion, content removal, entity reclassification. Save protocol. Both agree. Proof required.
+
+When in doubt, treat as constructive. The save gate costs one exchange. A bad write costs a recovery session.
+
 ## Mantra
 
 "Code > Prose. Both agree. Derive, not store."
