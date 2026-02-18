@@ -14,6 +14,7 @@ BOND IS:
 - A save discipline where both operators agree before writing.
 - A truth hierarchy where code outranks prose and prose outranks memory.
 - A framework that derives state rather than storing it redundantly.
+- A search daemon that IS also a read/write utility for file operations within BOND_ROOT. It IS NOT an authority — write discipline remains with the operators.
 
 BOND IS NOT:
 - An autonomous agent. Claude acts on human instruction within BOND protocol.
