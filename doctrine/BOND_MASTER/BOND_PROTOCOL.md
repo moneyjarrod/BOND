@@ -19,7 +19,7 @@ The counter tracks conversation depth. It IS the sync timer.
 - 🔴 = N ≥ 20 (sync critical)
 
 ### Config
-- `counter_limit` lives in project OPS CONFIG section.
+- `counter_limit` lives in GSG_OPS.md CONFIG section.
 - Default: 10.
 - QAIS backup: `CONFIG|counter_limit|10`.
 
@@ -33,12 +33,12 @@ Claude response → user reads → panel state updated via API
 
 ### Implementation
 - Panel writes `BOND:command:args` to clipboard.
-- AHK monitors clipboard, parses BOND: prefix.
+- AHK (BOND_v8.ahk) monitors clipboard, parses BOND: prefix.
 - AHK types the command into the active Claude window.
 - No HTTP polling. No websockets. Clipboard is the bridge.
 
 ### Why Clipboard
-- HTTP polling caused 500ms lag spikes.
+- HTTP polling caused 500ms lag spikes (discovered S81).
 - Clipboard is event-driven, zero polling overhead.
 - AHK already runs for counter — no new dependency.
 
@@ -54,6 +54,18 @@ Protocol:
 Reading an entity's files for reference (without adopting its voice) does NOT require entry. The rule triggers when Claude adopts the entity's stance and speaks from it.
 
 The panel should always reflect who is actually talking.
+
+## Local State Routing
+
+All session state commands ({Chunk}, {Handoff}, {Tick}) write to the active entity's local `state/` subdirectory, not global `state/`. This applies to ALL entity classes.
+
+- **Entity active:** write to `doctrine/{entity}/state/`
+- **No entity active:** write to global `state/`
+- **Auto-create:** `state/` subdirectory created on first write
+- **Always global:** `active_entity.json`, `config.json`
+- **Warm/Full Restore:** reads from entity-local state, never cross-entity
+
+Full specification: `LOCAL_STATE_ROUTING.md`
 
 ## Hook Recognition
 
