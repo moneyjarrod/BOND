@@ -9,8 +9,5 @@
     "heatmap": true,
     "crystal": true
   },
-  "links": [
-    "PROJECT_MASTER",
-    "PERSONAL_HOOKS"
-  ]
+  "links": []
 }

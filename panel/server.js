@@ -78,7 +78,7 @@ const FRAMEWORK_ENTITIES = {
       display_name: 'BOND Master',
       public: true,
       tools: { filesystem: true, iss: true, qais: true, heatmap: true, crystal: true },
-      links: ['PROJECT_MASTER'],
+      links: [],
     },
     files: {
       'BOND_MASTER.md': `# BOND Master — Constitutional Authority

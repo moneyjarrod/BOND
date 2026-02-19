@@ -16,6 +16,18 @@ Resets: {Sync}, {Full Restore}, {Warm Restore}, new conversation.
 No reset: {Save}, {Chunk}, {Handoff}, bonfire, task completion, compaction.
 Lost count: recommend {Sync}.
 
+## ⚠️ LINK MANAGEMENT (Context Budget)
+Linked entities load ALL their files into context on every {Sync}, {Full Restore}, and {Warm Restore}. Each link costs hundreds to thousands of tokens. Too many links = context overflow = failed responses or compaction.
+
+**On every {Sync} and Restore, Claude MUST:**
+1. Check the active entity's links array (entity.json)
+2. If links exist, tell the user: "You have N linked entities: [names]. Each loads fully on sync. Unlink any you don't need right now to save context."
+3. Guide unlinking: edit entity.json links array, or unlink via panel
+
+**Rule of thumb:** Only link entities you are actively consulting THIS session. Unlink when done. You can always re-link or use {Consult} for one-shot reads.
+
+**Note:** BOND is being overhauled with tiered loading that will make linked entities load only their identity (not full files) unless explicitly entered. Until that ships, manual link management is the safeguard.
+
 ## DAEMON (Search Daemon — Composite Endpoints)
 The BOND search daemon runs on localhost:3003. Composite endpoints replace cascading file reads with single HTTP calls. Claude should attempt daemon first, fall back to individual file reads if unavailable.
 
@@ -54,8 +66,8 @@ Seeding gate: /sync-complete returns armed_seeders array. If empty (length 0), s
        iii. Remove seed entry from seed_tracker.json.
        iv.  Delete the seed .md file from entity dir.
      What remains IS the growth.
-  If no seeders armed, skip. On first arm, bootstrap seeds via perspective_store. 6) Reset counter.
-{Full Restore}: {Sync} + full depth read.
+  If no seeders armed, skip. On first arm, bootstrap seeds via perspective_store. 6) Check links array — if non-empty, warn user about context cost per ⚠️ LINK MANAGEMENT section above. 7) Reset counter.
+{Full Restore}: {Sync} + full depth read. ⚠️ Full Restore loads ALL linked entity files — check links first, warn user per LINK MANAGEMENT section.
 {Warm Restore}: Selective session pickup via SLA. Panel runs SPECTRA (warm_restore.py via /api/warm-restore endpoint), writes result to state/warm_restore_output.md. Claude reads the file and echoes it to the user preserving all badges and formatting — do NOT summarize or paraphrase the output. The file contains pre-computed confidence badges that must appear in Claude's response exactly as written. Two layers:
   Layer 1 (always): Most recent handoff. Guaranteed context.
   Layer 2 (contextual): SLA query against archive (excluding Layer 1). Entity + user message as signal. Query entered via panel prompt.
@@ -64,7 +76,7 @@ Seeding gate: /sync-complete returns armed_seeders array. If empty (length 0), s
     Per-section badges: 🟢 HIGH / 🟡 MED / 🔴 LOW / ⚪ SIBLING.
     On RED: show cautionary note explaining why confidence is low, suggest narrower query.
   Claude reads the file, echoes the badged sections, then adds a brief pickup summary and asks what to work on. Do not strip, reformat, or consolidate the badge output.
-  Resets counter. Does not replace {Full Restore} — use Full for comprehensive cold boot, Warm for contextual pickup.
+  Resets counter. Does not replace {Full Restore} — use Full for comprehensive cold boot, Warm for contextual pickup. ⚠️ Warm Restore loads linked entity files — check links first per LINK MANAGEMENT section.
   See: doctrine/BOND_MASTER/WARM_RESTORE.md for full architecture.
 {Handoff}: Auto-combining session record. Always reads before writing.
   1) Check for existing handoffs/HANDOFF_S{N}.md for this session.
