@@ -216,3 +216,4 @@ warm_restore.py               ← indexer + query engine (BOND_ROOT level)
 - Warm Restore IS additive to the continuity stack, not a replacement for any layer.
 - Warm Restore IS NOT automatic. User invokes it explicitly.
 - Warm Restore IS NOT a storage mechanism. It consumes handoffs produced by {Save}.
+- Warm Restore resets the counter. It establishes a fresh context baseline like {Sync} and {Full Restore}.

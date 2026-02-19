@@ -8,8 +8,8 @@ The counter tracks conversation depth. It IS the sync timer.
 - User provides the counter tag: `«tN/L emoji»`
 - Claude echoes the user's tag exactly as first line of every response.
 - Claude does NOT compute the emoji. User display is source of truth.
-- Resets on: {Sync}, {Full Restore}, new conversation.
-- Does NOT reset on: {Save}, {Chunk}, bonfire, task completion, compaction.
+- Resets on: {Sync}, {Full Restore}, {Warm Restore}, new conversation.
+- Does NOT reset on: {Save}, {Chunk}, {Handoff}, bonfire, task completion, compaction.
 - Lost count → recommend {Sync}.
 
 ### Emoji Thresholds (computed by AHK, not Claude)
@@ -85,6 +85,8 @@ Hooks are subordinate to BOND_MASTER doctrine. They augment, never override.
 |---------|--------|---------------|
 | {Sync} | Read hierarchy by task, write state | Yes |
 | {Full Restore} | Complete reload + full depth read | Yes |
+| {Warm Restore} | Selective session pickup via SLA | Yes |
+| {Handoff} | Draft session handoff sections | No |
 | {Save} | Write proven work (both agree) | No |
 | {Crystal} | QAIS crystallization | No |
 | {Chunk} | Session snapshot → appends to state/session_chunks.md | No |
