@@ -48,7 +48,7 @@ BOND_MASTER lives at L0 alongside SKILL. It IS the system's self-knowledge.
 3. **Code > Prose.** When they conflict, code wins.
 4. **Counter is king.** The counter is the heartbeat. If it dies, sync.
 5. **Entities are contexts.** Loading an entity loads its files, not its history.
-6. **Class is boundary.** Entity class determines available tools. Hard limit.
+6. **Class is identity.** Entity class shapes how Claude thinks inside it — not which tools are available. Tools are universal. Protocol governs behavior. Doctrine doesn't grow because it's immutable, not because tools are locked. Perspectives grow because growth IS their nature.
 7. **Clipboard is bridge.** Panel → clipboard → AHK → Claude. No HTTP polling.
 8. **Armed = Obligated.** Any subsystem in an armed state creates a non-optional obligation during its governing command. The server generates obligations from state. The governing command services them. {Tick} audits completion. Gaps are surfaced structurally, not self-reported. Prose instructions are documentation; code enforcement is the mechanism.
 9. **New capability = doctrine review.** When a new system is added under BOND_MASTER authority, it must be evaluated against existing doctrine before it is considered complete. Triggers: new MCP tool, new server endpoint, new command keyword, new entity class, new file write behavior, or new cross-boundary mechanism. If the capability introduces a pattern not covered by current IS statements, the doctrine must be updated to cover it. New capabilities that contradict existing doctrine are rejected or the contradiction is resolved explicitly. The constitution cannot be silently outgrown by the system it governs.

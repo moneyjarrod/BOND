@@ -20,7 +20,7 @@ Lost count: recommend {Sync}.
 The BOND search daemon runs on localhost:3003. Composite endpoints replace cascading file reads with single HTTP calls. Claude should attempt daemon first, fall back to individual file reads if unavailable.
 
 Fast path (daemon available):
-- {Sync} → GET /sync-payload (returns entity, config, files, links, armed_seeders, capabilities in one call — replaces steps 2-5 of individual reads)
+- {Sync} → POST /sync-complete with {"text": "...", "session": "S{N}"} (returns entity, config, files, links, armed_seeders, vine resonance scores, tracker updates, capabilities — one call replaces steps 2-5 AND tracker bookkeeping)
 - {Enter} → GET /enter-payload?entity=NAME (returns entity files + linked files)
 - Vine pass → GET /vine-data?perspective=NAME (returns tracker, roots, seeds, pruned)
 - Obligations → GET /obligations (derived obligations + warnings from state)
@@ -34,11 +34,12 @@ Seeding gate: /sync-payload returns armed_seeders array. If empty (length 0), sk
 ## SYNC
 {Sync}: 1) Read project SKILL 2) Try GET /sync-payload — if daemon responds, use its data for steps 2-5 and skip to vine gate check (armed_seeders). If daemon unavailable, fall back: Read OPS/MASTER 3) Read state/active_entity.json — if entity set, read all files at path field; then read entity's entity.json for links array, load linked entities' .md files; if null, skip 4) Read state/config.json for save_confirmation toggle 5) Vine lifecycle: GET /api/seeders — if API unavailable, fallback: scan doctrine/*/entity.json for perspective-class entities with `"seeding": true`. Armed state is verified at execution time, not inherited from prior reads. A perspective armed earlier in the conversation is not assumed armed now. If any armed perspectives found, run the full vine pass for each:
   a) RESONATE: perspective_check(perspective, text) with substantive content from recent exchanges.
-  b) TRACK: Read perspective's seed_tracker.json. Increment `exposures` on ALL active seeds. Score each seed from (a):
-     - Score ≥ seed_threshold → `hits += 1`, update `last_hit` (SUNSHINE)
-     - Score ≥ rain_floor AND < seed_threshold → `rain += 1`, update `last_rain` (RAIN, max 1 per seed per session)
-     - Score < rain_floor → no effect (DRY)
+  b) TRACK: Daemon-owned when using POST /sync-complete. The daemon's VineProcessor handles all tracker bookkeeping: increments exposures on ALL active seeds, records hits/rain/dry, writes updated tracker to disk. Claude reads the `vine_processing` block from the response — `changes` array shows what happened per seed, `written: true` confirms disk write. Thresholds:
+     - Score ≥ seed_threshold → hit (SUNSHINE)
+     - Score ≥ rain_floor AND < seed_threshold → rain (RAIN, max 1 per seed per pass)
+     - Score < rain_floor → dry (DRY)
      Rain floor = seed_threshold × 0.625 (standard 0.04 → rain floor 0.025, wide-net 0.035 → rain floor 0.020).
+     Fallback (daemon unavailable): Claude reads tracker manually, applies same logic, writes tracker to disk.
   c) AUTO-SEED (novel discovery): Claude reads conversation through the perspective's ROOT lens. Patterns that fit the perspective's worldview but aren't captured = candidates. Check candidates against field — LOW resonance confirms novelty (high = already known).
      RE-GRAFT CHECK: perspective_check now returns `pruned_seeds` array. If candidate name matches a previously pruned seed, apply re-graft gate: count how many LIVING seeds scored above seed_threshold in step (a). If 2+ living seeds co-fired → re-graft allowed (vine grew around it, context changed). If <2 co-fired → blocked (old pattern repeating alone). Log re-graft with reason "re-graft: co-resonated with [seed1, seed2]".
      If candidate passes (novel + not pruned, or novel + re-graft approved): auto-write .md file + perspective_store into QAIS (pass reason + session for auto-logging) + add tracker entry. No approval gate.
@@ -101,17 +102,18 @@ Compaction = context was lost. QAIS retrieval is non-optional. This is an Armed=
 
 ## COMMANDS
 Commands are keyword-driven, not exact-match. `{Sync}`, `{Project Sync}`, `{Sync} GSG` all fire Sync. Additional words = parameters/context. Case insensitive. Multiple commands per message processed left-to-right.
-{Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (Layer 1: last handoff, Layer 2: archive query with confidence badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot → append to entity-local state/session_chunks.md (doctrine/{entity}/state/ if entity active, else global state/) (timestamped, 10-20 lines). Chunks are ingredients for {Handoff}, not standalone. Compaction insurance + handoff enrichment | {Tick} quick status + obligation audit (GET /api/sync-health) | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply tool boundaries | {Exit} clear active entity, confirm exit, drop tool boundaries | {Consult ENTITY} read-only lens: read entity ROOTs/docs, speak through lens, no entity switch, no lifecycle triggers. Requires active project + entity linked to project. One-shot default | {Relational} arch re-anchor | {Drift?} self-check
+{Sync} read+ground+reset | {Full Restore} complete reload+reset | {Warm Restore} selective pickup via SLA (Layer 1: last handoff, Layer 2: archive query with confidence badges) | {Handoff} draft session handoff sections | {Save} write proven work (both agree) | {Crystal} QAIS crystallization | {Chunk} session snapshot → append to entity-local state/session_chunks.md (doctrine/{entity}/state/ if entity active, else global state/) (timestamped, 10-20 lines). Chunks are ingredients for {Handoff}, not standalone. Compaction insurance + handoff enrichment | {Tick} quick status + obligation audit (GET /api/sync-health) | {Enter ENTITY} read state/active_entity.json, load all .md files from path, check entity.json links array and load linked .md files, acknowledge entity+class+links, apply class behavior | {Exit} clear active entity, confirm exit, return to unscoped behavior | {Consult ENTITY} read-only lens: read entity ROOTs/docs, speak through lens, no entity switch, no lifecycle triggers. Requires active project + entity linked to project. One-shot default | {Relational} arch re-anchor | {Drift?} self-check
 
 ## TOOL WIRING
-Command tools (fire on command, respect class boundaries):
+All tools available to all classes. Class identity shapes behavior, not tool access.
+Command tools (fire on command):
 {Full Restore} → heatmap_hot(top_k=5), qais_passthrough with session context
 {Warm Restore} → read state/warm_restore_output.md (pre-computed by panel endpoint /api/warm-restore), heatmap_hot(top_k=3) for signal boost. Panel runs SPECTRA, writes badges to file, Claude reads result.
 {Crystal} → iss_analyze on chunk text, crystal to QAIS, heatmap_chunk snapshot
-{Chunk} → heatmap_chunk snapshot. If crystal blocked by class matrix, Chunk still executes as conversational summary. Crystal adds persistence, doesn't gate the action.
+{Chunk} → heatmap_chunk snapshot. Chunk executes as conversational summary. Crystal adds persistence, doesn't gate the action.
 {Tick} → Panel button hits /api/sync-health, writes entity-local state/tick_output.md (doctrine/{entity}/state/ if entity active, else global state/). Claude reads the file for server-generated obligations, then adds Layer 1 session report (work completed, vine health, open threads) + heatmap_hot(top_k=3) for warm concepts. Three layers: (1) Claude session report, (2) Server obligation audit from tick_output.md, (3) Project health from project_tick_output.md if project active. Phase 1: structured self-report against server-generated checklist.
 {Save} → after write, qais_store binding (entity|role=save|fact=what was saved)
-Seed tools (framework-level, bypass class boundaries when seeders armed):
+Seed tools (perspective-only lifecycle, fire when seeders armed):
 perspective_store — write seed content into perspective's isolated .npz field (auto-seed + bootstrap). Optional: reason, session → auto-logs to seed_decisions.jsonl.
 perspective_check — resonate conversation text against perspective's field, returns scored matches. Used for exposure tracking (existing seeds) NOT for novel discovery (novel = low score = not in field yet). Claude identifies novel patterns through ROOT lens, then confirms novelty via low field resonance.
 perspective_remove — subtract pruned seed vectors from perspective's isolated field. Exact reversal of perspective_store. Optional: reason, session, tracker_stats → auto-logs to seed_decisions.jsonl.
@@ -136,8 +138,9 @@ Cost: ~1,200 tokens per Sync for full vine lifecycle. Toggle: SEED ON/OFF on ent
 Ref: doctrine/BOND_MASTER/VINE_GROWTH_MODEL.md
 
 ## ENTITIES (B69)
-Doctrine: static IS, Files+ISS, no growth. Project: bounded, Files+QAIS+Heatmap+Crystal+ISS, carries CORE. Perspective: unbounded growth, Files+QAIS+Heatmap+Crystal, no ISS. Library: reference, Files only.
-Pointer: state/active_entity.json. Panel writes Enter, clears Exit. {Sync} follows pointer. Switch overwrites — no drop needed. Class boundaries hard.
+All tools universal across all classes. Class shapes behavior, not tool access.
+Doctrine: static IS, no growth. Crystal/QAIS/Heatmap available for operational memory — none change IS statements. Project: bounded, carries CORE. Perspective: unbounded growth, vine lifecycle (seeding/pruning/rain/superposition). Only class with vine. Library: reference, consulted not inhabited.
+Pointer: state/active_entity.json. Panel writes Enter, clears Exit. {Sync} follows pointer. Switch overwrites — no drop needed. Class identity governs Claude's behavior inside the entity.
 
 CORE Enforcement (projects):
 Every project has a CORE.md — its local constitution. On {Enter} or {Sync}, if CORE.md is empty or contains only the starter template, Claude flags it and guides the user: "What is this project? Let's define it before we start." Work can proceed, but Claude treats an empty CORE as unresolved. Once CORE has real content, the project is initialized — Claude stops flagging. CORE is sovereign inside the project boundary (B4) — if CORE and doctrine conflict on project-internal matters, CORE wins. Projects cannot write to doctrine entities (B1). PROJECT_MASTER governs lifecycle, CORE governs content.

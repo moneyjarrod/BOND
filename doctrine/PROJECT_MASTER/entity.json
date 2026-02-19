@@ -4,7 +4,10 @@
   "public": true,
   "tools": {
     "filesystem": true,
-    "iss": true
+    "iss": true,
+    "qais": true,
+    "heatmap": true,
+    "crystal": true
   },
   "links": []
 }

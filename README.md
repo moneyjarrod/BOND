@@ -36,7 +36,7 @@ irm https://moneyjarrod.github.io/BOND/install.ps1 | iex
 
 **After install:**
 1. **Launch the counter** — Run `Counter/BOND_v8.ahk` (AutoHotkey). This is required. The counter tracks context freshness AND acts as the clipboard bridge between the panel and Claude. Without it, **panel buttons will not work** — they'll copy to clipboard but nothing will reach Claude.
-2. Add the BOND skill (`skills/bond/SKILL.md`) as Project Knowledge in a Claude Project
+2. Add `SKILL.md` (root directory) as Project Knowledge in a Claude Project
 3. Configure MCP servers in Claude (see [docs/MCP_SETUP.md](docs/MCP_SETUP.md) for copy-paste config)
 4. Type `{Sync}` in Claude to initialize
 5. Browse the [Visual Guide](docs/visual_guide/VISUAL_GUIDE.md) to see what every panel element does

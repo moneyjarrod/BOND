@@ -2,28 +2,37 @@
 
 ## The Four Classes
 
-| Class | Nature | Tools | Growth |
+| Class | Nature | Focus | Growth |
 |-------|--------|-------|--------|
-| Doctrine | Static IS | Files + ISS | None — immutable |
-| Project | Bounded workspace | Files + QAIS + Heatmap + Crystal + ISS | Bounded by CORE |
-| Perspective | Unbounded growth | Files + QAIS + Heatmap + Crystal | Unlimited |
-| Library | Reference shelf | Files only | None — read-only |
+| Doctrine | Static IS | Audit, memory, constitutional authority | None — immutable |
+| Project | Bounded workspace | Full operational capability | Bounded by CORE |
+| Perspective | Unbounded growth | Vine lifecycle, seed collection, identity evolution | Unlimited |
+| Library | Reference shelf | Retrieval and lookup | None — read-only |
+
+## Universal Tools
+
+All entity classes have access to all BOND tools: filesystem, QAIS, ISS, heatmap, crystal, and daemon. Tools are universal. **Class shapes how Claude thinks inside an entity, not which tools are available.**
+
+The daemon bridge (daemon_fetch) routes all capabilities through a single gateway. Per-tool gating is obsolete — it was scaffolding for when each tool was a separate pipe. Now there's one main, and the protocol governs behavior.
+
+What differentiates classes is *identity and behavior*, not tool locks:
+- Doctrine entities don't grow — not because seed tools are blocked, but because doctrine IS immutable.
+- Library entities are reference — not because QAIS is unavailable, but because libraries don't accumulate session state.
+- Perspectives grow freely — not because they have extra tools, but because growth IS their nature.
 
 ## Class IS Statements
 
 ### Doctrine
 - IS: Immutable truth. Constitutional authority.
 - IS: Self-auditable. ISS validates code against IS statements.
-- IS NOT: Growable. Doctrine doesn't learn — it defines.
-- Tools: Filesystem (read doctrine files) + ISS (audit/validate).
+- IS: Operationally aware. Crystal preserves session state. QAIS stores conversation memory. Heatmap tracks warm concepts. None of these change IS statements — they give the entity memory of what happened.
+- IS NOT: Growable. Doctrine doesn't learn — it defines. No seeding, no vine lifecycle, no seed collection.
 - Example: BOND_MASTER, Calendar Master, ROSETTA.
 
 ### Project
 - IS: A bounded workspace with a mission.
-- IS: The most capable class — all tools available.
 - IS: Governed by a CORE file (~500 tokens) that defines boundaries.
 - IS NOT: Open-ended. CORE constrains scope.
-- Tools: Files + QAIS + Heatmap + Crystal + ISS.
 - CORE file: Loaded once, refreshed on {Sync}. Counter cycle IS the refresh timer.
 - Example: GSG (Gnome Sweet Gnome).
 
@@ -31,71 +40,60 @@
 - IS: An unbounded knowledge domain that grows through conversation.
 - IS: Free to accumulate seeds, crystals, and connections.
 - IS: Narratively continuous. Each perspective maintains a local QAIS field (`data/perspectives/{entity}.npz`) that accumulates context independently of the global field.
-- IS NOT: Policed. No ISS — growth shouldn't be validated against fixed rules.
+- IS: The only class with vine lifecycle. Seeding, pruning, rain, superposition — these are perspective identity, not tool grants.
+- IS NOT: Policed. Growth shouldn't be validated against fixed rules. ISS is available but Claude exercises judgment about when audit-style analysis serves a perspective's nature.
 - IS NOT: Globally entangled. Perspective fields are isolated from the global QAIS field.
-- Tools: Files + QAIS + Heatmap + Crystal.
 - Local Field: Two .npz files per perspective, created automatically. Seed field (`{entity}.npz`) for vine lifecycle. Crystal field (`{entity}_crystal.npz`) for narrative continuity. Entity Warm Restore queries crystal field. Global Warm Restore does not touch perspective fields. Exclusive routing: perspective active → crystal writes local only (S116).
 - Field Isolation: Perspective fields are independent. Linked perspectives share seed resonance through the vine lifecycle but do not access each other's local fields.
 - Example: User-created perspectives (P11+).
 
 ### Library
 - IS: A reference shelf. Static knowledge for lookup.
-- IS: The simplest class — just files.
-- IS NOT: Active. No tools beyond reading.
-- Tools: Filesystem only.
+- IS: The simplest class in behavior, not in capability.
+- IS NOT: A session workspace. Libraries don't accumulate chunks, handoffs, or session state. They're consulted, not inhabited.
 - Example: Reference documents, archives.
 
-## Boundaries
+## Class Behavior, Not Tool Locks
 
-Class boundaries are HARD:
-- Cross-class tools are unavailable, not just hidden.
-- UI teaches architecture by showing what's possible per class.
-- An entity's class is set in its entity.json and does not change without deliberate reclassification.
+Class identity shapes Claude's behavior inside the entity:
+
+| Behavior | Doctrine | Project | Perspective | Library |
+|----------|----------|---------|-------------|---------|
+| Vine lifecycle (seeding/pruning) | No | No | Yes | No |
+| Crystal (session state) | Yes | Yes | Yes (local) | No |
+| Heatmap (warm concepts) | Yes | Yes | Yes | Yes |
+| QAIS (memory/retrieval) | Yes | Yes | Yes (local field) | Yes |
+| ISS (audit/analysis) | Yes | Yes | Available | Available |
+| Chunk/Handoff (session work) | Yes | Yes | Yes | No |
+
+"No" means Claude's protocol doesn't do this in that class — not that a tool is blocked. "Available" means the tool works but Claude uses judgment about when it fits the class nature.
 
 ## Class Linking Matrix
 
-Links load .md files during {Sync} and create an expectation of interaction. If the active entity's class cannot use the linked entity's tools, the link creates a misleading invitation. Links are filtered by class compatibility:
+Links load .md files during {Sync} and create context for interaction. All classes can link to all other classes — tool incompatibility no longer restricts pairings.
 
 | Active Class | Can Link To |
 |---|---|
-| Doctrine | Doctrine, Project, Library |
+| Doctrine | Doctrine, Project, Perspective, Library |
 | Project | Doctrine, Project, Perspective, Library |
-| Perspective | Project, Perspective, Library |
-| Library | Doctrine, Library |
+| Perspective | Doctrine, Project, Perspective, Library |
+| Library | Doctrine, Project, Perspective, Library |
 
-Rule: **Doctrine and Perspective never link directly.** Their tool boundaries are incompatible — doctrine uses ISS, perspectives use QAIS. Neither can fulfill the other's expectations.
-
-This is enforced at three levels:
-1. **UI** — Link dropdown only shows class-compatible entities.
-2. **Server** — `/api/state/link` validates the pairing and returns 403 on forbidden links.
-3. **Protocol** — Claude flags violations in conversation. {Tick} audits existing links for compliance.
-
-Even if the user requests a forbidden link, the system refuses. The wall is structural, not advisory.
+Cross-class links carry context, not tool grants. A doctrine entity linking to a perspective loads that perspective's .md files for reference — it doesn't adopt the perspective's growth behavior.
 
 ## Link Badges (S118)
 
 Two distinct visual signals on entity cards:
 
 - **Blue LINKED** — Entity is actively loaded as context in the current session. Appears when the active entity's links array includes this entity. Session-level, temporary.
-- **Purple 🔗 N** — Same-class peer references only. Counts how many entities of the SAME class permanently link to this entity in their entity.json. Cross-class links (project→perspective) do NOT count toward the purple badge.
+- **Purple 🔗 N** — Same-class peer references only. Counts how many entities of the SAME class permanently link to this entity in their entity.json. Cross-class links do NOT count toward the purple badge.
 
-Purple = "peers referencing you." Blue = "active in this session." Cross-class governance flows through PROJECT_MASTER's PERSPECTIVE_REGISTRY, not through badge clutter on perspective cards.
-
-## Cross-Class Consultation
-
-When doctrine needs perspective input (or vice versa), the **operator is the bridge**:
-
-1. Exit the current entity (or work unscoped).
-2. Run the consultation in the appropriate context.
-3. Carry the result into the target entity as user input.
-4. The target entity evaluates it against its own principles.
-
-The tool wall stays intact. Information flows through the operator, not around the boundary. No new infrastructure is needed — the protocol pattern is: **class boundaries restrict tool access, not information access.**
+Purple = "peers referencing you." Blue = "active in this session."
 
 ## Entity Structure
 
 Every entity lives in `doctrine/ENTITY_NAME/` and contains:
-- `entity.json` — class, tools, display_name
+- `entity.json` — class, display_name, and class-specific settings (seeding, seed_threshold, etc.)
 - One or more `.md` files — the entity's knowledge
 
 ## State Pointer
@@ -105,7 +103,7 @@ Every entity lives in `doctrine/ENTITY_NAME/` and contains:
 {
   "entity": "CM",
   "class": "doctrine",
-  "path": "C:\\Projects\\BOND_private\\doctrine\\CM",
+  "path": "doctrine/CM",
   "entered": "2026-02-07T..."
 }
 ```
@@ -123,4 +121,4 @@ Every entity lives in `doctrine/ENTITY_NAME/` and contains:
 
 ## Mantra
 
-"The class IS the filter. The CORE IS the boundary."
+"The class IS the identity. The protocol IS the boundary."

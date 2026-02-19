@@ -180,11 +180,11 @@ Write-Host ""
 Write-Host "  Next steps:" -ForegroundColor Yellow
 if (-not $ahkLaunched) {
     Write-Host "  1. Install AutoHotkey v2 and launch Counter\BOND_v8.ahk" -ForegroundColor Yellow
-    Write-Host "  2. Add skills\bond\SKILL.md to a Claude Project" -ForegroundColor Yellow
+    Write-Host "  2. Add SKILL.md (root directory) to a Claude Project" -ForegroundColor Yellow
     Write-Host "  3. Configure MCP servers (see docs\MCP_SETUP.md)" -ForegroundColor Yellow
     Write-Host "  4. Type {Sync} in Claude" -ForegroundColor Yellow
 } else {
-    Write-Host "  1. Add skills\bond\SKILL.md to a Claude Project" -ForegroundColor Yellow
+    Write-Host "  1. Add SKILL.md (root directory) to a Claude Project" -ForegroundColor Yellow
     Write-Host "  2. Configure MCP servers (see docs\MCP_SETUP.md)" -ForegroundColor Yellow
     Write-Host "  3. Type {Sync} in Claude" -ForegroundColor Yellow
 }

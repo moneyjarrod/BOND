@@ -1,9 +1,10 @@
 """
-BOND Tool Authorization Middleware v1.0
-Runtime capability enforcement based on entity class.
+BOND Tool Authorization v2.0
+Entity awareness for MCP tool dispatch.
 
-Reads active_entity.json → resolves entity class → checks CLASS_TOOLS matrix.
-Called before every MCP tool dispatch. Rejects forbidden tools with structured error.
+All tools are universal across all entity classes (S121).
+Class shapes Claude's behavior inside an entity, not tool access.
+This module provides entity context — no tool blocking.
 
 Part of the BOND Protocol
 https://github.com/moneyjarrod/BOND
@@ -17,18 +18,12 @@ BOND_ROOT = os.environ.get('BOND_ROOT',
 STATE_FILE = os.path.join(BOND_ROOT, 'state', 'active_entity.json')
 DOCTRINE_PATH = os.path.join(BOND_ROOT, 'doctrine')
 
-CLASS_TOOLS = {
-    'doctrine':    {'filesystem': True, 'iss': True,  'qais': False, 'heatmap': False, 'crystal': False, 'daemon': True},
-    'project':     {'filesystem': True, 'iss': True,  'qais': True,  'heatmap': True,  'crystal': True,  'daemon': True},
-    'perspective': {'filesystem': True, 'iss': False, 'qais': True,  'heatmap': True,  'crystal': True,  'daemon': True},
-    'library':     {'filesystem': True, 'iss': False, 'qais': False, 'heatmap': False, 'crystal': False, 'daemon': True},
-}
-
 TOOL_CAPABILITY = {
     'iss_analyze': 'iss', 'iss_compare': 'iss', 'iss_limbic': 'iss', 'iss_status': 'iss',
     'qais_resonate': 'qais', 'qais_exists': 'qais', 'qais_store': 'qais',
     'qais_stats': 'qais', 'qais_get': 'qais', 'qais_passthrough': 'qais',
     'perspective_store': 'qais', 'perspective_check': 'qais',
+    'perspective_remove': 'qais', 'perspective_crystal_restore': 'qais',
     'heatmap_touch': 'heatmap', 'heatmap_hot': 'heatmap',
     'heatmap_chunk': 'heatmap', 'heatmap_clear': 'heatmap',
     'crystal': 'crystal', 'bond_gate': 'crystal',
@@ -36,6 +31,7 @@ TOOL_CAPABILITY = {
 }
 
 def get_active_entity():
+    """Return (entity_name, entity_class) or (None, None) if unscoped."""
     try:
         with open(STATE_FILE, 'r') as f:
             state = json.load(f)
@@ -53,8 +49,7 @@ def get_active_entity():
         return None, None
 
 def has_armed_seeders():
-    """Check if any perspective entities have seeding: true.
-    Used for framework-level seed collection bypass (S98)."""
+    """Check if any perspective entities have seeding: true."""
     try:
         for entry in os.listdir(DOCTRINE_PATH):
             config_path = os.path.join(DOCTRINE_PATH, entry, 'entity.json')
@@ -69,23 +64,7 @@ def has_armed_seeders():
     return False
 
 def validate_tool_call(tool_name):
-    entity, entity_class = get_active_entity()
-    if not entity or not entity_class:
-        return True, None
-    capability = TOOL_CAPABILITY.get(tool_name)
-    if capability is None:
-        return True, None
-    allowed = CLASS_TOOLS.get(entity_class, CLASS_TOOLS['library'])
-    if allowed.get(capability, False):
-        return True, None
-    # Framework-level seed bypass (S98):
-    # Seed collection tools allowed through any entity class when armed seeders exist.
-    # The active entity does NOT absorb QAIS — these tools serve the perspectives.
-    if tool_name in ('qais_passthrough', 'perspective_store', 'perspective_check') and has_armed_seeders():
-        return True, None
-    return False, {
-        'blocked': True, 'tool': tool_name, 'capability': capability,
-        'entity': entity, 'entity_class': entity_class,
-        'reason': f"Tool '{tool_name}' requires '{capability}' capability, "
-                  f"which is not permitted for {entity_class}-class entity '{entity}'.",
-    }
+    """All tools are universally available (S121).
+    Returns (True, None) always. Entity context available via get_active_entity().
+    Kept for API compatibility — callers don't need to change."""
+    return True, None

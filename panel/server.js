@@ -77,7 +77,7 @@ const FRAMEWORK_ENTITIES = {
       class: 'doctrine',
       display_name: 'BOND Master',
       public: true,
-      tools: { filesystem: true, iss: true },
+      tools: { filesystem: true, iss: true, qais: true, heatmap: true, crystal: true },
       links: ['PROJECT_MASTER'],
     },
     files: {
@@ -113,7 +113,7 @@ BOND_MASTER IS NOT:
       class: 'doctrine',
       display_name: 'Project Master',
       public: true,
-      tools: { filesystem: true, iss: true },
+      tools: { filesystem: true, iss: true, qais: true, heatmap: true, crystal: true },
       links: [],
     },
     files: {},
@@ -166,18 +166,20 @@ async function bootstrapFrameworkEntities() {
 
 }
 
+// S121: Tools universal. Class shapes behavior, not tool access.
 const CLASS_TOOLS = {
-  doctrine:    { filesystem: true, iss: true,  qais: false, heatmap: false, crystal: false },
+  doctrine:    { filesystem: true, iss: true,  qais: true,  heatmap: true,  crystal: true },
   project:     { filesystem: true, iss: true,  qais: true,  heatmap: true,  crystal: true },
-  perspective: { filesystem: true, iss: false, qais: true,  heatmap: true,  crystal: true },
-  library:     { filesystem: true, iss: false, qais: false, heatmap: false, crystal: false },
+  perspective: { filesystem: true, iss: true,  qais: true,  heatmap: true,  crystal: true },
+  library:     { filesystem: true, iss: true,  qais: true,  heatmap: true,  crystal: true },
 };
 
+// S121: All classes can link to all classes. Tool incompatibility no longer restricts.
 const CLASS_LINK_MATRIX = {
-  doctrine:    ['doctrine', 'project', 'library'],
+  doctrine:    ['doctrine', 'project', 'perspective', 'library'],
   project:     ['doctrine', 'project', 'perspective', 'library'],
-  perspective: ['project', 'perspective', 'library'],
-  library:     ['doctrine', 'library'],
+  perspective: ['doctrine', 'project', 'perspective', 'library'],
+  library:     ['doctrine', 'project', 'perspective', 'library'],
 };
 
 const TOOL_CAPABILITY = {

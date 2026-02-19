@@ -44,7 +44,7 @@ File Ops Endpoints (Cold Water — verbatim, no processing):
 
 Composite Payloads (Data Assembly Layer — one call replaces many):
     GET  /sync-complete                        # {Sync} steps 1-5 (no vine scores)
-    POST /sync-complete {"text": "...", "session": "S124"}  # steps 1-5 + vine scores + tracker writes
+    POST /sync-complete {"text": "..."}        # {Sync} steps 1-5 + vine resonance scores
     GET  /sync-payload                         # legacy: entity, config, files, links, seeders
     GET  /enter-payload?entity=BOND_MASTER     # {Enter} in one call: entity files + linked files
     GET  /vine-data?perspective=P11-Plumber    # vine lifecycle: tracker, roots, seeds, pruned
@@ -1221,138 +1221,6 @@ class PerspectiveReader:
 perspective_reader = PerspectiveReader(BOND_ROOT)
 
 
-# ——— Vine Processor (Tracker Bookkeeping) ————————————————
-# Phase 4 of daemon consolidation: daemon scores AND writes tracker updates.
-# Claude no longer does manual exposure/hit/rain bookkeeping.
-# Daemon handles the math. Claude handles judgment (auto-seed, prune, ROOT lens).
-
-class VineProcessor:
-    """Vine lifecycle tracker updates during {Sync}.
-    
-    Scores come from PerspectiveReader (Phase 2-3).
-    This class applies those scores to seed_tracker.json:
-      - Increment exposures on ALL tracked seeds
-      - Record hits (score >= sunshine threshold)
-      - Record rain (rain_floor <= score < threshold), 1 per seed per Sync pass
-      - Write updated tracker to disk
-    
-    What daemon does: score + tracker bookkeeping + disk write.
-    What Claude still does: auto-seed judgment, prune decisions, narrative annotation.
-    """
-
-    def __init__(self, doctrine_path):
-        self.doctrine_path = Path(doctrine_path)
-
-    def _rain_floor(self, seed_threshold):
-        """Compute rain floor: seed_threshold × 0.625, rounded to nearest 0.005."""
-        raw = seed_threshold * 0.625
-        return round(raw * 200) / 200
-
-    def process(self, perspective, resonance_result, tracker, config, session_label=''):
-        """Process vine lifecycle for one perspective after resonance scoring.
-        
-        Args:
-            perspective: entity name (e.g. 'P11-Plumber')
-            resonance_result: output from PerspectiveReader.check()
-            tracker: current seed_tracker.json contents (dict)
-            config: {seed_threshold, prune_window, entity, ...}
-            session_label: e.g. 'S124' for tracker annotations
-            
-        Returns: {
-            tracker: updated tracker dict (also written to disk),
-            changes: list of {seed, event, score, ...},
-            thresholds: {sunshine, rain_floor},
-            written: bool,
-        }
-        """
-        threshold = config.get('seed_threshold', 0.04)
-        rain_floor = self._rain_floor(threshold)
-        changes = []
-
-        if not resonance_result or 'matches' not in resonance_result:
-            return {
-                'tracker': tracker, 'changes': [],
-                'thresholds': {'sunshine': threshold, 'rain_floor': rain_floor},
-                'written': False, 'reason': 'no resonance data',
-            }
-
-        # Build score lookup from resonance matches.
-        # Seeds in tracker are bare names; resonance may have bare or 'root:' prefix.
-        score_map = {}
-        for m in resonance_result.get('matches', []):
-            seed_name = m['seed']
-            score_map[seed_name] = m['score']
-            if seed_name.startswith('root:'):
-                score_map[seed_name[5:]] = m['score']
-
-        # Process each tracked seed
-        for seed_name, entry in tracker.items():
-            # Increment exposures on ALL tracked seeds
-            entry['exposures'] = entry.get('exposures', 0) + 1
-
-            # Find score — try exact name, then with root: prefix
-            score = score_map.get(seed_name)
-            if score is None:
-                score = score_map.get(f'root:{seed_name}')
-            if score is None:
-                changes.append({
-                    'seed': seed_name, 'event': 'exposure_only',
-                    'exposures': entry['exposures'],
-                })
-                continue
-
-            label = f"{session_label} — {score:.4f}" if session_label else f"{score:.4f}"
-
-            # Sunshine hit (score >= threshold)
-            if score >= threshold:
-                entry['hits'] = entry.get('hits', 0) + 1
-                entry['last_hit'] = label
-                changes.append({
-                    'seed': seed_name, 'event': 'hit',
-                    'score': round(score, 4),
-                    'hits': entry['hits'], 'exposures': entry['exposures'],
-                })
-            # Rain band (rain_floor <= score < threshold)
-            elif score >= rain_floor:
-                # Cap: 1 rain per seed per Sync pass (natural enforcement)
-                entry['rain'] = entry.get('rain', 0) + 1
-                entry['last_rain'] = label
-                changes.append({
-                    'seed': seed_name, 'event': 'rain',
-                    'score': round(score, 4),
-                    'rain': entry['rain'], 'exposures': entry['exposures'],
-                })
-            # Dry (below rain floor)
-            else:
-                changes.append({
-                    'seed': seed_name, 'event': 'dry',
-                    'score': round(score, 4),
-                    'exposures': entry['exposures'],
-                })
-
-        # Write updated tracker to disk
-        tracker_path = self.doctrine_path / perspective / 'seed_tracker.json'
-        written = False
-        try:
-            tracker_path.write_text(
-                json.dumps(tracker, indent=2, ensure_ascii=False),
-                encoding='utf-8'
-            )
-            written = True
-        except Exception as e:
-            changes.append({'error': f'Tracker write failed: {e}'})
-
-        return {
-            'tracker': tracker,
-            'changes': changes,
-            'thresholds': {'sunshine': threshold, 'rain_floor': rain_floor},
-            'written': written,
-        }
-
-
-vine_processor = VineProcessor(DOCTRINE_PATH)
-
-
 # ─── Session Heat Map (Daemon-Internal) ───────────────────
 # Phase 5 of daemon consolidation: heatmap moves from MCP to daemon.
 # Bypasses class matrix entirely — works during doctrine sessions.
@@ -1846,7 +1714,7 @@ class PayloadAssembler:
                 })
         return armed
 
-    def sync_complete(self, conversation_text=None, session_label=''):
+    def sync_complete(self, conversation_text=None):
         """One call replaces {Sync} steps 1-5.
         
         Returns everything Claude needs:
@@ -1886,19 +1754,9 @@ class PayloadAssembler:
                 'tracker': self._read_json(
                     self.doctrine_path / p_name / 'seed_tracker.json') or {},
             }
-            # Resonance scores + tracker updates (daemon-local, no MCP)
-            # Phase 2-3: daemon scores. Phase 4: daemon writes tracker.
+            # Resonance scores (daemon-local, no MCP)
             if conversation_text and perspective_reader.available():
                 v['resonance'] = perspective_reader.check(p_name, conversation_text)
-                # Phase 4: daemon processes tracker bookkeeping
-                vine_result = vine_processor.process(
-                    p_name, v['resonance'], v['tracker'], seeder, session_label)
-                v['tracker'] = vine_result['tracker']
-                v['vine_processing'] = {
-                    'changes': vine_result['changes'],
-                    'thresholds': vine_result['thresholds'],
-                    'written': vine_result['written'],
-                }
             else:
                 v['resonance'] = None
             vine[p_name] = v
@@ -1914,7 +1772,7 @@ class PayloadAssembler:
             'vine': vine,
             'heatmap': daemon_heatmap.for_chunk(),
             'capabilities': self.CAPABILITIES,
-            'daemon_version': '2.3.0',
+            'daemon_version': '2.2.0',
         }
 
     def sync_payload(self):
@@ -2371,11 +2229,10 @@ class SearchHandler(BaseHTTPRequestHandler):
                 self._json(400, {'error': f'Invalid JSON body: {e}'})
                 return
             text = body.get('text', '')
-            session_label = body.get('session', '')
             if not text:
                 self._json(400, {'error': 'Missing "text" in body (conversation context for vine scoring)'})
                 return
-            result = payloads.sync_complete(conversation_text=text, session_label=session_label)
+            result = payloads.sync_complete(conversation_text=text)
             self._json(200, result)
 
         elif path == '/write':
