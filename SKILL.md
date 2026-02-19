@@ -12,8 +12,8 @@ description: >-
 ## COUNTER
 Echo user's tag exactly. Do NOT compute emoji.
 First line of every response. No exceptions.
-Resets: {Sync}, {Full Restore}, new conversation.
-No reset: {Save}, {Chunk}, {Warm Restore}, {Handoff}, bonfire, task completion, compaction.
+Resets: {Sync}, {Full Restore}, {Warm Restore}, new conversation.
+No reset: {Save}, {Chunk}, {Handoff}, bonfire, task completion, compaction.
 Lost count: recommend {Sync}.
 
 ## DAEMON (Search Daemon — Composite Endpoints)
@@ -64,7 +64,7 @@ Seeding gate: /sync-complete returns armed_seeders array. If empty (length 0), s
     Per-section badges: 🟢 HIGH / 🟡 MED / 🔴 LOW / ⚪ SIBLING.
     On RED: show cautionary note explaining why confidence is low, suggest narrower query.
   Claude reads the file, echoes the badged sections, then adds a brief pickup summary and asks what to work on. Do not strip, reformat, or consolidate the badge output.
-  No counter reset. Does not replace {Full Restore} — use Full for comprehensive cold boot, Warm for contextual pickup.
+  Resets counter. Does not replace {Full Restore} — use Full for comprehensive cold boot, Warm for contextual pickup.
   See: doctrine/BOND_MASTER/WARM_RESTORE.md for full architecture.
 {Handoff}: Auto-combining session record. Always reads before writing.
   1) Check for existing handoffs/HANDOFF_S{N}.md for this session.
