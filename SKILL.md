@@ -1,7 +1,7 @@
 ---
 name: bond
 description: >-
-  BOND protocol. Triggers: Sync, Save, Crystal, Chunk, Tick, Enter, Exit,
+  BOND protocol. Triggers: Sync, Save, Crystal, Chunk, Tick, Project Tick, Enter, Exit,
   Full Restore, Warm Restore, Handoff, Consult, Drift, counter, emoji, bonfire,
   drift, session, entity, doctrine, perspective, project class, library class,
   save protocol, sync limit, compaction, context degradation.
@@ -54,7 +54,9 @@ Fallback (daemon unavailable): 1) Read SKILL 2) Read OPS/MASTER 3) Read state/ac
 
 **{Chunk}:** Session snapshot → append to entity-local state/session_chunks.md. Timestamped, 10-20 lines. Compaction insurance + handoff ingredient. No counter reset.
 
-**{Tick}:** Read entity-local state/tick_output.md (server-generated obligations). Add session report (work, vine health, threads) + heatmap_hot(top_k=3). No counter reset.
+**{Tick}:** Read state/tick_output.md (server-generated global obligation audit). Add session report (work, vine health, threads) + heatmap_hot(top_k=3). No counter reset.
+
+**{Project Tick}:** Project-class only. Panel writes entity-local doctrine/{entity}/state/tick_output.md with CORE status, crystal count, handoff count, git status, links. No counter reset.
 
 **{Relational}:** Architecture re-anchor. **{Drift?}:** Self-check.
 

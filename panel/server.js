@@ -814,17 +814,41 @@ async function generateObligations() {
 app.get('/api/sync-obligations', async (req, res) => { try { res.json(await generateObligations()); } catch (err) { res.status(500).json({ error: err.message }); } });
 app.get('/api/sync-health', async (req, res) => {
   try {
-    const result = await generateObligations();
-    const syncObligations = result.obligations.filter(o => o.command === 'sync');
-    const enterObligations = result.obligations.filter(o => o.command === 'enter');
-    const conditionalObligations = result.obligations.filter(o => o.conditional);
-    const response = { ...result, health: { sync_obligations: syncObligations.length, enter_obligations: enterObligations.length, conditional_obligations: conditionalObligations.length, total: result.obligation_count, verified: 0, unverified: result.obligation_count, phase: 1, note: 'Phase 1: structured self-report. Server generates, Claude audits against list.' }, by_command: { sync: syncObligations, enter: enterObligations, conditional: conditionalObligations } };
+    // Single source: daemon /obligations
+    let result;
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 5000);
+      const daemonRes = await fetch(`${DAEMON_URL}/obligations`, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (daemonRes.ok) {
+        result = await daemonRes.json();
+      } else {
+        // Daemon returned error — fall back to local
+        result = await generateObligations();
+      }
+    } catch {
+      // Daemon unavailable — fall back to local
+      result = await generateObligations();
+    }
 
-    // S118: Write tick output for Claude to read
-    const lines = [`# Tick — Obligation Audit`, `_${result.generated_at}_`, '',
-      `**Active Entity:** ${result.active_entity || 'none'} (${result.active_class || 'unscoped'})`,
-      `**Total Obligations:** ${result.obligation_count}`,
-      `**Armed Perspectives:** ${result.armed_perspectives}`, ''];
+    const obligations = result.obligations || [];
+    const syncObligations = obligations.filter(o => o.command === 'sync');
+    const enterObligations = obligations.filter(o => o.command === 'enter');
+    const conditionalObligations = obligations.filter(o => o.conditional);
+    const obligationCount = result.obligation_count || obligations.length;
+    const armedPerspectives = result.armed_seeders || result.armed_perspectives || 0;
+    const activeEntity = result.active_entity || null;
+    const activeClass = result.active_class || null;
+    const generatedAt = result.timestamp || new Date().toISOString();
+
+    const response = { obligations, active_entity: activeEntity, active_class: activeClass, obligation_count: obligationCount, armed_perspectives: armedPerspectives, generated_at: generatedAt, health: { sync_obligations: syncObligations.length, enter_obligations: enterObligations.length, conditional_obligations: conditionalObligations.length, total: obligationCount, phase: 1, note: 'Source: daemon /obligations (panel fallback if unavailable)' }, by_command: { sync: syncObligations, enter: enterObligations, conditional: conditionalObligations } };
+
+    // Write tick output for Claude to read
+    const lines = [`# Tick -- Obligation Audit`, `_${generatedAt}_`, '',
+      `**Active Entity:** ${activeEntity || 'none'} (${activeClass || 'unscoped'})`,
+      `**Total Obligations:** ${obligationCount}`,
+      `**Armed Perspectives:** ${armedPerspectives}`, ''];
     if (syncObligations.length > 0) {
       lines.push('## Sync Obligations');
       syncObligations.forEach(o => lines.push(`- **${o.id}**: ${o.description}`));
@@ -832,7 +856,7 @@ app.get('/api/sync-health', async (req, res) => {
     }
     if (enterObligations.length > 0) {
       lines.push('## Enter Obligations');
-      enterObligations.forEach(o => lines.push(`- **${o.id}**: ${o.description} ${o.severity === 'warn' ? '⚠️' : ''}`));
+      enterObligations.forEach(o => lines.push(`- **${o.id}**: ${o.description} ${o.severity === 'warn' ? '\u26A0\uFE0F' : ''}`));
       lines.push('');
     }
     if (conditionalObligations.length > 0) {
@@ -840,10 +864,10 @@ app.get('/api/sync-health', async (req, res) => {
       conditionalObligations.forEach(o => lines.push(`- **${o.id}**: ${o.description}`));
       lines.push('');
     }
-    if (result.obligation_count === 0) lines.push('No obligations. System at rest.', '');
+    if (obligationCount === 0) lines.push('No obligations. System at rest.', '');
     const tickPath = join(STATE_PATH, 'tick_output.md');
     await verifiedWrite(tickPath, lines.join('\n'), 'tick:sync-health');
-    console.log(`⚡ Tick: ${result.obligation_count} obligations, ${result.armed_perspectives} armed`);
+    console.log(`\u26A1 Tick: ${obligationCount} obligations, ${armedPerspectives} armed`);
 
     res.json(response);
   } catch (err) { res.status(500).json({ error: err.message }); }
@@ -1086,7 +1110,9 @@ app.get('/api/project-tick/:entity', async (req, res) => {
       if (tick.git.changes?.length) tick.git.changes.forEach(c => lines.push(`  ${c}`));
     }
     lines.push('');
-    const tickPath = join(STATE_PATH, 'project_tick_output.md');
+    const entityStatePath = join(entityPath, 'state');
+    await mkdir(entityStatePath, { recursive: true });
+    const tickPath = join(entityStatePath, 'tick_output.md');
     await verifiedWrite(tickPath, lines.join('\n'), `project-tick:${entity}`);
 
     console.log(`⚡ Project Tick: ${entity}`);
