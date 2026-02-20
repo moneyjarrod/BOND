@@ -30,10 +30,8 @@ if %errorlevel%==0 (
   start "BOND Search" /min cmd /c "python "%~dp0search_daemon\bond_search.py""
   echo [OK] Search daemon starting on http://localhost:3003
 ) else (
-  echo [WARN] Python not found — search daemon, QAIS, and ISS disabled
-  echo        Without Python, Claude has no memory, analysis, or search tools.
-  echo        Install Python 3.8+ from https://python.org (check 'Add to PATH')
-  echo        Then restart BOND.
+  echo [WARN] Python not found — search daemon disabled
+  echo        Install Python 3.8+ and add to PATH to enable search
 )
 
 :: Dev mode: pass --dev to also launch Vite HMR
@@ -70,7 +68,12 @@ if "%1"=="--dev" (
   echo    Run with --dev for hot reload.
 )
 echo.
-echo Optional: Double-click bridge\BOND_v8.ahk
-echo for counter + command bridge.
+:: Start AHK Counter Bridge
+if exist "%~dp0bridge\BOND_v8.ahk" (
+  start "" "%~dp0bridge\BOND_v8.ahk"
+  echo [OK] Counter bridge started (BOND_v8.ahk)
+) else (
+  echo [WARN] AHK counter not found at bridge\BOND_v8.ahk
+)
 echo.
 pause

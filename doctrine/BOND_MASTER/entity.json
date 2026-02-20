@@ -2,12 +2,5 @@
   "class": "doctrine",
   "display_name": "BOND Master",
   "public": true,
-  "tools": {
-    "filesystem": true,
-    "iss": true,
-    "qais": true,
-    "heatmap": true,
-    "crystal": true
-  },
   "links": []
 }

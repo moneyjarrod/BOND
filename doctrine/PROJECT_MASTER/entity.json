@@ -1,13 +1,5 @@
 {
   "class": "doctrine",
   "display_name": "Project Master",
-  "public": true,
-  "tools": {
-    "filesystem": true,
-    "iss": true,
-    "qais": true,
-    "heatmap": true,
-    "crystal": true
-  },
-  "links": []
+  "public": true
 }

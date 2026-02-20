@@ -1,77 +1,129 @@
-# 🔥🌊 BOND
+# BOND
 
-**A governed runtime for persistent human-AI collaboration.**
+**Your AI forgets you every conversation. BOND fixes that.**
 
-AI conversations are stateless. Projects aren't. BOND bridges that gap.
+You build something with Claude — a project, a strategy, a codebase — and next session, it's gone. You re-explain, re-attach files, re-establish context. Every conversation starts from zero.
 
-## What It Does
+BOND gives Claude persistent memory, structured projects, and a protocol where you both agree before anything changes. Your work carries forward. Your AI knows what happened last session, what's in progress, and what to do next.
 
-BOND gives Claude persistent memory, structured context, runtime tool governance, and a protocol where both human and AI agree before anything is written. It's not a wrapper, not a plugin — it's the substrate that collaboration runs inside.
+One install. One command to start. Type `{Sync}` in Claude and pick up where you left off.
 
-## What's In The Box
+---
 
-- **Control Panel** — React dashboard with entity management, doctrine viewing, and spectral text search
-- **QAIS** — Resonance-based memory using hyperdimensional vectors, not keyword matching
-- **ISS** — Semantic force measurement with psycholinguistic classification and evolved limbic perception
-- **Four-Class Entity Architecture** — Doctrine, Project, Perspective, Library — each with scoped tool permissions enforced at runtime
-- **SLA** — Spectral Lexical Addressing for deterministic paragraph-level text retrieval
-- **Save Protocol** — Both operators must agree before any file is written, with a toggleable confirmation widget
-- **Obligation Engine** — Server derives what must happen from state. Armed subsystems create non-optional obligations. {Tick} audits completion structurally, not by self-report
-- **Clipboard Bridge** — Panel → AHK → Claude, seamless command relay
+### Get Started
 
-## Get Started
+**Download:** [BOND_Setup.exe](https://github.com/moneyjarrod/BOND/releases/latest) — double-click, choose your folder, done.
 
-### [⚡ Install BOND →](https://moneyjarrod.github.io/BOND/)
-
-One command. Paste it into PowerShell, press Enter, BOND installs and opens.
-
-**Or from the command line directly:**
-```powershell
-irm https://moneyjarrod.github.io/BOND/install.ps1 | iex
-```
-
-**Requirements:** Node.js 18+ · Python 3.8+ · Git · [AutoHotkey v2](https://www.autohotkey.com/) · Windows 10/11
-
-> ⚠️ **Platform Notice:** Full BOND (panel + counter + clipboard bridge) currently requires **Windows 10/11**. The core architecture — Node.js server, Python MCP servers, React panel — is cross-platform, but the installer, startup scripts, and AutoHotkey counter/bridge have no Linux or macOS equivalents yet. Community contributors with access to these systems are welcome to build platform-native tooling. Credit the fundamental architecture to J-Dub and Claude.
+**Requirements:** Python 3.8+ and Node.js 18+
 
 **After install:**
-1. **Launch the counter** — Run `Counter/BOND_v8.ahk` (AutoHotkey). This is required. The counter tracks context freshness AND acts as the clipboard bridge between the panel and Claude. Without it, **panel buttons will not work** — they'll copy to clipboard but nothing will reach Claude.
-2. Add `SKILL.md` (root directory) as Project Knowledge in a Claude Project
-3. Configure MCP servers in Claude (see [docs/MCP_SETUP.md](docs/MCP_SETUP.md) for copy-paste config)
-4. Type `{Sync}` in Claude to initialize
-5. Browse the [Visual Guide](docs/visual_guide/VISUAL_GUIDE.md) to see what every panel element does
+1. Add the MCP config snippet to your Claude settings (generated during install)
+2. Copy `SKILL.md` into your Claude Project system prompt
+3. Run `start_bond.bat`
+4. Type `{Sync}` in Claude
 
-## Architecture
+That's it. Claude now remembers.
+
+---
+
+### What You Get
+
+**Entities** — Structured contexts for your projects, perspectives, and reference material. Each one carries its own state, handoffs, and session history.
+
+**Session continuity** — `{Sync}` loads your active entity, recent handoff, and system state in one call. `{Crystal}` saves session momentum. `{Handoff}` writes what the next session needs to know.
+
+**Governed writes** — Nothing gets written without both you and Claude agreeing. No silent file changes.
+
+**Resonance memory (QAIS)** — Not keyword search. Hyperdimensional vector matching that finds what's *relevant*, not just what contains your search terms.
+
+**A control panel** — Visual dashboard for managing entities, browsing doctrine, running spectral searches.
+
+---
+
+### How It Works
+
+BOND runs a local daemon that reads your files, derives system state, and delivers it to Claude through MCP servers. Claude gets everything it needs in one payload — no re-reading files every session.
 
 ```
-L0  SKILL.md + BOND_MASTER     ← Identity + constitutional doctrine
-L1  OPS / Entity files          ← Operational state
-L2  Code                        ← Source of truth (code > prose)
+You <-> Claude <-> MCP servers <-> BOND daemon <-> Your files on disk
 ```
 
-Entities are contexts, not databases. Each entity has a class that determines which tools it can access. Tool authorization is enforced at the Express API layer — forbidden calls return 403 before execution.
+Your data never leaves your machine. The daemon is the engine; Claude is the operator.
 
-## Novel Components
+---
 
-- **HDC Resonance Memory (QAIS)** — 4096-dimensional binary vectors with superposition-based storage and dot-product retrieval
-- **Psycholinguistic Force Classification (ISS/ROSETTA)** — text analysis grounded in Pennebaker's linguistic dimensions
-- **Spectral Text Retrieval (SLA/SPECTRA)** — IDF-weighted spectral fingerprints for paragraph-level addressing
-- **Capability-Scoped Entities** — four-class architecture with runtime enforcement, not just policy
+## Under the Hood
 
-## The Protocol
+*For the technically curious.*
 
-BOND is a protocol, not just software. The rules matter more than the implementation:
+### Architecture
+
+```
+L0  SKILL.md + BOND_MASTER     <- Identity + constitutional doctrine
+L1  OPS / Entity files          <- Operational state per entity
+L2  Code                        <- Source of truth (code > prose)
+```
+
+The daemon (`bond_search.py`) consolidates file reads server-side and delivers assembled payloads through composite endpoints. This is a deliberate design constraint — MCP direct reads cost N tool calls for N files, each landing fully in Claude's context window. The daemon does the same work in one call.
+
+### Entity System
+
+Four classes, each with scoped capabilities:
+
+| Class | Purpose | Examples |
+|-------|---------|---------|
+| Doctrine | Constitutional authority | BOND_MASTER, system rules |
+| Project | Active work streams | Your codebase, your strategy |
+| Perspective | Consulting viewpoints | Named advisors with their own memory |
+| Library | Reference material | Style guides, domain knowledge |
+
+Entities carry `entity.json` (identity), state files (handoff, active status, session chunks), and class-specific content. Tool authorization is enforced at the API layer.
+
+### Novel Components
+
+**QAIS (Quantum-Aligned Identity Substrate)** — 4096-dimensional binary hypervectors with superposition-based storage. Resonance matching via dot-product retrieval. Perspective-isolated fields for tight associative recall.
+
+**ISS (Integrated Semantic Scoring)** — Semantic force measurement: mechanistic (G), prescriptive (P), coherence (E) forces plus residual analysis. Evolved limbic perception genome for salience gating.
+
+**SLA/SPECTRA** — Spectral Lexical Addressing for deterministic paragraph-level text retrieval using IDF-weighted spectral fingerprints.
+
+**Vine Growth Model** — Perspectives grow through seed collection, resonance testing, and pruning. Armed seeders create non-optional obligations that the daemon tracks.
+
+### The Protocol
+
+BOND is a protocol, not just software:
 
 - **Derive, not store.** Redundant state is debt.
-- **Armed = Obligated.** If a subsystem is armed, its governing command must service it. No silent skips.
-- **Both agree.** No unilateral writes. Proof required.
+- **Armed = Obligated.** If a subsystem is armed, its governing command must service it.
+- **Both agree.** No unilateral writes.
 - **Code > Prose.** When they conflict, code wins.
-- **Counter is king.** The counter is the heartbeat. Claude's grounding degrades over conversation length — the counter tracks freshness and tells you when to sync. Ignore it and BOND drifts. **[Read why →](docs/COUNTER.md)**
 
-## Built By
+### Directory Layout
 
-J-Dub and Claude. 100+ sessions. No team.
+```
+BOND/
+  SKILL.md                    <- Runtime identity for Claude
+  search_daemon/              <- Python daemon (main line)
+  QAIS/                       <- Resonance memory MCP server
+  ISS/                        <- Semantic scoring MCP server
+  doctrine/                   <- Entity directories
+    BOND_MASTER/              <- Constitutional authority
+    PROJECT_MASTER/           <- Project template
+    [your entities]/          <- Your work lives here
+  data/                       <- QAIS fields, perspective .npz
+  state/                      <- Config, active entity, heatmap
+  handoffs/                   <- Session handoff archive
+  templates/                  <- Entity/project starter kits
+  panel/                      <- React dashboard (optional)
+  bridge/                     <- AHK clipboard bridge (optional)
+```
 
-## License
+### Platform
 
-MIT
+Full BOND (panel + clipboard bridge + counter) currently requires **Windows 10/11**. The core architecture (Python daemon, MCP servers, entity system) is cross-platform. Community contributors are welcome to build platform-native tooling for macOS/Linux.
+
+---
+
+Built by J-Dub and Claude. 130+ sessions. No team.
+
+MIT License

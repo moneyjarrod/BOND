@@ -1,4 +1,4 @@
-# BOND Entities — Four-Class Architecture (B69)
+# BOND Entities — Four-Class Architecture
 
 ## The Four Classes
 
@@ -13,7 +13,7 @@
 
 All entity classes have access to all BOND tools: filesystem, QAIS, ISS, heatmap, crystal, and daemon. Tools are universal. **Class shapes how Claude thinks inside an entity, not which tools are available.**
 
-The daemon bridge (daemon_fetch) routes all capabilities through a single gateway. Per-tool gating is obsolete — it was scaffolding for when each tool was a separate pipe. Now there's one main, and the protocol governs behavior.
+All capabilities route through a single gateway. Per-tool gating is obsolete — it was scaffolding for when each tool was a separate pipe. Now there's one main, and the protocol governs behavior.
 
 What differentiates classes is *identity and behavior*, not tool locks:
 - Doctrine entities don't grow — not because seed tools are blocked, but because doctrine IS immutable.
@@ -27,31 +27,28 @@ What differentiates classes is *identity and behavior*, not tool locks:
 - IS: Self-auditable. ISS validates code against IS statements.
 - IS: Operationally aware. Crystal preserves session state. QAIS stores conversation memory. Heatmap tracks warm concepts. None of these change IS statements — they give the entity memory of what happened.
 - IS NOT: Growable. Doctrine doesn't learn — it defines. No seeding, no vine lifecycle, no seed collection.
-- Example: BOND_MASTER, Calendar Master, ROSETTA.
+- Example: BOND_MASTER, user-created doctrine entities.
 
 ### Project
 - IS: A bounded workspace with a mission.
 - IS: Governed by a CORE file (~500 tokens) that defines boundaries.
 - IS NOT: Open-ended. CORE constrains scope.
 - CORE file: Loaded once, refreshed on {Sync}. Counter cycle IS the refresh timer.
-- Example: GSG (Gnome Sweet Gnome).
 
 ### Perspective
 - IS: An unbounded knowledge domain that grows through conversation.
 - IS: Free to accumulate seeds, crystals, and connections.
-- IS: Narratively continuous. Each perspective maintains a local QAIS field (`data/perspectives/{entity}.npz`) that accumulates context independently of the global field.
+- IS: Narratively continuous. Each perspective maintains a local QAIS field that accumulates context independently of the global field.
 - IS: The only class with vine lifecycle. Seeding, pruning, rain, superposition — these are perspective identity, not tool grants.
 - IS NOT: Policed. Growth shouldn't be validated against fixed rules. ISS is available but Claude exercises judgment about when audit-style analysis serves a perspective's nature.
 - IS NOT: Globally entangled. Perspective fields are isolated from the global QAIS field.
-- Local Field: Two .npz files per perspective, created automatically. Seed field (`{entity}.npz`) for vine lifecycle. Crystal field (`{entity}_crystal.npz`) for narrative continuity. Entity Warm Restore queries crystal field. Global Warm Restore does not touch perspective fields. Exclusive routing: perspective active → crystal writes local only (S116).
+- Local Field: Two .npz files per perspective, created automatically. Seed field for vine lifecycle. Crystal field for narrative continuity. Entity Warm Restore queries crystal field. Global Warm Restore does not touch perspective fields. Exclusive routing: perspective active → crystal writes local only.
 - Field Isolation: Perspective fields are independent. Linked perspectives share seed resonance through the vine lifecycle but do not access each other's local fields.
-- Example: User-created perspectives (P11+).
 
 ### Library
 - IS: A reference shelf. Static knowledge for lookup.
 - IS: The simplest class in behavior, not in capability.
 - IS NOT: A session workspace. Libraries don't accumulate chunks, handoffs, or session state. They're consulted, not inhabited.
-- Example: Reference documents, archives.
 
 ## Class Behavior, Not Tool Locks
 
@@ -81,15 +78,6 @@ Links load .md files during {Sync} and create context for interaction. All class
 
 Cross-class links carry context, not tool grants. A doctrine entity linking to a perspective loads that perspective's .md files for reference — it doesn't adopt the perspective's growth behavior.
 
-## Link Badges (S118)
-
-Two distinct visual signals on entity cards:
-
-- **Blue LINKED** — Entity is actively loaded as context in the current session. Appears when the active entity's links array includes this entity. Session-level, temporary.
-- **Purple 🔗 N** — Same-class peer references only. Counts how many entities of the SAME class permanently link to this entity in their entity.json. Cross-class links do NOT count toward the purple badge.
-
-Purple = "peers referencing you." Blue = "active in this session."
-
 ## Entity Structure
 
 Every entity lives in `doctrine/ENTITY_NAME/` and contains:
@@ -108,14 +96,14 @@ Every entity lives in `doctrine/ENTITY_NAME/` and contains:
 }
 ```
 
-- Panel writes on Enter, clears on Exit.
+- Written on {Enter}, cleared on {Exit}.
 - {Sync} follows the pointer — reads path if set, skips if null.
 - Switch overwrites — no Exit needed before Enter.
 
 ## Naming
 
 - Doctrine/Project: Descriptive names (BOND_MASTER, CM)
-- Perspectives: User-created (P11+ for J-Dub's instance, new installs start at P1)
+- Perspectives: User-created (new installs start at P1, number increments)
 - Library: Descriptive names
 - Files within: `[ENTITY]_[topic].md` pattern
 

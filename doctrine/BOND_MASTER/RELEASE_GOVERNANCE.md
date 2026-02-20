@@ -1,9 +1,7 @@
 # RELEASE_GOVERNANCE
 ## BOND Versioning & Release Standards
 
-**Authority:** BOND_MASTER  
-**Version:** 1.0  
-**Effective:** 2026-02-12
+**Authority:** BOND_MASTER
 
 ---
 
@@ -14,7 +12,7 @@ BOND 1.0.0 is the first stable release. It represents a commitment:
 - **The install works.** One command, panel opens. No tricks, no jargon.
 - **The framework is functional.** Doctrine entities load, the panel renders, modules connect, QAIS and ISS respond, {Sync} initializes.
 - **The skill file is complete.** A user can add SKILL.md to a Claude Project and begin working with BOND immediately.
-- **The public API is defined.** Entity structure, command syntax, counter protocol, and MCP tool interfaces are stable. Users can build on them without fear of breakage.
+- **The public API is defined.** Entity structure, command syntax, counter protocol, and tool interfaces are stable. Users can build on them without fear of breakage.
 
 ### What 1.0 Does NOT Mean
 
@@ -37,9 +35,9 @@ BOND follows [Semantic Versioning](https://semver.org/): **MAJOR.MINOR.PATCH**
 ### Rules
 
 1. **PATCH releases** ship silently. Users benefit automatically on next `git pull`.
-2. **MINOR releases** are announced in the changelog and optionally in the panel.
+2. **MINOR releases** are announced in the changelog.
 3. **MAJOR releases** require migration guidance. No one gets left behind without instructions.
-4. Version number is tracked in `package.json` and displayed in the panel header.
+4. Version number is tracked in `package.json`.
 
 ---
 
@@ -58,22 +56,9 @@ BOND maintains a `CHANGELOG.md` in the repository root following the [Keep a Cha
 | **Deprecated** | Features marked for future removal |
 | **Security** | Vulnerability patches |
 
-### Format
-
-```markdown
-## [1.1.0] - 2026-XX-XX
-
-### Added
-- Project creation wizard in panel
-- Auto-detect existing BOND installs
-
-### Fixed
-- Counter emoji not echoing on fresh sessions
-```
-
 ### Principles
 
-- **Write for humans.** Not commit hashes. Not PR numbers. Plain language that a structural engineer or a writer can understand.
+- **Write for humans.** Not commit hashes. Not PR numbers. Plain language.
 - **Group by impact.** Breaking changes first, new features second, fixes third.
 - **Date every release.** Format: YYYY-MM-DD.
 - **Link versions.** Each version header links to the GitHub comparison view.
@@ -85,14 +70,13 @@ BOND maintains a `CHANGELOG.md` in the repository root following the [Keep a Cha
 ### How Users Learn About Updates
 
 1. **CHANGELOG.md** — The canonical record. Always current, always in the repo root.
-2. **GitHub Releases** — Each tagged version gets a GitHub Release with the changelog entry copied in. This shows on the repo's main page.
-3. **Panel notification** (future) — A subtle indicator in the panel header when a new version is available. Non-intrusive. No popups.
-4. **README badge** — Version badge at the top of README showing current stable version.
+2. **GitHub Releases** — Each tagged version gets a GitHub Release with the changelog entry.
+3. **README badge** — Version badge at the top of README showing current stable version.
 
 ### How Users Update
 
-```powershell
-cd C:\BOND
+```
+cd <BOND_ROOT>
 git pull
 cd panel
 npm install
@@ -113,17 +97,16 @@ Before tagging any release:
 - [ ] {Sync} initializes successfully
 - [ ] Skill file reflects any new commands or changes
 - [ ] GitHub Release created with changelog entry
-- [ ] README version badge updated (if applicable)
 
 ---
 
-## The J-Dub Standard
+## The Usability Standard
 
 > Intelligence isn't the blocker. It's: do I have the real estate mentally to just go on here and it makes sense.
 
 Every release, every update, every communication passes through this filter:
 
-- **Would someone without Git real estate understand what changed?**
+- **Would someone without Git experience understand what changed?**
 - **Would someone without file-handling experience know what to do?**
 - **Does the update path require zero new knowledge?**
 
@@ -131,15 +114,13 @@ If the answer to any of these is "no," the release isn't ready.
 
 ---
 
-## In-Panel Help
+## In-App Help
 
-BOND includes a Help button in the panel that opens a Getting Started guide directly in the interface. Users never need to leave the panel to learn how BOND works.
+BOND includes a Help function that provides a Getting Started guide directly in the interface. Users never need to leave the application to learn how BOND works.
 
 The guide covers:
 - What BOND is (one paragraph)
-- What they're looking at (panel layout)
+- What they're looking at (layout overview)
 - How to start working (type {Sync})
 - How to update (git pull or re-run installer)
 - Where to get help (GitHub Issues)
-
-This guide lives at `docs/GETTING_STARTED.md` and is rendered in-panel via the Help button.

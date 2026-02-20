@@ -46,6 +46,8 @@ File Ops Endpoints (Cold Water — verbatim, no processing):
 Composite Payloads (Data Assembly Layer — one call replaces many):
     GET  /sync-complete                        # {Sync} steps 1-5 (no vine scores)
     POST /sync-complete {"text": "...", "session": "S124"}  # steps 1-5 + vine scores + tracker writes
+    # D11: sync-complete includes state/handoff.md content
+    # D12: linked entities return entity.json identity only (tier 1)
     GET  /sync-payload                         # legacy: entity, config, files, links, seeders
     GET  /enter-payload?entity=BOND_MASTER     # {Enter} in one call: entity files + linked files
     GET  /vine-data?perspective=P11-Plumber    # vine lifecycle: tracker, roots, seeds, pruned
@@ -1851,10 +1853,15 @@ class PayloadAssembler:
         
         Returns everything Claude needs:
           - Active entity + config (step 2-3)
-          - Entity files + linked files (step 3-4)
+          - Entity files (full) + linked identities (entity.json only) (step 3-4)
           - Armed seeders + vine resonance scores (step 5)
           - Seed trackers for each armed perspective
+          - Handoff content from state/handoff.md (D11)
           - Capability manifest
+        
+        D11: Handoff carried in payload (no separate file read needed).
+        D12: Linked entities return entity.json identity only (tier 1).
+             Full linked content available via /enter-payload (tier 3).
         
         If conversation_text provided, scores against all armed perspectives.
         If not, returns armed list without scores (Claude can score later).
@@ -1867,13 +1874,17 @@ class PayloadAssembler:
         config = self._read_json(self.state_path / 'config.json') or {}
 
         entity_files = {}
-        linked_files = {}
+        linked_identities = {}  # D12: tiered loading — identity only
         links = []
         if entity_name:
             entity_files = self._entity_files(entity_name)
             links = self._linked_entities(entity_name)
+            # D12: linked entities get entity.json only (tier 1: identity)
+            # Full content available via /enter-payload (tier 3: full)
             for linked_name in links:
-                linked_files[linked_name] = self._entity_files(linked_name)
+                identity = self._read_json(self.doctrine_path / linked_name / 'entity.json')
+                if identity:
+                    linked_identities[linked_name] = identity
 
         # Step 5: armed seeders + vine data
         armed = self._armed_seeders()
@@ -1903,18 +1914,26 @@ class PayloadAssembler:
                 v['resonance'] = None
             vine[p_name] = v
 
+        # D11: Sync carries handoff (entity-local state, then global fallback)
+        handoff = None
+        if entity_name:
+            handoff = self._read_file(self.doctrine_path / entity_name / 'state' / 'handoff.md')
+        if handoff is None:
+            handoff = self._read_file(self.state_path / 'handoff.md')
+
         return {
             'active_entity': entity_name,
             'active_class': entity_class,
             'config': config,
             'entity_files': entity_files,
             'links': links,
-            'linked_files': linked_files,
+            'linked_identities': linked_identities,  # D12: entity.json only
             'armed_seeders': armed,
             'vine': vine,
+            'handoff': handoff,
             'heatmap': daemon_heatmap.for_chunk(),
             'capabilities': self.CAPABILITIES,
-            'daemon_version': '2.3.0',
+            'daemon_version': '3.0.0',
         }
 
     def sync_payload(self):

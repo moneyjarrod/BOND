@@ -1,35 +1,38 @@
-# BOND .gitignore
-# Data files (needed locally for MCP servers, not for public repo)
-
-# QAIS field data (personal bindings)
-qais_field.npz
-
-# ISS trained projections and genomes
-ISS/iss_projections.npz
-ISS/iss_projections_st.npz
-ISS/limbic_genome.json
-ISS/limbic_genome_10d.json
+# BOND v2 .gitignore
 
 # Python cache
 __pycache__/
 *.pyc
 
-# Empty directories left from cleanup
-archives/
-experiments/
-artifacts/
-Python/
-User Scripts/
+# Node
+node_modules/
 
-# Doctrine: track framework entities, ignore personal/user-created entities
+# Personal data (entities, perspectives, handoffs)
 /doctrine/*
 !/doctrine/BOND_MASTER/
 !/doctrine/PROJECT_MASTER/
-!/doctrine/P11-Plumber/
 
-# State: auto-generated at runtime
-/state/
+# Personal QAIS/perspective data
+/data/perspectives/
+/data/seed_decisions.jsonl
+
+# State (runtime-generated)
+/state/active_entity.json
+/state/heatmap.json
+
+# Installer artifacts (personal)
+/installer/v1_backup/
+/installer/transfer_report.md
+/installer/output/
+
+# Session handoffs (personal)
+/handoffs/
 
 # OS files
 .DS_Store
 Thumbs.db
+
+# Empty legacy directories
+archives/
+experiments/
+artifacts/

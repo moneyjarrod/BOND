@@ -8,13 +8,12 @@ state of a living project.
 
 BOND IS:
 - A protocol, not a product. The rules matter more than the implementation.
-- A clipboard bridge between a React panel and Claude via AutoHotkey.
 - A counter system that tracks conversation depth and signals sync needs.
 - An entity system that loads context on demand, not all at once.
 - A save discipline where both operators agree before writing.
 - A truth hierarchy where code outranks prose and prose outranks memory.
 - A framework that derives state rather than storing it redundantly.
-- A search daemon that IS also a read/write utility for file operations within BOND_ROOT. It IS NOT an authority — write discipline remains with the operators.
+- A server-side state layer that reads files, derives system state, and delivers consolidated payloads. It IS NOT an authority — write discipline remains with the operators.
 
 BOND IS NOT:
 - An autonomous agent. Claude acts on human instruction within BOND protocol.
@@ -49,10 +48,11 @@ BOND_MASTER lives at L0 alongside SKILL. It IS the system's self-knowledge.
 4. **Counter is king.** The counter is the heartbeat. If it dies, sync.
 5. **Entities are contexts.** Loading an entity loads its files, not its history.
 6. **Class is identity.** Entity class shapes how Claude thinks inside it — not which tools are available. Tools are universal. Protocol governs behavior. Doctrine doesn't grow because it's immutable, not because tools are locked. Perspectives grow because growth IS their nature.
-7. **Clipboard is bridge.** Panel → clipboard → AHK → Claude. No HTTP polling.
+7. **Communication flows through a bridge.** The bridge is the sole path between the user's interface and Claude. Its implementation is a fixture; the one-way flow direction is the principle.
 8. **Armed = Obligated.** Any subsystem in an armed state creates a non-optional obligation during its governing command. The server generates obligations from state. The governing command services them. {Tick} audits completion. Gaps are surfaced structurally, not self-reported. Prose instructions are documentation; code enforcement is the mechanism.
-9. **New capability = doctrine review.** When a new system is added under BOND_MASTER authority, it must be evaluated against existing doctrine before it is considered complete. Triggers: new MCP tool, new server endpoint, new command keyword, new entity class, new file write behavior, or new cross-boundary mechanism. If the capability introduces a pattern not covered by current IS statements, the doctrine must be updated to cover it. New capabilities that contradict existing doctrine are rejected or the contradiction is resolved explicitly. The constitution cannot be silently outgrown by the system it governs.
+9. **New capability = doctrine review.** When a new system is added under BOND_MASTER authority, it must be evaluated against existing doctrine before it is considered complete. Triggers: new server endpoint, new command keyword, new entity class, new file write behavior, or new cross-boundary mechanism. If the capability introduces a pattern not covered by current IS statements, the doctrine must be updated to cover it. New capabilities that contradict existing doctrine are rejected or the contradiction is resolved explicitly. The constitution cannot be silently outgrown by the system it governs.
 10. **Command recognition is keyword-driven.** Commands are identified by their core keyword inside `{}` braces. Additional words inside or outside the braces are treated as parameters or context, never as command modification. `{Sync}`, `{Project Sync}`, `{Sync} GSG`, and `{Project Sync} GSG` all fire `{Sync}`. The core keyword is authoritative. Known keywords: Sync, Full Restore, Warm Restore, Save, Crystal, Chunk, Tick, Enter, Exit, Relational, Drift, Handoff.
+11. **Identify = Execute.** When Claude identifies a problem, fix it now. The identification IS the authorization for execution. Exception: destructive changes still require {Save} protocol.
 
 ## Mantra
 

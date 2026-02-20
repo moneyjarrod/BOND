@@ -1,4 +1,4 @@
-# BOND Protocol — Counter, Bridge, Commands
+# BOND Protocol — Counter, Commands, State Routing
 
 ## Counter
 
@@ -7,69 +7,67 @@ The counter tracks conversation depth. It IS the sync timer.
 ### Rules
 - User provides the counter tag: `«tN/L emoji»`
 - Claude echoes the user's tag exactly as first line of every response.
-- Claude does NOT compute the emoji. User display is source of truth.
+- Counter state is authoritative. Claude echoes it, does not compute it.
 - Resets on: {Sync}, {Full Restore}, {Warm Restore}, new conversation.
 - Does NOT reset on: {Save}, {Chunk}, {Handoff}, bonfire, task completion, compaction.
 - Lost count → recommend {Sync}.
 
-### Emoji Thresholds (computed by AHK, not Claude)
-- 🗒️ = N ≤ LIMIT (normal)
-- 🟡 = N > LIMIT (sync recommended)
-- 🟠 = N ≥ 15 (sync urged)
-- 🔴 = N ≥ 20 (sync critical)
+### Urgency Thresholds
+The counter has escalating urgency levels. Normal → sync recommended → sync urged → sync critical. Threshold boundaries and display implementation are fixture-level — the protocol requires only that escalation exists and that Claude recognizes urgency signals from the counter tag.
 
 ### Config
-- `counter_limit` lives in GSG_OPS.md CONFIG section.
+- `counter_limit` lives in the operational config file.
 - Default: 10.
 - QAIS backup: `CONFIG|counter_limit|10`.
-
-## Bridge Architecture
-
-### Flow
-```
-Panel Button → clipboard write → AHK monitor → keystroke injection → Claude
-Claude response → user reads → panel state updated via API
-```
-
-### Implementation
-- Panel writes `BOND:command:args` to clipboard.
-- AHK (BOND_v8.ahk) monitors clipboard, parses BOND: prefix.
-- AHK types the command into the active Claude window.
-- No HTTP polling. No websockets. Clipboard is the bridge.
-
-### Why Clipboard
-- HTTP polling caused 500ms lag spikes (discovered S81).
-- Clipboard is event-driven, zero polling overhead.
-- AHK already runs for counter — no new dependency.
 
 ## Entity Voice Rule
 
 If Claude speaks *as* an entity — using its stance, ROOTs, or perspective lens — that entity MUST be the active entity on disc (`state/active_entity.json`). No ghost entries. No invisible consultations.
 
 Protocol:
-1. {Enter ENTITY} — write to active_entity.json, panel reflects it
+1. {Enter ENTITY} — write to active_entity.json
 2. Speak as that entity
-3. {Exit} or {Enter OTHER} when done — panel updates accordingly
+3. {Exit} or {Enter OTHER} when done
 
 Reading an entity's files for reference (without adopting its voice) does NOT require entry. The rule triggers when Claude adopts the entity's stance and speaks from it.
 
-The panel should always reflect who is actually talking.
+System state should always reflect who is actually talking.
 
 ## Local State Routing
 
 All session state commands ({Chunk}, {Handoff}, {Tick}) write to the active entity's local `state/` subdirectory, not global `state/`. This applies to ALL entity classes.
 
+### Routing Rule
 - **Entity active:** write to `doctrine/{entity}/state/`
 - **No entity active:** write to global `state/`
 - **Auto-create:** `state/` subdirectory created on first write
-- **Always global:** `active_entity.json`, `config.json`
-- **Warm/Full Restore:** reads from entity-local state, never cross-entity
 
-Full specification: `LOCAL_STATE_ROUTING.md`
+### What Routes Locally
+
+| Command | Output File | Entity Active | No Entity |
+|---------|------------|---------------|-----------|
+| {Chunk} | session_chunks.md | `doctrine/{entity}/state/` | `state/` |
+| {Handoff} | handoff.md | `doctrine/{entity}/state/` | `state/` |
+| {Tick} | tick_output.md | `doctrine/{entity}/state/` | `state/` |
+| {Crystal} | QAIS crystal field | Already local ✓ | Global field |
+| {Save} | Target file(s) | Entity's own directory | As specified |
+
+### What Stays Global
+
+| File | Reason |
+|------|--------|
+| `state/active_entity.json` | Pointer TO the entity — must be accessible before entity is known |
+| `state/config.json` | User preferences — not entity content |
+
+### Restore Scoping
+- **Warm/Full Restore:** reads from active entity's local state, never cross-entity.
+- **Entity active:** reads `doctrine/{entity}/state/handoff.md` and `session_chunks.md`
+- **No entity:** reads global `state/` equivalents
+- **Cross-entity:** NEVER. In GSG, you don't see P11's handoff. In P11, you don't see GSG's chunks.
 
 ## Hook Recognition
 
-If a library-class entity with positional hooks (BUILD_HOOKS, AUDIT_HOOKS, WORKFLOW_HOOKS) is linked to the active entity, Claude reads the hook files at workflow entry and honors positional triggers:
+If a library-class entity with positional hooks is linked to the active entity, Claude reads the hook files at workflow entry and honors positional triggers:
 
 - **Pre-Build** hooks fire before any file creation or modification.
 - **Post-Build** hooks fire after changes are written, before the session moves on.
@@ -89,13 +87,13 @@ Hooks are subordinate to BOND_MASTER doctrine. They augment, never override.
 | {Handoff} | Draft session handoff sections | No |
 | {Save} | Write proven work (both agree) | No |
 | {Crystal} | QAIS crystallization | No |
-| {Chunk} | Session snapshot → appends to state/session_chunks.md | No |
+| {Chunk} | Session snapshot → appends to entity-local state/session_chunks.md | No |
 | {Tick} | Quick status | No |
 | {Enter ENTITY} | Load entity files, apply class boundaries | No |
 | {Exit} | Clear active entity, drop boundaries | No |
 | {Relational} | Architecture re-anchor | No |
 | {Drift?} | Self-check | No |
-| {Consult ENTITY} | Read-only lens — load entity ROOTs/docs, speak through lens, no entity switch | No |
+| {Consult ENTITY} | Read-only lens — load entity docs, speak through lens, no entity switch | No |
 
 ## Command Recognition
 
@@ -107,15 +105,7 @@ Commands are parsed by **core keyword**, not exact string match. When Claude enc
 4. All other words (inside or outside braces) are treated as **parameters** — entity names, project context, descriptors.
 5. Multiple commands in one message are processed left-to-right.
 
-**Examples:**
-- `{Sync}` → fires Sync
-- `{Sync} GSG` → fires Sync, "GSG" is context
-- `{Project Sync} GSG` → fires Sync, "Project" and "GSG" are context
-- `{Project Chunk} GSG{Project Sync} GSG` → fires Chunk then Sync
-- `{Enter BOND_MASTER}` → fires Enter, "BOND_MASTER" is the entity parameter
-
 **Case insensitive.** `{sync}`, `{SYNC}`, `{Sync}` all match.
-
 **Unknown keywords are ignored.** `{Thoughts on dinner}` does not fire any command.
 
 ## Sync Protocol
@@ -124,7 +114,7 @@ Commands are parsed by **core keyword**, not exact string match. When Claude enc
 1. Project SKILL.md
 2. OPS/MASTER state file
 3. state/active_entity.json — if entity set, read all files at path; if null, skip
-4. Seed check — **Gate: read armed_seeders from /sync-payload or scan entity.json files. If armed_seeders = 0, skip entirely — no vine pass, no exposure increment, no tracker writes.** For each armed perspective, collect seed file titles and run `qais_passthrough` against recent conversation context. Report any hits. Disarmed perspectives are invisible to {Sync}.
+4. Vine lifecycle — **Gate: if armed_seeders = 0, skip entirely.** Armed seeders trigger the vine pass (see VINE_GROWTH_MODEL). Disarmed perspectives are invisible to {Sync}.
 5. Reset counter
 
 {Full Restore} = {Sync} + full depth read of all referenced files + bond_gate(trigger="restore").
@@ -144,9 +134,31 @@ Save writes to the appropriate layer:
 
 Bug-to-fix link format: Symptom + Fix + Link.
 
+## Write Classification
+
+Not all writes require Save protocol. Classification by impact:
+
+- **Non-persistent** — context-only reasoning, no file touch. No protocol needed.
+- **Corrective** — fixing a wrong path, typo, config error where the intended state is unambiguous. Identify=Execute applies. Fix now.
+- **Constructive** — new content, new files, structural changes. Save protocol. Both agree.
+- **Destructive** — file deletion, content removal, entity reclassification. Save protocol. Both agree. Proof required.
+
+When in doubt, treat as constructive. The save gate costs one exchange. A bad write costs a recovery session.
+
+## Conflict Resolution
+
+When sources conflict across layers, resolve by conflict type:
+
+| Conflict Type | Resolution | Example |
+|---|---|---|
+| Code vs prose | Code wins (unless code is a proven bug) | Implementation differs from .md description → update prose |
+| CORE vs doctrine (project-internal) | CORE wins (B4 sovereignty) | Project defines its own naming convention |
+| CORE vs doctrine (constitutional) | Doctrine wins (B1-B3) | CORE cannot grant itself tools outside class matrix |
+| Code vs doctrine | If code is correct behavior → update prose. If code violates constitutional rule → code is bug → fix code | |
+
 ## Chunk Persistence
 
-{Chunk} writes a timestamped snapshot to `state/session_chunks.md` (append-only). Each entry is a concise summary (10-20 lines) of work completed, decisions made, and open threads at that point in the session.
+{Chunk} writes a timestamped snapshot to entity-local `state/session_chunks.md` (append-only). Each entry is a concise summary (10-20 lines) of work completed, decisions made, and open threads at that point in the session.
 
 Chunks are **ingredients for {Handoff}**, not standalone artifacts. They serve two purposes:
 1. **Compaction insurance** — if context is lost mid-session, chunks on disc carry what was lost.
@@ -164,22 +176,12 @@ Chunk format:
 {Handoff} always **reads before it writes**. One file per session, auto-combining.
 
 1. Check for existing `handoffs/HANDOFF_S{N}.md` for this session.
-2. Check `state/session_chunks.md` for accumulated chunks.
+2. Check entity-local `state/session_chunks.md` for accumulated chunks.
 3. Synthesize: previous handoff content + new chunks + current context → structured sections (WORK, DECISIONS, THREADS, FILES).
 4. Write to `handoffs/HANDOFF_S{N}.md` (overwrite if exists).
-5. Clear `state/session_chunks.md`.
+5. Clear entity-local `state/session_chunks.md`.
 
 Consecutive {Handoff} calls in the same session automatically combine. Each write is richer than the last. The final write is always the most complete — no "mid" or "final" labels needed.
-
-```
-{Chunk} t3  → session_chunks.md
-{Chunk} t7  → session_chunks.md
-{Handoff} t10 → reads chunks → writes HANDOFF_S119.md → clears chunks
-{Chunk} t14 → session_chunks.md
-{Handoff} t20 → reads HANDOFF_S119.md + chunks → overwrites HANDOFF_S119.md → clears chunks
-```
-
-{Warm Restore} Layer 1 picks up the one file. Everything synthesized. Nothing lost.
 
 ## Consult Protocol
 
@@ -204,4 +206,6 @@ Consecutive {Handoff} calls in the same session automatically combine. Each writ
 
 Consult is **one-shot by default**. The lens applies to the current response only. Call again for another consultation. For sustained work through a perspective, use {Enter} instead.
 
-**Panel integration:** Consult button appears on active project cards. Dropdown populated from `GET /api/state/consultable` — returns linked perspectives and doctrine. Selection copies `BOND:{Consult ENTITY}` to clipboard for AHK bridge.
+## Mantra
+
+"The protocol IS the product."

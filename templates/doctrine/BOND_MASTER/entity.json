@@ -1,0 +1,8 @@
+{
+  "class": "doctrine",
+  "display_name": "BOND Master",
+  "public": true,
+  "links": [
+    "PROJECT_MASTER"
+  ]
+}

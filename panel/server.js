@@ -77,8 +77,6 @@ const FRAMEWORK_ENTITIES = {
       class: 'doctrine',
       display_name: 'BOND Master',
       public: true,
-      tools: { filesystem: true, iss: true, qais: true, heatmap: true, crystal: true },
-      links: [],
     },
     files: {
       'BOND_MASTER.md': `# BOND Master — Constitutional Authority
@@ -113,8 +111,6 @@ BOND_MASTER IS NOT:
       class: 'doctrine',
       display_name: 'Project Master',
       public: true,
-      tools: { filesystem: true, iss: true, qais: true, heatmap: true, crystal: true },
-      links: [],
     },
     files: {},
   },
@@ -132,13 +128,16 @@ async function bootstrapFrameworkEntities() {
     await mkdir(entityPath, { recursive: true });
 
     const configPath = join(entityPath, 'entity.json');
-    let existing = {};
+    let existing = null;
     try { existing = JSON.parse(await readFile(configPath, 'utf-8')); } catch {}
-    const merged = {
-      ...def.config,
-      links: [...new Set([...(def.config.links || []), ...(existing.links || [])])],
-    };
-    await verifiedWrite(configPath, JSON.stringify(merged, null, 2) + '\n', `bootstrap:${name}/entity.json`);
+    if (existing) {
+      // Existing config is source of truth — only fill missing fields from bootstrap
+      const merged = { ...def.config, ...existing };
+      await verifiedWrite(configPath, JSON.stringify(merged, null, 2) + '\n', `bootstrap:${name}/entity.json`);
+    } else {
+      // Fresh install — use bootstrap config
+      await verifiedWrite(configPath, JSON.stringify(def.config, null, 2) + '\n', `bootstrap:${name}/entity.json`);
+    }
 
     for (const [filename, content] of Object.entries(def.files)) {
       const filePath = join(entityPath, filename);
@@ -166,13 +165,8 @@ async function bootstrapFrameworkEntities() {
 
 }
 
-// S121: Tools universal. Class shapes behavior, not tool access.
-const CLASS_TOOLS = {
-  doctrine:    { filesystem: true, iss: true,  qais: true,  heatmap: true,  crystal: true },
-  project:     { filesystem: true, iss: true,  qais: true,  heatmap: true,  crystal: true },
-  perspective: { filesystem: true, iss: true,  qais: true,  heatmap: true,  crystal: true },
-  library:     { filesystem: true, iss: true,  qais: true,  heatmap: true,  crystal: true },
-};
+// S121 + S130: Tools universal. All tools available to all classes.
+const UNIVERSAL_TOOLS = { filesystem: true, iss: true, qais: true, heatmap: true, crystal: true };
 
 // S121: All classes can link to all classes. Tool incompatibility no longer restricts.
 const CLASS_LINK_MATRIX = {
@@ -182,34 +176,7 @@ const CLASS_LINK_MATRIX = {
   library:     ['doctrine', 'project', 'perspective', 'library'],
 };
 
-const TOOL_CAPABILITY = {
-  iss_analyze: 'iss', iss_compare: 'iss', iss_limbic: 'iss', iss_status: 'iss',
-  qais_resonate: 'qais', qais_exists: 'qais', qais_store: 'qais',
-  qais_stats: 'qais', qais_get: 'qais', qais_passthrough: 'qais',
-  heatmap_touch: 'heatmap', heatmap_hot: 'heatmap',
-  heatmap_chunk: 'heatmap', heatmap_clear: 'heatmap',
-  crystal: 'crystal', bond_gate: 'crystal',
-};
-
-async function validateToolCall(toolName) {
-  try {
-    const raw = await readFile(join(STATE_PATH, 'active_entity.json'), 'utf-8');
-    const state = JSON.parse(raw);
-    if (!state.entity || !state.class) return { allowed: true };
-    const capability = TOOL_CAPABILITY[toolName];
-    if (!capability) return { allowed: true };
-    const allowed = CLASS_TOOLS[state.class] || CLASS_TOOLS.library;
-    if (allowed[capability]) return { allowed: true };
-    return {
-      allowed: false,
-      error: {
-        blocked: true, tool: toolName, capability,
-        entity: state.entity, entity_class: state.class,
-        reason: `Tool '${toolName}' requires '${capability}' capability, which is not permitted for ${state.class}-class entity '${state.entity}'.`,
-      }
-    };
-  } catch { return { allowed: true }; }
-}
+// S130: Tool gating removed. All tools universal per BOND_ENTITIES doctrine.
 
 // ─── Doctrine Filesystem API ──────────────────────────────
 
@@ -227,7 +194,7 @@ app.get('/api/doctrine', async (req, res) => {
         const configRaw = await readFile(join(entityPath, 'entity.json'), 'utf-8');
         entityConfig = JSON.parse(configRaw);
       } catch {
-        entityConfig = { class: entry.name.startsWith('_') ? 'library' : /^P\d/.test(entry.name) ? 'perspective' : 'doctrine', tools: {} };
+        entityConfig = { class: entry.name.startsWith('_') ? 'library' : /^P\d/.test(entry.name) ? 'perspective' : 'doctrine' };
       }
       const pruned = mdFiles.filter(f => f.match(/^G-pruned-|^G-/));
       const roots = mdFiles.filter(f => f.startsWith('ROOT-'));
@@ -247,10 +214,7 @@ app.get('/api/doctrine', async (req, res) => {
           tracker = { seed_count: entries.length, total_exposures: totalExposures, total_hits: totalHits, max_exposure: maxExposure, prune_window: pruneWindow, at_risk: atRisk };
         } catch {}
       }
-      const defaults = CLASS_TOOLS[type] || CLASS_TOOLS.library;
-      const tools = { ...defaults, ...(entityConfig.tools || {}) };
-      const allowed = CLASS_TOOLS[type] || {};
-      for (const key of Object.keys(tools)) { if (allowed[key] === false) tools[key] = false; }
+      const tools = { ...UNIVERSAL_TOOLS };
       entities.push({
         name: entry.name, display_name: entityConfig.display_name || null, files: mdFiles, type, tools,
         core: entityConfig.core || null, seeding: type === 'perspective' ? !!entityConfig.seeding : undefined,
@@ -340,26 +304,7 @@ app.get('/api/seeders', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
-app.put('/api/doctrine/:entity/tools', async (req, res) => {
-  try {
-    if (FRAMEWORK_ENTITY_NAMES.includes(req.params.entity)) return res.status(403).json({ error: `${req.params.entity} is a framework entity — tools are immutable` });
-    const entityPath = join(DOCTRINE_PATH, req.params.entity);
-    const resolved = resolve(entityPath);
-    if (!resolved.startsWith(resolve(DOCTRINE_PATH))) return res.status(403).json({ error: 'Access denied' });
-    const configPath = join(entityPath, 'entity.json');
-    let config = {};
-    try { config = JSON.parse(await readFile(configPath, 'utf-8')); } catch {}
-    const type = config.class || 'doctrine';
-    const allowed = CLASS_TOOLS[type] || {};
-    const incoming = req.body.tools || {};
-    const tools = { ...(config.tools || {}) };
-    for (const [key, val] of Object.entries(incoming)) { if (allowed[key] !== false) tools[key] = val; }
-    config.tools = tools;
-    await verifiedWrite(configPath, JSON.stringify(config, null, 2) + '\n', `tools:${req.params.entity}`);
-    broadcast({ type: 'tool_toggled', entity: req.params.entity, detail: { entity: req.params.entity, tools }, timestamp: new Date().toISOString() });
-    res.json({ saved: true, tools });
-  } catch (err) { res.status(500).json({ error: err.message }); }
-});
+// S130: PUT /api/doctrine/:entity/tools removed. Tools are universal — no per-entity gating.
 
 app.put('/api/doctrine/:entity/name', async (req, res) => {
   try {
@@ -445,7 +390,7 @@ app.post('/api/doctrine', async (req, res) => {
     if (!resolved.startsWith(resolve(DOCTRINE_PATH))) return res.status(403).json({ error: 'Access denied' });
     try { await stat(entityPath); return res.status(409).json({ error: `Entity '${safeName}' already exists` }); } catch {}
     await mkdir(entityPath, { recursive: true });
-    const config = { class: entityClass };
+    const config = { class: entityClass, display_name: safeName, public: false };
     if (entityClass === 'project') { config.core = 'CORE.md'; config.links = ['PROJECT_MASTER']; }
     if (entityClass === 'perspective') { config.seeding = false; config.seed_threshold = 0.04; config.prune_window = 10; }
     await verifiedWrite(join(entityPath, 'entity.json'), JSON.stringify(config, null, 2) + '\n', `create:${safeName}/entity.json`);
@@ -549,8 +494,6 @@ app.post('/api/mcp/:system/invoke', async (req, res) => {
   const { system } = req.params;
   const { tool, input } = req.body;
   if (!tool) return res.status(400).json({ error: 'tool required' });
-  const auth = await validateToolCall(tool);
-  if (!auth.allowed) { console.log(`⛔ Blocked: ${tool} (${auth.error.reason})`); return res.status(403).json(auth.error); }
   try {
     const { stdout, stderr } = await execFileAsync('python', [MCP_INVOKE_SCRIPT, system, tool, input || ''], { timeout: 15000, cwd: process.cwd() });
     try { res.json(JSON.parse(stdout)); } catch { res.json({ raw: stdout, stderr: stderr || null }); }

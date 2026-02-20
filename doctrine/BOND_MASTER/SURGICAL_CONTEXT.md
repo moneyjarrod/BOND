@@ -17,9 +17,9 @@ Surgical Context Management is a protocol for editing large files without exhaus
 
 ## Why the Composition Check Exists
 
-Step 2 was added after S114 proved the cost of skipping it. The surgical pattern worked perfectly on a single file (private server.js — 17 writeFile swaps completed in sequence). It failed when applied across two copies of the same file with different formatting (private vs public repo). Three turns burned on edit-string mismatches before a full overwrite resolved it in one.
+Step 2 was added after experience proved the cost of skipping it. The surgical pattern worked perfectly on a single file (17 writeFile swaps completed in sequence). It failed when applied across two copies of the same file with different formatting (private vs public repo). Three turns burned on edit-string mismatches before a full overwrite resolved it in one.
 
-The root cause: tool was chosen before material was checked. Plumber's ROOT-know-pipe-composition — cold water pipe and hot water pipe carry the same flow but need different handling based on material.
+The root cause: tool was chosen before material was checked. Know your pipe composition — cold water pipe and hot water pipe carry the same flow but need different handling based on material.
 
 ## Decision Rules
 

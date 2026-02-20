@@ -1,7 +1,6 @@
 # Warm Restore — SLA-Powered Session Retrieval
 
 **Entity Class:** Doctrine (BOND_MASTER)
-**Created:** Session 93
 **Authority:** BOND_MASTER
 **Domain:** Session continuity through selective handoff retrieval
 
@@ -140,7 +139,7 @@ When user invokes {Warm Restore}:
 
 4. **Expand selections:**
    - For each selected section, also load its CONTEXT and STATE siblings
-   - Deduplicate (if CONTEXT from S92 is already selected, don't load twice)
+   - Deduplicate (if CONTEXT from the same handoff is already selected, don't load twice)
 
 5. **Return to Claude:**
    - Ordered by session number (chronological)
@@ -194,18 +193,10 @@ warm_restore.py               ← indexer + query engine (BOND_ROOT level)
 
 ## Integration Points
 
-- **{Save} / Handoff writing:** Claude writes handoffs in the standardized template.
-  The template IS the contract. Deviation breaks indexing.
-- **BOND skill:** {Warm Restore} is defined alongside {Full Restore} in the BOND
-  skill file. Claude reads the command definition and executes the pipeline.
-- **Panel server:** `POST /api/warm-restore` endpoint (server.js, S95). Panel prompts
-  user for optional query, calls endpoint, server runs `warm_restore.py` with
-  `PYTHONIOENCODING=utf-8`, writes formatted output to `state/warm_restore_output.md`.
-  Claude reads the pre-computed file via filesystem MCP — badges already rendered.
-  Panel copies `BOND:{Warm Restore}` to clipboard → AHK bridges to Claude.
-- **Why server-side:** Claude's MCP tools run in a sandboxed environment that cannot
-  execute Python against the local filesystem. The panel server runs on the user's
-  machine where Python has full access to `handoffs/` and `state/`.
+- **Handoff writing:** Claude writes handoffs in the standardized template. The template IS the contract. Deviation breaks indexing.
+- **BOND skill:** {Warm Restore} is defined alongside {Full Restore} in the BOND skill file. Claude reads the command definition and executes the pipeline.
+- **Server-side execution:** The indexer and query engine run server-side where Python has full filesystem access. The retrieval output is written to `state/warm_restore_output.md`. Claude reads the pre-computed result — badges already rendered.
+- **Why server-side:** Claude's tool environment cannot execute Python against the local filesystem. The server runs on the user's machine where Python has full access to `handoffs/` and `state/`.
 
 ## IS Statements
 
@@ -216,3 +207,4 @@ warm_restore.py               ← indexer + query engine (BOND_ROOT level)
 - Warm Restore IS additive to the continuity stack, not a replacement for any layer.
 - Warm Restore IS NOT automatic. User invokes it explicitly.
 - Warm Restore IS NOT a storage mechanism. It consumes handoffs produced by {Save}.
+- Warm Restore resets the counter. It establishes a fresh context baseline like {Sync} and {Full Restore}.

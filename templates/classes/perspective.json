@@ -1,0 +1,8 @@
+{
+  "class": "perspective",
+  "display_name": "",
+  "public": false,
+  "seeding": false,
+  "seed_threshold": 0.04,
+  "prune_window": 10
+}

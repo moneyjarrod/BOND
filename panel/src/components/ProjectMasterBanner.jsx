@@ -215,13 +215,13 @@ export default function ProjectMasterBanner({ entities, allEntities, activeEntit
             {showLinkPicker && (
               <div style={{
                 position: 'absolute',
-                bottom: '100%',
+                top: '100%',
                 left: 0,
-                marginBottom: 6,
+                marginTop: 6,
                 background: '#1e2030',
                 border: '1px solid rgba(180,140,60,0.4)',
                 borderRadius: 'var(--radius-md)',
-                boxShadow: '0 -8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(180,140,60,0.15)',
+                boxShadow: '0 8px 32px rgba(0,0,0,0.6), 0 0 0 1px rgba(180,140,60,0.15)',
                 minWidth: 220,
                 maxHeight: 260,
                 overflowY: 'auto',
