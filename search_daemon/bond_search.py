@@ -10,9 +10,10 @@ Standalone process that:
   - Loads external corpora for SLA v2 retrieval
 
 Usage:
-    python bond_search.py                # start daemon
-    python bond_search.py --port 3004    # custom port
-    python bond_search.py --once "query" # one-shot query, no server
+    python bond_search.py                          # start daemon
+    python bond_search.py --port 3004              # custom port
+    python bond_search.py --root C:/Projects/BOND  # custom BOND_ROOT
+    python bond_search.py --once "query"            # one-shot query, no server
 
 Search Endpoints (Hot Water — SLA pipeline):
     GET /search?q=backflow+prevention          # query the index (auto mode)
@@ -1033,7 +1034,7 @@ class FileOps:
         }
 
 
-file_ops = FileOps(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
+file_ops = None  # initialized in __main__ (after --root parse)
 
 
 # ─── QAIS Resonance (Perspective Vine Scoring) ────────
@@ -1217,8 +1218,7 @@ class PerspectiveReader:
         return results
 
 
-# Initialize reader (available even if numpy missing — graceful degradation)
-perspective_reader = PerspectiveReader(BOND_ROOT)
+perspective_reader = None  # initialized in __main__
 
 
 # ——— Vine Processor (Tracker Bookkeeping) ————————————————
@@ -1350,7 +1350,7 @@ class VineProcessor:
         }
 
 
-vine_processor = VineProcessor(DOCTRINE_PATH)
+vine_processor = None  # initialized in __main__
 
 
 # ─── Session Heat Map (Daemon-Internal) ───────────────────
@@ -1456,7 +1456,7 @@ class DaemonHeatMap:
         return {'cleared': count, 'status': 'reset'}
 
 
-daemon_heatmap = DaemonHeatMap(STATE_PATH)
+daemon_heatmap = None  # initialized in __main__
 
 
 # ─── RepoSync (Private→Public Sync Engine) ────────────────
@@ -1764,7 +1764,7 @@ class RepoSync:
             return {'exists': True, 'entries': 'unknown'}
 
 
-repo_sync = RepoSync(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
+repo_sync = None  # initialized in __main__
 
 
 # ─── Composite Payloads (Data Assembly Layer) ──────────────
@@ -2110,13 +2110,13 @@ class PayloadAssembler:
         }
 
 
-payloads = PayloadAssembler(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
+payloads = None  # initialized in __main__
 
 
 # ─── HTTP Server ───────────────────────────────────────────
 
-index = SearchIndex()
-watcher = FileWatcher(index)
+index = None  # initialized in __main__
+watcher = None  # initialized in __main__
 
 
 class SearchHandler(BaseHTTPRequestHandler):
@@ -2443,6 +2443,24 @@ def write_results_file(results, output_path=None):
 
 
 if __name__ == '__main__':
+    # --root: override BOND_ROOT (default: parent of search_daemon/)
+    if '--root' in sys.argv:
+        ri = sys.argv.index('--root')
+        if ri + 1 < len(sys.argv):
+            BOND_ROOT = sys.argv[ri + 1]
+            DOCTRINE_PATH = os.path.join(BOND_ROOT, 'doctrine')
+            STATE_PATH = os.path.join(BOND_ROOT, 'state')
+
+    # Initialize all objects with (possibly overridden) paths
+    file_ops = FileOps(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
+    perspective_reader = PerspectiveReader(BOND_ROOT)
+    vine_processor = VineProcessor(DOCTRINE_PATH)
+    daemon_heatmap = DaemonHeatMap(STATE_PATH)
+    payloads = PayloadAssembler(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
+    repo_sync = RepoSync(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
+    index = SearchIndex()
+    watcher = FileWatcher(index)
+
     port = DEFAULT_PORT
     if '--port' in sys.argv:
         pi = sys.argv.index('--port')
