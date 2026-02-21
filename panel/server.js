@@ -511,7 +511,7 @@ app.get('/api/modules', async (req, res) => {
 });
 
 app.get('/api/config', (req, res) => {
-  res.json({ doctrine_path: DOCTRINE_PATH, state_path: STATE_PATH, mcp_url: MCP_URL, ws_port: 3001, version: '1.5.0' });
+  res.json({ doctrine_path: DOCTRINE_PATH, state_path: STATE_PATH, mcp_url: MCP_URL, ws_port: 3001, version: versionCache.local || 'unknown' });
 });
 
 const CONFIG_FILE = join(STATE_PATH, 'config.json');
