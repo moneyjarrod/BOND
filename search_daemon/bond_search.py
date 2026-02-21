@@ -76,6 +76,12 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from socketserver import ThreadingMixIn
 from urllib.parse import urlparse, parse_qs, unquote
 
+# D13: PowerShell Execution module
+try:
+    from powershell_exec import PowerShellExecutor
+except ImportError:
+    PowerShellExecutor = None
+
 # ─── Config ────────────────────────────────────────────────
 
 BOND_ROOT = os.environ.get('BOND_ROOT', str(Path(__file__).parent.parent))
@@ -2417,8 +2423,35 @@ class SearchHandler(BaseHTTPRequestHandler):
                 self._json(400, result)
             else:
                 self._json(200, result)
+
+        # ── D13: PowerShell Execution ──
+        elif path == '/exec':
+            if not ps_executor:
+                self._json(500, {'error': 'PowerShell execution module not available'})
+                return
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(length).decode('utf-8'))
+            except Exception as e:
+                self._json(400, {'error': f'Invalid JSON body: {e}'})
+                return
+            card_id = body.get('card_id', '')
+            if not card_id:
+                self._json(400, {'error': 'Missing "card_id" in body'})
+                return
+            result = ps_executor.validate_and_execute(
+                card_id=card_id,
+                dry_run=body.get('dry_run', False),
+                initiator=body.get('initiator', 'user'),
+                params=body.get('params', {}),
+                confirmed=body.get('confirmed', False),
+            )
+            level = result.get('level', 0)
+            status_code = 200 if level < 3 else 403
+            self._json(status_code, result)
+
         else:
-            self._json(404, {'error': 'POST endpoints: /sync-complete, /write'})
+            self._json(404, {'error': 'POST endpoints: /sync-complete, /write, /exec'})
 
     def _json(self, code, data):
         body = json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8')
@@ -2477,6 +2510,7 @@ if __name__ == '__main__':
     daemon_heatmap = DaemonHeatMap(STATE_PATH)
     payloads = PayloadAssembler(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
     repo_sync = RepoSync(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
+    ps_executor = PowerShellExecutor(BOND_ROOT) if PowerShellExecutor else None
     index = SearchIndex()
     watcher = FileWatcher(index)
 

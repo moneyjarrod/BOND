@@ -528,6 +528,73 @@ app.put('/api/config/bond', async (req, res) => {
   } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
+// ─── Gift Pack / Starters API (S138) ─────────────────────
+const STARTERS_PATH = join(BOND_ROOT, 'starters', 'Gift_Pack');
+
+app.get('/api/starters', async (req, res) => {
+  try {
+    const manifestPath = join(STARTERS_PATH, 'manifest.json');
+    const raw = await readFile(manifestPath, 'utf-8');
+    const manifest = JSON.parse(raw);
+    // Check which ones are already installed
+    for (const p of manifest.perspectives) {
+      const exists = existsSync(join(DOCTRINE_PATH, p.id));
+      p.installed = exists;
+    }
+    res.json(manifest);
+  } catch (err) {
+    res.status(404).json({ error: 'Gift Pack not found', detail: err.message });
+  }
+});
+
+app.post('/api/starters/import', async (req, res) => {
+  try {
+    const { id } = req.body;
+    if (!id) return res.status(400).json({ error: 'id required' });
+
+    // Validate perspective exists in manifest
+    const manifestPath = join(STARTERS_PATH, 'manifest.json');
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf-8'));
+    const entry = manifest.perspectives.find(p => p.id === id);
+    if (!entry) return res.status(404).json({ error: `Perspective '${id}' not in Gift Pack manifest` });
+
+    // Source directory
+    const srcDir = join(STARTERS_PATH, id);
+    if (!existsSync(srcDir)) return res.status(404).json({ error: `Source directory not found: ${id}` });
+
+    // Destination — refuse if exists (P11: no merge, no overwrite)
+    const dstDir = join(DOCTRINE_PATH, id);
+    if (existsSync(dstDir)) return res.status(409).json({ error: `Entity '${id}' already exists. Remove it first to re-import.` });
+
+    // Copy entire directory (flat — Gift Pack perspectives have no subdirs)
+    await mkdir(dstDir, { recursive: true });
+    const files = await readdir(srcDir);
+    const copied = [];
+    for (const f of files) {
+      const srcFile = join(srcDir, f);
+      const dstFile = join(dstDir, f);
+      const info = await stat(srcFile);
+      if (info.isFile()) {
+        const content = await readFile(srcFile);
+        await writeFile(dstFile, content);
+        copied.push(f);
+      }
+    }
+
+    console.log(`🎁 Gift Pack imported: ${id} (${copied.length} files)`);
+    broadcast({
+      type: 'file_added',
+      entity: id,
+      detail: { entity: id, source: 'gift_pack', files: copied },
+      timestamp: new Date().toISOString()
+    });
+
+    res.json({ imported: true, id, display_name: entry.display_name, files: copied, file_count: copied.length });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 const STATE_FILE = join(STATE_PATH, 'active_entity.json');
 const NULL_STATE = { entity: null, class: null, path: null, entered: null };
 const MASTER_ENTITY = 'BOND_MASTER';
@@ -1267,6 +1334,100 @@ app.get('/api/ahk-status', async (req, res) => {
     res.json({ ...status, running: true });
   } catch {
     res.json({ running: false, bond_active: false, bridge_active: false, turn: 0, limit: 10, commands_typed: 0 });
+  }
+});
+
+// ─── PowerShell Execution API (D13) ──────────────────────
+const PS_DIR = join(BOND_ROOT, 'panel', 'powershell');
+const PS_CONFIG = join(PS_DIR, 'config.json');
+const PS_CARDS_DIR = join(PS_DIR, 'cards');
+const PS_LOG = join(PS_DIR, 'exec_log.jsonl');
+
+app.get('/api/powershell/config', async (req, res) => {
+  try {
+    const raw = await readFile(PS_CONFIG, 'utf-8');
+    res.json(JSON.parse(raw));
+  } catch {
+    res.json({ enabled: false, mode: 'right', verbs: {} });
+  }
+});
+
+app.post('/api/powershell/config', async (req, res) => {
+  try {
+    let current;
+    try { current = JSON.parse(await readFile(PS_CONFIG, 'utf-8')); } catch { current = { enabled: false, mode: 'right', verbs: {} }; }
+    const updated = { ...current, ...req.body };
+    if (req.body.verbs) {
+      updated.verbs = { ...current.verbs };
+      for (const [verb, val] of Object.entries(req.body.verbs)) {
+        updated.verbs[verb] = { ...(current.verbs[verb] || {}), ...val };
+      }
+    }
+    await mkdir(PS_DIR, { recursive: true });
+    await verifiedWrite(PS_CONFIG, JSON.stringify(updated, null, 2) + '\n', 'powershell:config');
+    res.json({ saved: true, config: updated });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.get('/api/powershell/cards', async (req, res) => {
+  try {
+    await mkdir(PS_CARDS_DIR, { recursive: true });
+    const files = await readdir(PS_CARDS_DIR);
+    const cards = [];
+    for (const f of files) {
+      if (!f.endsWith('.json')) continue;
+      try { cards.push(JSON.parse(await readFile(join(PS_CARDS_DIR, f), 'utf-8'))); } catch {}
+    }
+    res.json({ cards });
+  } catch (err) { res.json({ cards: [] }); }
+});
+
+app.post('/api/powershell/cards', async (req, res) => {
+  try {
+    const card = req.body;
+    if (!card.id || !card.command) {
+      return res.status(400).json({ error: 'Card requires "id" and "command" fields' });
+    }
+    if (!card.verb) card.verb = 'read';
+    if (!card.scope) card.scope = 'global';
+    await mkdir(PS_CARDS_DIR, { recursive: true });
+    const cardPath = join(PS_CARDS_DIR, `${card.id}.json`);
+    await verifiedWrite(cardPath, JSON.stringify(card, null, 2) + '\n', `powershell:card:${card.id}`);
+    res.json({ saved: true, card_id: card.id });
+  } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/api/powershell/exec', async (req, res) => {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 35000);
+    const response = await fetch(`${DAEMON_URL}/exec`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(req.body),
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.name === 'AbortError' ? 'Daemon timeout (35s)' : err.message });
+  }
+});
+
+app.get('/api/powershell/log', async (req, res) => {
+  try {
+    const limit = parseInt(req.query.limit) || 50;
+    const raw = await readFile(PS_LOG, 'utf-8');
+    const lines = raw.trim().split('\n').filter(Boolean);
+    const entries = [];
+    for (const line of lines.slice(-limit)) {
+      try { entries.push(JSON.parse(line)); } catch {}
+    }
+    entries.reverse();
+    res.json({ entries });
+  } catch {
+    res.json({ entries: [] });
   }
 });
 

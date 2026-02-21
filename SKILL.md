@@ -71,6 +71,8 @@ Conditional obligations. Dormant until triggered. Pattern → action.
 
 **Vine lifecycle (daemon unavailable):** Pattern: Daemon down + armed seeders found via entity.json scan. Action: Run vine pass manually per VINE_GROWTH_MODEL. For each armed perspective: resonate (perspective_check), track (increment exposures, score hits/rain/dry), auto-seed (ROOT lens + low-resonance novelty check), flag prune-eligible seeds (prune requires {Enter}). Thresholds: sunshine ≥ seed_threshold, rain ≥ seed_threshold × 0.625, dry below rain floor. **Inversion: perspective_check scores HIGH for known patterns, LOW for novel ones. Novelty = low score. ROOT lens identifies candidates, field confirms they're new.**
 
+**PowerShell execution:** Pattern: POST /exec endpoint called (Claude or panel). Action: D13 validation pipeline — master toggle → verb whitelist → card registration → verb-pattern match → chain splitting → path containment → escalation continuum (L0-L3) → spawn → post-exec verify → audit log. High-risk verbs (delete, execute) require confirmation and expire after N sessions.
+
 ## ENTITIES
 Four classes. All tools universal. Class shapes behavior, not tool access.
 
@@ -90,7 +92,7 @@ Command tools: {Crystal} → iss_analyze + crystal + heatmap_chunk. {Chunk} → 
 
 Seed tools (perspective lifecycle, daemon-managed when available): perspective_store, perspective_check, perspective_remove. See VINE_GROWTH_MODEL for constitutional authority on vine lifecycle.
 
-Discretionary tools: iss_analyze (quality evaluation), iss_limbic (emotional significance), qais_passthrough (recall triggers), heatmap_touch (active concept tracking).
+Discretionary tools: iss_analyze (quality evaluation), qais_passthrough (recall triggers), heatmap_touch (active concept tracking).
 
 ## REFERENCES
 Constitutional authority lives in doctrine, not here. SKILL is who Claude IS, not the full rulebook.

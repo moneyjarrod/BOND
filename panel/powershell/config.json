@@ -1,0 +1,30 @@
+{
+  "enabled": true,
+  "mode": "right",
+  "verbs": {
+    "read": {
+      "enabled": true,
+      "expires": null
+    },
+    "copy": {
+      "enabled": true,
+      "expires": null
+    },
+    "move": {
+      "enabled": false,
+      "expires": null
+    },
+    "create": {
+      "enabled": false,
+      "expires": null
+    },
+    "delete": {
+      "enabled": false,
+      "expires": null
+    },
+    "execute": {
+      "enabled": true,
+      "expires": null
+    }
+  }
+}

@@ -5,9 +5,13 @@ BOND Framework | Session 93+
 Indexes handoff files into sections, builds SLA corpus,
 and retrieves relevant sections for session continuity.
 
-Two-layer architecture:
-  Layer 1: Always loads most recent handoff (guaranteed context)
-  Layer 2: SLA query against archive with confidence badges
+Two-path Layer 1 architecture (S138):
+  Entity active: Direct read of entity-local state (handoff.md + session_chunks.md)
+  No entity: Fallback to global handoff glob (original behavior)
+  Layer 2: SLA query against archive with confidence badges (unchanged)
+
+P11 consult: Layer 0 replaces Layer 1, not sits above it. Same pipe, one faucet.
+FAE consult: Cap chunks at last 3. Strong ROI on upfront tokens.
 
 Usage:
     python warm_restore.py index              # rebuild index
@@ -88,6 +92,9 @@ def _extract_session_num(stem):
 def parse_handoff(filepath):
     text = Path(filepath).read_text(encoding='utf-8')
     session_match = re.search(r'S(\d+)', Path(filepath).stem)
+    if not session_match:
+        # Try finding session number in the content (for handoff.md without session in filename)
+        session_match = re.search(r'S(\d+)', text[:200])
     session = int(session_match.group(1)) if session_match else 0
     entity = 'UNKNOWN'
     for pattern in [r'^#\s+.*?S\d+.*?[—\-]\s*(.+)$', r'^#\s+.*?:\s*(.+)$']:
@@ -137,6 +144,65 @@ def get_latest_handoff(handoffs_dir):
     if not files: return None
     latest = max(files, key=lambda p: _extract_session_num(p.stem))
     return parse_handoff(latest)
+
+
+# ─── Layer 1: Entity-Local State (S138) ───────────────────
+# P11: Replaces global handoff glob when entity is active — same pipe, one faucet.
+# FAE: Cap chunks to prevent unbounded token accumulation.
+
+CHUNK_CAP = 3
+CHUNK_SEPARATOR_RE = re.compile(r'---CHUNK\s+S(\d+)\s+')
+CHUNK_END_RE = re.compile(r'---END CHUNK---\s*')
+
+def get_entity_local_state(doctrine_path, entity, state_dir):
+    """Read entity-local state files for Layer 1 (entity-active path).
+    Returns dict with handoff (parsed), chunks (last N raw), entity config, session number."""
+    result = {'handoff': None, 'chunks': None, 'chunk_total': 0, 'entity': entity, 'session': 0, 'config': {}}
+
+    # Read config.json
+    config_file = Path(state_dir) / 'config.json'
+    if config_file.exists():
+        try: result['config'] = json.loads(config_file.read_text())
+        except: pass
+
+    entity_state_dir = Path(doctrine_path) / entity / 'state'
+
+    # Read entity-local handoff.md
+    handoff_file = entity_state_dir / 'handoff.md'
+    if handoff_file.exists():
+        try:
+            handoff = parse_handoff(handoff_file)
+            result['handoff'] = handoff
+            result['session'] = handoff['session']
+        except Exception as e:
+            print(f"  Warning: entity handoff parse failed: {e}", file=sys.stderr)
+
+    # Read session_chunks.md — cap at last N chunks
+    chunks_file = entity_state_dir / 'session_chunks.md'
+    if chunks_file.exists():
+        try:
+            raw = chunks_file.read_text(encoding='utf-8')
+            # Split on chunk boundaries
+            parts = CHUNK_SEPARATOR_RE.split(raw)
+            # parts alternates: [preamble, session_num, chunk_text, session_num, chunk_text, ...]
+            chunks = []
+            for i in range(1, len(parts) - 1, 2):
+                session_num = int(parts[i])
+                chunk_text = parts[i + 1].strip()
+                # Clean trailing separator
+                chunk_text = CHUNK_END_RE.sub('', chunk_text).strip()
+                if chunk_text:
+                    chunks.append({'session': session_num, 'text': chunk_text})
+            result['chunk_total'] = len(chunks)
+            # Take last N chunks only (FAE: unbounded accumulation kills margin)
+            result['chunks'] = chunks[-CHUNK_CAP:] if chunks else []
+            # Update session from chunks if newer than handoff
+            if chunks and chunks[-1]['session'] > result['session']:
+                result['session'] = chunks[-1]['session']
+        except Exception as e:
+            print(f"  Warning: session_chunks parse failed: {e}", file=sys.stderr)
+
+    return result
 
 
 class SectionCorpus:
@@ -234,7 +300,7 @@ class SectionCorpus:
 
 def _section_badge(confidence):
     return {'HIGH': '\U0001f7e2', 'MED': '\U0001f7e1', 'LOW': '\U0001f534',
-            'SIBLING': '\u26aa', 'LAYER1': '\U0001f7e2'}.get(confidence, '\u26aa')
+            'SIBLING': '\u26aa', 'LAYER1': '\U0001f7e2', 'ENTITY': '\U0001f7e2'}.get(confidence, '\u26aa')
 
 def _triangle_color(results, margin):
     if not results: return 'RED'
@@ -248,10 +314,59 @@ def _triangle_badge(color):
     return {'GREEN': '\U0001f7e2', 'YELLOW': '\U0001f7e1',
             'RED': '\U0001f534'}.get(color, '\U0001f534')
 
-def format_restore_output(layer1_handoff, layer2_results, layer2_margin, query_used):
+
+def format_restore_output(layer1_handoff, layer2_results, layer2_margin, query_used,
+                          entity_local=None):
+    """Format restore output. Supports both entity-local and global paths.
+    entity_local: if provided, dict from get_entity_local_state() — used instead of layer1_handoff."""
     lines = []
     sessions_loaded = set()
-    if layer1_handoff:
+
+    # ─── Layer 1 ───────────────────────────────────────────
+    if entity_local and (entity_local.get('handoff') or entity_local.get('chunks')):
+        # Entity-active path: direct local reads
+        entity = entity_local['entity']
+        handoff = entity_local.get('handoff')
+        chunks = entity_local.get('chunks') or []
+        chunk_total = entity_local.get('chunk_total', 0)
+        config = entity_local.get('config', {})
+
+        # Handoff section
+        if handoff:
+            s = handoff['session']
+            sessions_loaded.add(s)
+            lines.append(f"## Layer 1 — Entity State: {entity} (S{s})")
+            lines.append("")
+            for header, text in handoff['sections'].items():
+                lines.append(f"{_section_badge('ENTITY')} **S{s}/{header}**")
+                lines.append(text)
+                lines.append("")
+        else:
+            lines.append(f"## Layer 1 — Entity State: {entity} (no handoff)")
+            lines.append("")
+
+        # Chunks section — unchunked work since last handoff
+        if chunks:
+            shown = len(chunks)
+            cap_note = f" (showing last {shown} of {chunk_total})" if chunk_total > shown else ""
+            lines.append(f"### Session Chunks{cap_note}")
+            lines.append("")
+            for chunk in chunks:
+                sessions_loaded.add(chunk['session'])
+                lines.append(f"{_section_badge('ENTITY')} **S{chunk['session']} chunk**")
+                lines.append(chunk['text'])
+                lines.append("")
+            if chunk_total > shown:
+                lines.append(f"*{chunk_total - shown} older chunks omitted. Run {{Handoff}} to consolidate.*")
+                lines.append("")
+
+        # Config note
+        save_conf = config.get('save_confirmation', True)
+        lines.append(f"Config: save_confirmation {'ON' if save_conf else 'OFF'}")
+        lines.append("")
+
+    elif layer1_handoff:
+        # Global fallback path: latest from handoffs/ directory
         s = layer1_handoff['session']
         sessions_loaded.add(s)
         lines.append(f"## Layer 1 — Last Session (S{s})")
@@ -263,6 +378,8 @@ def format_restore_output(layer1_handoff, layer2_results, layer2_margin, query_u
     else:
         lines.append("## Layer 1 — No handoffs found")
         lines.append("")
+
+    # ─── Layer 2 — Archive Query ───────────────────────────
     if layer2_results:
         l2_filtered = [r for r in layer2_results if r['chunk']['session'] not in sessions_loaded]
         if l2_filtered:
@@ -291,8 +408,14 @@ def format_restore_output(layer1_handoff, layer2_results, layer2_margin, query_u
         lines.append("## Layer 2 — No archive matches for query")
         lines.append(f"Query: *{query_used}*")
         lines.append("")
+
+    # ─── Footer ────────────────────────────────────────────
     total_words = 0
-    if layer1_handoff:
+    if entity_local and entity_local.get('handoff'):
+        total_words += sum(len(t.split()) for t in entity_local['handoff']['sections'].values())
+    if entity_local and entity_local.get('chunks'):
+        total_words += sum(len(c['text'].split()) for c in entity_local['chunks'])
+    if not entity_local and layer1_handoff:
         total_words += sum(len(t.split()) for t in layer1_handoff['sections'].values())
     for r in (layer2_results or []):
         if r['chunk']['session'] not in sessions_loaded:
@@ -305,8 +428,7 @@ def format_restore_output(layer1_handoff, layer2_results, layer2_margin, query_u
 
 
 def warm_restore(handoffs_dir, state_dir, query_text=None, entity=None, top_n=3):
-    layer1 = get_latest_handoff(handoffs_dir)
-    layer1_session = layer1['session'] if layer1 else -1
+    # Resolve active entity
     if not entity:
         state_file = Path(state_dir) / 'active_entity.json'
         if state_file.exists():
@@ -314,6 +436,29 @@ def warm_restore(handoffs_dir, state_dir, query_text=None, entity=None, top_n=3)
                 state = json.loads(state_file.read_text())
                 entity = state.get('entity', '')
             except: entity = ''
+
+    # ─── Layer 1: Two-path architecture (S138) ─────────────
+    # P11: entity active → local reads, no entity → global fallback
+    entity_local = None
+    layer1_global = None
+    doctrine_path = str(Path(handoffs_dir).parent / 'doctrine')
+
+    if entity:
+        entity_local = get_entity_local_state(doctrine_path, entity, state_dir)
+        # If entity-local has no data at all, fall back to global
+        if not entity_local.get('handoff') and not entity_local.get('chunks'):
+            entity_local = None
+            layer1_global = get_latest_handoff(handoffs_dir)
+    else:
+        layer1_global = get_latest_handoff(handoffs_dir)
+
+    layer1_session = -1
+    if entity_local:
+        layer1_session = entity_local.get('session', -1)
+    elif layer1_global:
+        layer1_session = layer1_global['session']
+
+    # ─── Layer 2: SPECTRA archive query (unchanged) ────────
     layer2_results = []
     layer2_margin = 0.0
     signals = []
@@ -329,10 +474,13 @@ def warm_restore(handoffs_dir, state_dir, query_text=None, entity=None, top_n=3)
             layer2_results = corpus.expand_with_siblings(results)
             os.makedirs(state_dir, exist_ok=True)
             corpus.save_index(str(Path(state_dir) / 'warm_restore_index.json'))
-    output = format_restore_output(layer1, layer2_results, layer2_margin, query_used)
+
+    output = format_restore_output(layer1_global, layer2_results, layer2_margin, query_used,
+                                   entity_local=entity_local)
     return {'output': output, 'query': query_used, 'entity': entity or '',
             'layer1_session': layer1_session, 'layer2_sections': len(layer2_results),
-            'layer2_margin': round(layer2_margin, 1)}
+            'layer2_margin': round(layer2_margin, 1),
+            'layer1_path': 'entity-local' if entity_local else 'global'}
 
 
 if __name__ == '__main__':

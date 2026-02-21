@@ -1,0 +1,13 @@
+{
+  "id": "powershell",
+  "name": "PowerShell",
+  "icon": "⚡",
+  "description": "Governed shell execution (D13)",
+  "status_endpoint": "/api/powershell/config",
+  "custom_renderer": "powershell",
+  "display_fields": [
+    { "key": "enabled", "label": "Master", "icon": "🔌" },
+    { "key": "mode", "label": "Mode", "icon": "🎮" }
+  ],
+  "refresh_interval": 10
+}

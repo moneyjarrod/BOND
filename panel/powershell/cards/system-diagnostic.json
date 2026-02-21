@@ -1,0 +1,12 @@
+{
+  "id": "system-diagnostic",
+  "name": "System Diagnostic",
+  "description": "List BOND_ROOT contents and report directory health",
+  "verb": "read",
+  "scope": "global",
+  "confirm": false,
+  "command": "Get-ChildItem \"{BOND_ROOT}\" -Depth 0 | Format-Table Name, Length, LastWriteTime",
+  "dry_run_text": "Would list top-level BOND_ROOT directory contents",
+  "params": [],
+  "post_verify": null
+}

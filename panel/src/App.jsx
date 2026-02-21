@@ -9,6 +9,7 @@ import ModuleBay from './components/ModuleBay';
 import EntityCards from './components/EntityCards';
 import DoctrineViewer from './components/DoctrineViewer';
 import CreateEntity from './components/CreateEntity';
+import GiftPackImport from './components/GiftPackImport';
 import EntityBar from './components/EntityBar';
 import DoctrineBanner from './components/DoctrineBanner';
 import ProjectMasterBanner from './components/ProjectMasterBanner';
@@ -392,6 +393,7 @@ function AppInner() {
 
   // Create entity modal
   const [showCreate, setShowCreate] = useState(null); // null or class string
+  const [showGiftPack, setShowGiftPack] = useState(false);
 
   const handleEntityCreated = useCallback((data) => {
     setShowCreate(null);
@@ -502,13 +504,22 @@ function AppInner() {
             onCreate={() => setShowCreate(currentTab.filter)}
             onLink={handleLink}
           />
-          <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 12 }}>
             <button
               className="btn-create-entity"
               onClick={() => setShowCreate(currentTab.filter)}
             >
               + New {currentTab.label.replace(/s$/, '')}
             </button>
+            {currentTab.filter === 'perspective' && (
+              <button
+                className="btn-create-entity"
+                onClick={() => setShowGiftPack(true)}
+                title="Import from Gift Pack"
+              >
+                Gift Pack
+              </button>
+            )}
           </div>
           </>
         )}
@@ -539,6 +550,16 @@ function AppInner() {
           entityClass={showCreate}
           onCreated={handleEntityCreated}
           onCancel={() => setShowCreate(null)}
+        />
+      )}
+
+      {showGiftPack && (
+        <GiftPackImport
+          onImported={() => {
+            setShowGiftPack(false);
+            refresh();
+          }}
+          onCancel={() => setShowGiftPack(false)}
         />
       )}
 

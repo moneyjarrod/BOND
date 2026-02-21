@@ -1,9 +1,16 @@
 // ModuleRenderer — Expanded module detail view with live stats + tool invocation
 // S3/S4: Renders full module panel when clicked from ModuleBay
 // S81 polish: data-driven tools, offline/error distinction, loading states
+// D13: custom_renderer support for PowerShell module
 import { useState, useEffect, useCallback } from 'react';
+import PowerShellModule from './PowerShellModule';
 
 const API = 'http://localhost:3000';
+
+// Custom renderers — modules with custom_renderer field delegate here
+const CUSTOM_RENDERERS = {
+  powershell: PowerShellModule,
+};
 
 // Tools defined as data — adding a module means adding an entry here, not editing JSX
 const MODULE_TOOLS = {
@@ -35,6 +42,12 @@ function getTools(module) {
 }
 
 export default function ModuleRenderer({ module, onClose }) {
+  // D13: Delegate to custom renderer if specified
+  const CustomRenderer = CUSTOM_RENDERERS[module.custom_renderer];
+  if (CustomRenderer) {
+    return <CustomRenderer module={module} onClose={onClose} />;
+  }
+
   const [stats, setStats] = useState(module.data || null);
   const [statsError, setStatsError] = useState(null);
   const [loading, setLoading] = useState(false);
