@@ -48,6 +48,18 @@ BOND runs a local daemon that reads your files, derives system state, and delive
 You <-> Claude <-> MCP servers <-> BOND daemon <-> Your files on disk
 ```
 
+### Picking Up Where You Left Off
+
+BOND offers three ways to resume work:
+
+| Command | What It Loads | Best For |
+|---------|--------------|----------|
+| `{Sync}` | Active entity + current state | Quick check-in, light tasks |
+| `{Warm Restore}` | SLA-selected handoff sections + entity state | Perspective chats, creative work, loose sessions |
+| `{Full Restore}` | Complete state — all handoffs, crystals, QAIS context, heatmap | Large projects, complex work streams, deep accumulated state |
+
+**Recommendation:** For projects with many sessions of accumulated decisions and open threads, `{Full Restore}` delivers more accurate context and fewer correction cycles. `{Warm Restore}` is faster but trades depth for speed — ideal for perspective conversations and lighter work.
+
 Your data never leaves your machine. The daemon is the engine; Claude is the operator.
 
 ---

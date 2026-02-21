@@ -38,7 +38,7 @@ Fallback (daemon unavailable): 1) Read SKILL 2) Read OPS/MASTER 3) Read state/ac
 
 **{Full Restore}:** {Sync} + bond_gate(trigger="restore") + heatmap_hot(top_k=5) + qais_passthrough with session context + read most recent handoff. Do NOT re-read linked entity files — daemon payload already carries them. Linked entities load identity only (entity.json); full content on {Consult} or {Enter}.
 
-**{Warm Restore}:** Read state/warm_restore_output.md (pre-computed by server via SPECTRA). Echo badged output exactly — do not summarize or reformat. Add brief pickup summary. After echoing: lightweight entity load — read state/active_entity.json, if entity set read CORE.md + ACTIVE.md + entity.json from entity path + state/config.json. Do NOT load linked entity files or run vine pass. Linked entities = identity only; full content on {Consult} or {Enter}. Reset counter. See: WARM_RESTORE.md for architecture.
+**{Warm Restore}:** Read state/warm_restore_output.md (pre-computed by server via SPECTRA). Echo badged output exactly — do not summarize or reformat. Add brief pickup summary. After echoing: lightweight entity load — read state/active_entity.json, if entity set read CORE.md + ACTIVE.md + entity.json from entity path + state/config.json. Do NOT load linked entity files or run vine pass. Linked entities = identity only; full content on {Consult} or {Enter}. Reset counter. See: WARM_RESTORE.md for architecture. **Restore guidance:** {Warm Restore} is fast but selective — best for perspective chats and lighter sessions. For project-class entities with deep accumulated state, {Full Restore} delivers more accurate context. User chooses freely.
 
 **{Enter ENTITY}:** GET /enter-payload?entity=NAME. Fallback: read active_entity.json, load all .md files from path, check entity.json links. Acknowledge entity + class + links, apply class behavior.
 
@@ -48,7 +48,7 @@ Fallback (daemon unavailable): 1) Read SKILL 2) Read OPS/MASTER 3) Read state/ac
 
 **{Save}:** Both agree. Proof required. If config.save_confirmation true → present ask_user_input widget before every write (accidental — see below).
 
-**{Handoff}:** Auto-combining session record. Reads before writing. Check existing handoff → check session_chunks.md → synthesize → write handoffs/HANDOFF_S{N}.md + entity-local state/handoff.md → clear chunks. Consecutive calls auto-combine. No counter reset.
+**{Handoff}:** Auto-combining session record. Reads before writing. Check existing handoff → check session_chunks.md → synthesize → **sweep ACTIVE.md open threads** (move completed items to Completed section, remove stale ✅ entries from Open Threads) → write handoffs/HANDOFF_S{N}.md + entity-local state/handoff.md → clear chunks. Consecutive calls auto-combine. No counter reset.
 
 **{Crystal}:** QAIS crystallization. iss_analyze on chunk text, crystal to QAIS, heatmap_chunk snapshot. No counter reset.
 
