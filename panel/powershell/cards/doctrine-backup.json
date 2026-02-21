@@ -1,0 +1,12 @@
+{
+  "id": "doctrine-backup",
+  "name": "Doctrine Backup",
+  "description": "Snapshot entire doctrine/ folder to a timestamped backup",
+  "verb": "copy",
+  "scope": "global",
+  "confirm": true,
+  "command": "$ts = Get-Date -Format 'yyyy-MM-dd_HHmmss'; $dst = Join-Path '{BOND_ROOT}' \"backups\\doctrine_$ts\"; Copy-Item (Join-Path '{BOND_ROOT}' 'doctrine') $dst -Recurse -Force; Write-Host \"Backed up to $dst\"",
+  "dry_run_text": "Would copy doctrine/ to backups/doctrine_{timestamp}",
+  "params": [],
+  "post_verify": null
+}

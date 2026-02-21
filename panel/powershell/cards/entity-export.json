@@ -1,0 +1,14 @@
+{
+  "id": "entity-export",
+  "name": "Entity Export",
+  "description": "Combine all .md files from active entity into a single export file",
+  "verb": "execute",
+  "scope": "global",
+  "confirm": true,
+  "command": "powershell -ExecutionPolicy Bypass -File \"{BOND_ROOT}/panel/powershell/scripts/entity_export.ps1\" -EntityPath \"{ENTITY_PATH}\" -BondRoot \"{BOND_ROOT}\"",
+  "dry_run_text": "Would combine all .md files from the active entity into a single timestamped export in backups/",
+  "params": [
+    { "name": "ENTITY_PATH", "source": "active_entity", "validate": "doctrine_path" }
+  ],
+  "post_verify": null
+}
