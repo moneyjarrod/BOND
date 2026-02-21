@@ -24,6 +24,21 @@ Warm Restore IS NOT:
 - A replacement for crystals or memory edits. Those serve different continuity layers.
 - Automatic. The user invokes {Warm Restore} explicitly.
 
+## Choosing Your Restore
+
+Both restore commands are always available. The choice depends on the session ahead.
+
+| Factor | {Warm Restore} | {Full Restore} |
+|--------|---------------|----------------|
+| Speed to productive | 1 turn | 2-3 turns |
+| Context depth | Selective (SLA-ranked sections) | Comprehensive (full state) |
+| Accumulated state handling | May miss cross-session proof chains | Carries full history |
+| Best fit | Perspective chats, creative riffing, light check-ins | Large projects, complex work streams, deep decision history |
+
+**Calibration insight:** For project-class entities with many completed items, open threads, and cross-session dependencies, Full Restore's extra context load pays for itself in accuracy. Warm Restore can reach "productive" in one turn but may not reach "accurate" without corrections. The more accumulated state a project carries, the stronger the case for Full Restore.
+
+The user chooses freely. This is guidance, not a gate.
+
 ## The Continuity Stack
 
 Four layers, each serving a different purpose:
