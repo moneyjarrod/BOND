@@ -58,14 +58,6 @@ def eap_stats():
         "schema": "valence, arousal, confidence, urgency, connection, curiosity, frustration, fatigue, wonder, trust"
     }
 
-def limbic_stats():
-    """Limbic evolver status."""
-    return {
-        "status": "active",
-        "fitness": 0.017,
-        "genome": "v2.0 evolved"
-    }
-
 def gate_stats():
     """Bond Gate routing status."""
     return {
@@ -95,7 +87,6 @@ def main():
         "qais": qais_stats,
         "iss": iss_stats,
         "eap": eap_stats,
-        "limbic": limbic_stats,
         "gate": gate_stats,
     }
     

@@ -1,0 +1,8 @@
+{
+  "class": "perspective",
+  "display_name": "Financial Advisor Extraordinaire",
+  "public": true,
+  "seeding": false,
+  "seed_threshold": 0.04,
+  "prune_window": 10
+}

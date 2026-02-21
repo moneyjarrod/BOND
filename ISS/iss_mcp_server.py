@@ -1,16 +1,13 @@
 """
-ISS MCP Server v2.0 — Invariant Semantic Substrate + Limbic (10D EAP)
-Exposes ISS analysis and limbic perception to Claude via MCP protocol.
+ISS MCP Server v2.1 — Invariant Semantic Substrate
+Exposes ISS analysis to Claude via MCP protocol.
 
-Tools: iss_analyze, iss_compare, iss_limbic, iss_status
+Tools: iss_analyze, iss_compare, iss_status
 
-Limbic v2.0: 10D EAP input, evolved genome (S75, fitness 0.017)
-  Pipeline: Claude native read → EAP (10 floats) → ISS forces → Genome → S/T/G
-  Constraints: C1-C4 compliant (no word lists, no new axes, no vocab logic)
+Limbic removed S137 — genome preserved in git history if needed.
 
 Author: J-Dub & Claude
-Date: 2026-02-02 (v1.0), 2026-02-03 (v2.0)
-Session: S75
+Date: 2026-02-02 (v1.0), 2026-02-20 (v2.1 limbic removed)
 """
 
 import json
@@ -76,56 +73,7 @@ def analyze(text: str, alpha: float = 1.0, beta: float = 1.0, gamma: float = 1.0
 def compare(texts: list) -> list:
     return [{"text": t[:50] + "..." if len(t) > 50 else t, **analyze(t)} for t in texts]
 
-# =============================================================================
-# LIMBIC v2.0 — Evolved 10D EAP Genome (S75, fitness 0.017)
-# =============================================================================
 
-EAP_NAMES = ["valence", "arousal", "confidence", "urgency", "connection",
-             "curiosity", "frustration", "fatigue", "wonder", "trust"]
-
-S_RAW = np.array([0.3557, 0.5550, -0.0634, 0.3239, 0.4997, 0.1450, 0.5622, -0.4786, -0.4183, 0.6361, -0.1271, 0.2949, 0.3145, 0.2332, -0.4887, -0.1811])
-S_DERIVED = np.array([0.3309, -0.2142, 0.0663, -0.4381, -0.8057])
-S_BIAS = 0.0742
-
-T_RAW = np.array([0.0318, 0.9895, -0.1544, -0.8483, -0.0094, 0.4800, -0.8201, -0.8575, 0.1807, -0.1981, 0.0053, -0.0314, -0.2000, -0.1210, -0.5289, 0.0183])
-T_DERIVED = np.array([0.2263, 0.8268, 0.2601, 0.4073, 0.4335])
-T_BIAS = 0.6439
-
-G_S_THRESH = 0.4787
-G_T_THRESH = 0.3892
-
-def clamp(x, lo=0.0, hi=1.0):
-    return max(lo, min(hi, float(x)))
-
-def limbic(text: str, eap: list = None, qais_score: float = 0.3, context: str = "") -> dict:
-    iss = analyze(text)
-    g_norm, p_norm, E, r_norm, gap = iss["g_norm"], iss["p_norm"], iss["E"], iss["r_norm"], iss["gap"]
-    if eap is None or len(eap) != 10:
-        eap = [0.0, 0.0, 0.5, 0.0, 0.3, 0.0, 0.0, 0.0, 0.0, 0.5]
-    eap = [float(v) for v in eap]
-    raw = np.array([g_norm, p_norm, E, r_norm, gap, *eap, float(qais_score)])
-    derived = np.array([abs(eap[0]), max(0.0, -eap[0]), abs(g_norm - p_norm), 1.0 - E, 1.0 - float(qais_score)])
-    S = clamp(float(np.dot(S_RAW, raw)) + float(np.dot(S_DERIVED, derived)) + S_BIAS)
-    T = clamp(float(np.dot(T_RAW, raw)) + float(np.dot(T_DERIVED, derived)) + T_BIAS)
-    G = (S > G_S_THRESH) or (T > G_T_THRESH)
-    V = eap[0]
-    signals = []
-    if S > 0.8: signals.append("HIGH salience")
-    elif S > 0.5: signals.append("moderate salience")
-    if T > 0.7: signals.append("HIGH threat")
-    elif T > 0.4: signals.append("moderate threat")
-    if eap[6] > 0.6: signals.append("frustration elevated")
-    if eap[7] > 0.7: signals.append("fatigue warning")
-    if eap[9] < 0.3: signals.append("trust low")
-    if eap[8] > 0.7: signals.append("wonder spike")
-    if V > 0.5: signals.append("positive")
-    elif V < -0.3: signals.append("negative")
-    if not G: action = "pass"
-    elif T > 0.6: action = "intervene — threat detected"
-    elif S > 0.7 and T < 0.2: action = "celebrate — significant positive moment"
-    elif S > 0.5: action = "attend — something matters here"
-    else: action = "note — gate triggered, review context"
-    return {"S": round(S, 4), "V": round(V, 4), "T": round(T, 4), "G": G, "gap": round(gap, 4), "signal": "; ".join(signals) if signals else "quiet", "action": action, "iss": {"g_norm": round(g_norm, 4), "p_norm": round(p_norm, 4), "E": round(E, 4), "r_norm": round(r_norm, 4), "diagnosis": iss["diagnosis"]}, "eap": {name: round(v, 2) for name, v in zip(EAP_NAMES, eap)}, "qais_score": round(float(qais_score), 4), "genome": "v2.0-10D-S75"}
 
 # =============================================================================
 # TOOLS
@@ -134,7 +82,6 @@ def limbic(text: str, eap: list = None, qais_score: float = 0.3, context: str = 
 TOOLS = [
     {"name": "iss_analyze", "description": "Analyze text for semantic forces (G=mechanistic, P=prescriptive, E=coherence, r=residual, gap=imbalance)", "inputSchema": {"type": "object", "properties": {"text": {"type": "string", "description": "Text to analyze"}}, "required": ["text"]}},
     {"name": "iss_compare", "description": "Compare multiple texts for semantic force differences", "inputSchema": {"type": "object", "properties": {"texts": {"type": "array", "items": {"type": "string"}, "description": "List of texts to compare"}}, "required": ["texts"]}},
-    {"name": "iss_limbic", "description": "Limbic scan: ISS perception + EAP emotion (10D) + QAIS familiarity → S(salience), V(valence), T(threat), G(gate). Uses evolved genome (v2.0, fitness 0.017). Claude provides EAP from native read.", "inputSchema": {"type": "object", "properties": {"text": {"type": "string", "description": "Raw text to analyze (user message or situation)"}, "eap": {"type": "array", "items": {"type": "number"}, "description": "10 floats: [valence, arousal, confidence, urgency, connection, curiosity, frustration, fatigue, wonder, trust]. Range: -1 to 1 for valence, 0 to 1 for others."}, "qais_score": {"type": "number", "description": "QAIS familiarity (0=novel, 1=familiar). Default 0.3"}, "context": {"type": "string", "description": "Optional hint (e.g. 'GSG mining', 'self-exploration')"}}, "required": ["text"]}},
     {"name": "iss_status", "description": "Get ISS status and configuration", "inputSchema": {"type": "object", "properties": {}}}
 ]
 
@@ -160,8 +107,7 @@ def handle_request(request):
         try:
             if tool_name == "iss_analyze": result = analyze(args.get("text", ""))
             elif tool_name == "iss_compare": result = compare(args.get("texts", []))
-            elif tool_name == "iss_limbic": result = limbic(text=args.get("text", ""), eap=args.get("eap", None), qais_score=args.get("qais_score", 0.3), context=args.get("context", ""))
-            elif tool_name == "iss_status": result = {"status": "active", "version": "2.0.0", "embedding": "qais-hash", "embed_dim": EMBED_DIM, "proj_file": PROJ_FILE, "proj_dim": 64, "limbic": "active", "limbic_genome": "v2.0-10D-S75", "limbic_fitness": 0.017355, "eap_schema": EAP_NAMES, "eap_dims": 10, "gate_thresholds": {"S": G_S_THRESH, "T": G_T_THRESH}}
+            elif tool_name == "iss_status": result = {"status": "active", "version": "2.0.0", "embedding": "qais-hash", "embed_dim": EMBED_DIM, "proj_file": PROJ_FILE, "proj_dim": 64}
             else: return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32601, "message": f"Unknown tool: {tool_name}"}}
             return {"jsonrpc": "2.0", "id": req_id, "result": {"content": [{"type": "text", "text": json.dumps(result, indent=2)}]}}
         except Exception as e:

@@ -135,31 +135,7 @@ def eap_schema():
         "note": "Claude provides EAP from native read. Not invocable externally.",
     }
 
-# ─── Limbic Tools ──────────────────────────────────────────
 
-def limbic_status():
-    """Limbic system status."""
-    genome_path = os.path.join(ISS_PATH, "limbic_genome_10d.json")
-    try:
-        with open(genome_path) as f:
-            genome = json.load(f)
-        return {
-            "status": "active",
-            "fitness": genome.get("fitness", "unknown"),
-            "genome_version": "v2.0 evolved",
-            "inputs": "ISS(G,P,E,r,gap) + EAP(10D) + QAIS(familiarity)",
-            "outputs": "S(salience), V(valence), T(threat), G(gate)",
-        }
-    except Exception as e:
-        return {"error": str(e)}
-
-def limbic_scan(input_str):
-    """Run ISS on text, return forces (limbic proper needs EAP from Claude)."""
-    result = iss_analyze(input_str)
-    if "error" in result:
-        return result
-    result["note"] = "Full limbic requires Claude's EAP read. Showing ISS forces only."
-    return result
 
 # ─── Dispatch ──────────────────────────────────────────────
 
@@ -291,10 +267,7 @@ TOOLS = {
     "eap": {
         "schema": lambda _: eap_schema(),
     },
-    "limbic": {
-        "status": lambda _: limbic_status(),
-        "scan": limbic_scan,
-    },
+
 }
 
 def main():

@@ -1,0 +1,8 @@
+{
+  "class": "perspective",
+  "display_name": "Half-Baked Jake",
+  "public": true,
+  "seeding": false,
+  "seed_threshold": 0.035,
+  "prune_window": 30
+}

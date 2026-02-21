@@ -1,0 +1,32 @@
+{
+  "name": "Gift Pack",
+  "version": "1.0.0",
+  "author": "J-Dub",
+  "description": "Three starter perspectives — a philosopher, a practitioner, and a wildcard.",
+  "perspectives": [
+    {
+      "id": "P11-Plumber",
+      "display_name": "P11-The Plumber",
+      "tagline": "The philosopher. Sees systems before parts.",
+      "description": "Thinks in pipes, joints, pressure, and flow. The consulting voice behind BOND's architecture. 16 custom roots.",
+      "root_count": 16,
+      "icon": "🔧"
+    },
+    {
+      "id": "FinancialAdvisorExtraordinaire",
+      "display_name": "Financial Advisor Extraordinaire",
+      "tagline": "The practitioner. Pressure-tests decisions against financial reality.",
+      "description": "Thinks in ROI, KPIs, operational hierarchy, and cost control. Grounded in real manufacturing and business operations. 14 custom roots.",
+      "root_count": 14,
+      "icon": "💰"
+    },
+    {
+      "id": "Half-BakedJake",
+      "display_name": "Half-Baked Jake",
+      "tagline": "The wildcard. Finds the signal everyone else filters out.",
+      "description": "Thinks in half-formed ideas, lateral connections, and structured absurdity. Coherence comes last. 6 custom roots.",
+      "root_count": 6,
+      "icon": "🌀"
+    }
+  ]
+}
