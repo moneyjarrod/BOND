@@ -1,7 +1,7 @@
 // useModules — Fetch module configs, toggle enable/disable, poll live status
 import { useState, useEffect, useCallback } from 'react';
 
-const API = 'http://localhost:3000';
+// S139: Use relative paths — Vite proxy handles dev routing
 const STORAGE_KEY = 'bond_modules_enabled';
 
 function loadEnabled() {
@@ -20,7 +20,7 @@ export function useModules() {
 
   const fetchModules = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/api/modules`);
+      const res = await fetch('/api/modules');
       const data = await res.json();
 
       const withStatus = await Promise.all(
@@ -31,7 +31,7 @@ export function useModules() {
 
           if (enabled) {
             try {
-              const statusRes = await fetch(`${API}${mod.status_endpoint}`, {
+              const statusRes = await fetch(`${mod.status_endpoint}`, {
                 signal: AbortSignal.timeout(2000),
               });
               if (statusRes.ok) {

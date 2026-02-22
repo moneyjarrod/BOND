@@ -17,8 +17,7 @@ import HandoffGenerator from './components/HandoffGenerator';
 import { useEntities } from './hooks/useDoctrine';
 // useBridge removed S85 (Dead Code Audit) — clipboard is native in App.jsx
 import { useModules } from './hooks/useModules';
-// SLA panel search removed S119 — SPECTRA handles search server-side
-// import { useSearch } from './hooks/useSearch';
+// SLA panel search removed S119 — SPECTRA handles search server-side (useSearch/sla.js deleted)
 import { WebSocketProvider, WebSocketContext } from './context/WebSocketContext';
 import './styles/bond.css';
 
@@ -216,19 +215,7 @@ function AppInner() {
     }
   }, [refresh, activeEntity]);
 
-  // B69: Tool toggle — persists to entity.json via sidecar
-  const handleToolToggle = useCallback(async (entityName, toolId, value) => {
-    try {
-      await fetch(`/api/doctrine/${entityName}/tools`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tools: { [toolId]: value } }),
-      });
-      refresh(); // Re-fetch entities to get updated tool state
-    } catch (err) {
-      console.error('Tool toggle failed:', err);
-    }
-  }, [refresh]);
+  // S130: Tool toggles removed — tools are universal per BOND_ENTITIES doctrine.
 
   // Save confirmation toggle
   const handleSaveConfirmToggle = useCallback(async () => {
@@ -498,7 +485,6 @@ function AppInner() {
             activeEntity={activeEntity}
             onView={handleView}
             onEnter={handleEnter}
-            onToolToggle={handleToolToggle}
             onRename={handleRename}
             onExit={handleExit}
             onCreate={() => setShowCreate(currentTab.filter)}

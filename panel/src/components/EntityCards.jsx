@@ -1,19 +1,17 @@
 // EntityCards.jsx — Four-Class Entity Architecture (B69)
-// Doctrine: IS statements, Files + ISS
-// Project: Bounded workspace, Files + QAIS + Heatmap + Crystal + ISS, has CORE
-// Perspective: Unbounded growth, Files + QAIS + Heatmap + Crystal
-// Library: Reference shelf, Files only
+// S130: Tools are universal. Class shapes behavior, not tool availability.
+// All entity classes have access to all BOND tools.
 
 import { useState, useMemo, useCallback, useContext, useEffect, useRef } from 'react';
 import { WebSocketContext } from '../context/WebSocketContext';
 
-// Tool definitions with class availability
+// Tool definitions — universal per BOND_ENTITIES doctrine (S130)
 const TOOLS = [
-  { id: 'filesystem', icon: '📁', label: 'Files',   classes: ['doctrine','project','perspective','library'] },
-  { id: 'iss',        icon: '📐', label: 'ISS',     classes: ['doctrine','project'] },
-  { id: 'qais',       icon: '🔮', label: 'QAIS',    classes: ['project','perspective'] },
-  { id: 'heatmap',    icon: '🔥', label: 'Heat',    classes: ['project','perspective'] },
-  { id: 'crystal',    icon: '💎', label: 'Crystal', classes: ['project','perspective'] },
+  { id: 'filesystem', icon: '📁', label: 'Files' },
+  { id: 'iss',        icon: '📐', label: 'ISS' },
+  { id: 'qais',       icon: '🔮', label: 'QAIS' },
+  { id: 'heatmap',    icon: '🔥', label: 'Heat' },
+  { id: 'crystal',    icon: '💎', label: 'Crystal' },
 ];
 
 // Class display info
@@ -32,7 +30,6 @@ export default function EntityCards({
   activeEntity,
   onView,
   onEnter,
-  onToolToggle,
   onRename,
   onExit,
   onCreate,
@@ -76,7 +73,6 @@ export default function EntityCards({
           isActive={activeEntity?.name === entity.name}
           onView={onView}
           onEnter={onEnter}
-          onToolToggle={onToolToggle}
           onRename={onRename}
           onExit={onExit}
           onLink={onLink}
@@ -86,10 +82,9 @@ export default function EntityCards({
   );
 }
 
-function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToolToggle, onRename, onLink }) {
+function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onRename, onLink }) {
   const isEmpty = entity.files.length === 0 && (entity.seed_count || 0) === 0;
   const meta = CLASS_META[entity.type] || CLASS_META.library;
-  const tools = entity.tools || {};
   const [editing, setEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [saved, setSaved] = useState(false);
@@ -164,12 +159,6 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
     }
   }, [lastEvent, entity.name]);
 
-  const handleToggle = useCallback((toolId) => {
-    if (onToolToggle) {
-      onToolToggle(entity.name, toolId, !tools[toolId]);
-    }
-  }, [entity.name, tools, onToolToggle]);
-
   const handleEditStart = useCallback(() => {
     setEditValue(entity.display_name || entity.name);
     setEditing(true);
@@ -196,7 +185,7 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
     if (entity.type !== 'perspective' || seedingLoading) return;
     setSeedingLoading(true);
     try {
-      const res = await fetch(`http://localhost:3000/api/doctrine/${entity.name}/seeding`, {
+      const res = await fetch(`/api/doctrine/${entity.name}/seeding`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ seeding: !seeding }),
@@ -329,7 +318,7 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
         </div>
       )}
 
-      {/* Tool toggles (B69) */}
+      {/* Tool indicators — universal per BOND_ENTITIES doctrine (S130) */}
       <div style={{
         display: 'flex',
         gap: 4,
@@ -338,21 +327,15 @@ function EntityCard({ entity, isLinked, isActive, onView, onEnter, onExit, onToo
         borderTop: '1px solid var(--border)',
         borderBottom: '1px solid var(--border)',
       }}>
-        {TOOLS.map(tool => {
-          const allowed = tool.classes.includes(entity.type);
-          const enabled = allowed && tools[tool.id];
-
-          return (
-            <ToolBadge
-              key={tool.id}
-              icon={tool.icon}
-              label={tool.label}
-              allowed={allowed}
-              enabled={enabled}
-              onClick={allowed ? () => handleToggle(tool.id) : undefined}
-            />
-          );
-        })}
+        {TOOLS.map(tool => (
+          <ToolBadge
+            key={tool.id}
+            icon={tool.icon}
+            label={tool.label}
+            allowed={true}
+            enabled={true}
+          />
+        ))}
       </div>
 
       {/* Action buttons */}

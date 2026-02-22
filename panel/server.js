@@ -78,33 +78,7 @@ const FRAMEWORK_ENTITIES = {
       display_name: 'BOND Master',
       public: true,
     },
-    files: {
-      'BOND_MASTER.md': `# BOND Master — Constitutional Authority
-
-## What BOND_MASTER IS
-
-BOND_MASTER is the constitutional authority of the BOND protocol.
-It governs how doctrine is structured, how entities behave, and how the system evolves.
-
-BOND_MASTER IS:
-- The highest doctrine authority in BOND.
-- Owner of protocol-level rules, class definitions, and tool boundaries.
-- The framework constitution. All other doctrine operates under it.
-
-BOND_MASTER IS NOT:
-- A project. It does not build things.
-- Above the user. The user and Claude are co-operators. BOND_MASTER defines the rules they work within.
-
-## Core Principles
-
-1. **Armed = Obligated.** Any subsystem in an armed state creates a non-optional obligation during its governing command. The server generates obligations from state. The governing command services them. {Tick} audits completion. Gaps are surfaced structurally, not self-reported.
-2. **New capability = doctrine review.** When a new system is added under BOND_MASTER authority, it must be evaluated against existing doctrine before it is considered complete. If it introduces a pattern not covered by current IS statements, the doctrine must be updated. The constitution cannot be silently outgrown by the system it governs.
-
-## Mantra
-
-"The protocol IS the product."
-`,
-    },
+    files: {},
   },
   PROJECT_MASTER: {
     config: {

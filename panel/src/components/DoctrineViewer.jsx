@@ -4,7 +4,7 @@
 
 import { useState, useCallback } from 'react';
 import { useEntityFiles, useFileContent } from '../hooks/useDoctrine';
-import SearchPanel from './SearchPanel';
+// SearchPanel removed S139 (dead code audit) — SPECTRA handles search server-side
 
 // Framework entities — files are read-only
 const FRAMEWORK_ENTITIES = ['BOND_MASTER', 'PROJECT_MASTER'];
@@ -34,7 +34,6 @@ export default function DoctrineViewer({
   const [saveMsg, setSaveMsg] = useState(null);
   const [newFileName, setNewFileName] = useState('');
   const [showNewFile, setShowNewFile] = useState(false);
-  const [showSearch, setShowSearch] = useState(false);
   const linkedNames = new Set((linkedEntities || []).map(e => typeof e === 'string' ? e : e.name));
   const isFramework = FRAMEWORK_ENTITIES.includes(viewerTarget);
   const isRoot = (name) => name?.startsWith('ROOT-');
@@ -140,34 +139,11 @@ export default function DoctrineViewer({
           {saveMsg && (
             <span style={{ fontSize: '0.75rem', fontFamily: 'var(--font-mono)' }}>{saveMsg}</span>
           )}
-          <button
-            onClick={() => setShowSearch(!showSearch)}
-            style={{
-              padding: '3px 10px',
-              fontSize: '0.7rem',
-              fontFamily: 'var(--font-mono)',
-              background: showSearch ? 'rgba(168,130,255,0.15)' : 'var(--bg-elevated)',
-              color: showSearch ? '#a882ff' : 'var(--text-secondary)',
-              border: showSearch ? '1px solid rgba(168,130,255,0.3)' : '1px solid var(--border)',
-              borderRadius: 'var(--radius-sm)',
-              cursor: 'pointer',
-            }}
-          >
-            🔍 Search
-          </button>
+
         </div>
       </div>
 
-      {/* Search panel (collapsible) */}
-      {showSearch && (
-        <div style={{
-          padding: '10px 0',
-          borderBottom: '1px solid var(--border)',
-          marginBottom: 12,
-        }}>
-          <SearchPanel />
-        </div>
-      )}
+
 
       {/* Main content area */}
       <div style={{ display: 'flex', flex: 1, gap: 12, minHeight: 0 }}>

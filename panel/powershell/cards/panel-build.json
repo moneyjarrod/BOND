@@ -1,0 +1,9 @@
+{
+  "id": "panel-build",
+  "name": "Panel Build",
+  "description": "Rebuild panel dist/ from source (vite build)",
+  "verb": "execute",
+  "scope": "global",
+  "command": "Set-Location '{BOND_ROOT}\\panel'; npm.cmd run build",
+  "confirm": true
+}

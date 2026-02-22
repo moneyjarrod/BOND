@@ -3,7 +3,7 @@
 // S81 fix: useCallback wrapping functions, not object literals
 import { useState, useCallback } from 'react';
 
-const API = 'http://localhost:3000';
+// S139: Use relative paths — Vite proxy handles dev routing
 
 export function useMCP() {
   const [loading, setLoading] = useState(false);
@@ -16,7 +16,7 @@ export function useMCP() {
     setLastResult(null);
 
     try {
-      const res = await fetch(`${API}/api/mcp/${system}/invoke`, {
+      const res = await fetch(`/api/mcp/${system}/invoke`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tool, input }),
