@@ -722,7 +722,7 @@ def handle_request(request):
                         method='POST')
                 else:
                     req = urllib.request.Request(url)
-                resp = urllib.request.urlopen(req, timeout=15)
+                resp = urllib.request.urlopen(req, timeout=60)
                 result = json.loads(resp.read().decode('utf-8'))
             else:
                 return {"jsonrpc": "2.0", "id": req_id, "error": {

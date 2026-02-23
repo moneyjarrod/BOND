@@ -335,6 +335,15 @@ class PowerShellExecutor:
             except (ValueError, TypeError):
                 pass
 
+        # Step 4: D-pad mode gate
+        mode = config.get('mode', 'right')
+        if initiator == 'claude' and mode == 'right':
+            r = self._result('deny', 2, card_id, verb,
+                             reason='Manual mode active — Claude-initiated execution blocked. Switch to Auto (←) to allow.')
+            r['duration_ms'] = self._ms(t0)
+            self._log(r, initiator, params)
+            return r
+
         # Resolve command with params
         command = card.get('command', '')
         card_params = card.get('params') or []
