@@ -5,6 +5,69 @@ All notable changes to BOND will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.4.0] - 2026-02-23
+
+### Added
+- **D17 GNOISE** — Inverted resonance auditor. Daemon scans entities for content that no longer belongs, routes findings to a holding cell for triage. Three endpoints: `/gnoise`, `/gnoise-cell`, `/gnoise-triage`. Panel Module Bay tile with entity dropdown, scan, and triage UI.
+- **D18 Async Execution** — Bypass valve for long-running PowerShell cards. Cards declare `async: true`, daemon spawns background thread, panel polls for result. No more timeouts on repo-sync or heavy operations.
+- **Auto-mode wiring** — When PowerShell mode is set to Auto (←), Claude can execute cards via the daemon with `initiator: "claude"`. D16 dry-run gate still enforced. Manual mode (→) denies Claude-initiated execution at the daemon layer.
+- **SKILL.md PowerShell auto-mode instruction** — Protocol now documents the auto-mode flow: Claude identifies task → user confirms → Claude fires dry run → user confirms → Claude fires live.
+
+### Fixed
+- **SPA catch-all hang** — Unmatched `/api/` paths now return 404 JSON instead of hanging indefinitely.
+- **Zombie process guard** — `start_bond.bat` now kills existing processes on port 3000 before launching, matching `start_daemon.bat` pattern. Prevents silent EADDRINUSE crashes on restart.
+- **GnoiseModule dropdown** — Triple data-shape mismatch fixed (API response wrapping, field names, .type vs .class).
+
+## [2.3.0] - 2026-02-21
+
+### Added
+- **D16 Computed Dry Runs** — Static `dry_run_text` replaced with `dry_run_command` (read-verb validated) + `requires_dry_run` (enforced gate). Daemon session tracking gates both panel and auto paths identically. Execute and delete verbs always require dry run.
+- **CONSULTATION.md** — Six-perspective consultation bench mapped to all open threads.
+- **DECIDED splits** — DECIDED_CONSTITUTIONAL.md (active decisions) separated from DECIDED_ARCHIVE.md (historical rationale moved to handoffs/).
+
+### Changed
+- **ACTIVE.md trim** — 26 completed items archived to CHANGELOG.md. Mandatory-set payload cut from ~4.5KB to ~1.5KB. Compounds D14 savings every sync.
+- **Entity reclassifications** — Bridge_Doctrine, ROSETTA, SPECTRA, SLA reclassified from doctrine to library class.
+
+## [2.2.0] - 2026-02-20
+
+### Added
+- **D14 Deferred Entity File Loading** — `{Sync}` now loads mandatory file set only (CORE.md + ACTIVE.md + entity.json for projects). Remaining files listed in deferred manifest with size. 85% payload reduction for large entities.
+- **D15 Write Path Safety** — New daemon endpoints: `POST /append` (positional insert), `POST /replace` (exact-match edit). `POST /write` gets shadow `.bak` backup and 50% destructive overwrite gate. Implements CORE principle P9: write path mirrors read path.
+
+### Changed
+- **Daemon v3.1.0** — Write safety endpoints, deferred loading logic, mandatory file resolution by entity class.
+
+## [2.1.0] - 2026-02-18
+
+### Added
+- **D13 PowerShell Execution** — Governed shell execution with 12-step validation pipeline. Verb classification (read/copy/move/create/delete/execute), whitelist toggles, operation cards, Level 3 blacklist, chain splitting, path containment, audit logging. Panel UI with master toggle, mode selector, verb switches, card list.
+- **Gift Pack Import** — `GET /api/starters` + `POST /api/starters/import` endpoints. Panel UI for importing starter ROOT files into perspectives. 409 conflict detection for existing files.
+- **Layer 0 Warm Restore** — Entity-local state replaces global handoff as primary restore source. Global becomes fallback. `warm_restore.py` rewritten.
+- **Starter PowerShell cards** — doctrine-backup (copy), doctrine-backup-check (read), entity-export (execute), panel-build (execute), system-diagnostic (read), repo-sync (execute).
+- **Parameterized cards** — Cards can declare `source: "argument"` params with validation. Panel renders inline input prompts.
+
+### Fixed
+- **Panel audit (2 rounds)** — 16 violations fixed: dead code removed (empty services/, unused components, vestigial module defs), hardcoded `localhost:3000` → relative paths across all fetch calls, tool toggle endpoint removed (tools universal per doctrine).
+- **D-pad Auto mode gate** — Daemon validation step 4 checks config mode. Manual denies `initiator: "claude"` at L2.
+
+### Security
+- **Pipeline Audit A1-A4** — 45 findings, 17 fixed. EncodedCommand L3 block, BLACKLIST_REGEX patterns (.NET types, UNC paths, env vars), unrecognized command classification gate, argument-source param validation.
+
+## [2.0.0] - 2026-02-17
+
+### Changed
+- **Phase 6 Switchover** — BOND_parallel is now the live system. All development, installer builds, and repo syncs ship from it. The original BOND directory is archived.
+- **Daemon v3.0.0** — Composite payloads (`/sync-complete`, `/enter-payload`, `/vine-data`, `/obligations`), D11 sync carries handoff, D12 tiered linking (identity only for linked entities), `--root` flag for portable paths.
+- **SKILL.md rewrite** — Three-zone architecture (Key Signature, Instrument, Accidentals). 52% token reduction. Runtime audience only.
+- **IS Reduction** — 15 doctrine files consolidated to 8 framework entities via audience sort.
+
+### Added
+- **Daemon Heat Map** — Session concept tracking with disk persistence. Bypasses class matrix. Endpoints: `/heatmap-touch`, `/heatmap-hot`, `/heatmap-chunk`, `/heatmap-clear`.
+- **QAIS Resonance (daemon-local)** — Vine scoring moved from MCP round-trips to daemon. `/resonance-test`, `/resonance-multi` endpoints. Daemon reads perspective `.npz` fields directly.
+- **Vine Processor** — Daemon handles tracker bookkeeping (exposures, hits, rain, dry) and disk writes during `{Sync}`. Claude handles judgment only.
+- **Acceptance suite** — 22/22 tests covering entity lifecycle, linking, handoff, sync, restore.
+
 ## [1.5.0] - 2026-02-14
 
 ### Added
@@ -102,5 +165,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - **Example templates** — writer MASTER and SKILL examples for reference
 - **Documentation** — commands, entities, counter, and search reference guides
 
+[2.4.0]: https://github.com/moneyjarrod/BOND/releases/tag/v2.4.0
+[2.3.0]: https://github.com/moneyjarrod/BOND/releases/tag/v2.3.0
+[2.2.0]: https://github.com/moneyjarrod/BOND/releases/tag/v2.2.0
+[2.1.0]: https://github.com/moneyjarrod/BOND/releases/tag/v2.1.0
+[2.0.0]: https://github.com/moneyjarrod/BOND/releases/tag/v2.0.0
 [1.5.0]: https://github.com/moneyjarrod/BOND/releases/tag/v1.5.0
 [1.0.0]: https://github.com/moneyjarrod/BOND/releases/tag/v1.0.0
