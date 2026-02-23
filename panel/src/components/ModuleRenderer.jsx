@@ -5,7 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import PowerShellModule from './PowerShellModule';
 
-const API = 'http://localhost:3000';
+// S139: Use relative paths — Vite proxy handles dev routing
 
 // Custom renderers — modules with custom_renderer field delegate here
 const CUSTOM_RENDERERS = {
@@ -24,13 +24,6 @@ const MODULE_TOOLS = {
   iss: [
     { id: 'analyze', label: 'Analyze', icon: '📐', inputLabel: 'Text to analyze', needsInput: true },
     { id: 'compare', label: 'Compare', icon: '⚖️', inputLabel: 'Texts (one per line)', needsInput: true },
-    { id: 'status', label: 'Status', icon: '📋', needsInput: false },
-  ],
-  eap: [
-    { id: 'schema', label: 'Schema', icon: '🧬', needsInput: false },
-  ],
-  limbic: [
-    { id: 'scan', label: 'Limbic Scan', icon: '🧠', inputLabel: 'Text to scan', needsInput: true },
     { id: 'status', label: 'Status', icon: '📋', needsInput: false },
   ],
 };
@@ -62,7 +55,7 @@ export default function ModuleRenderer({ module, onClose }) {
     setLoading(true);
     setStatsError(null);
     try {
-      const res = await fetch(`${API}${module.status_endpoint}`, {
+      const res = await fetch(`${module.status_endpoint}`, {
         signal: AbortSignal.timeout(3000),
       });
       if (res.ok) {
@@ -88,7 +81,7 @@ export default function ModuleRenderer({ module, onClose }) {
     setToolResult(null);
 
     try {
-      const res = await fetch(`${API}/api/mcp/${module.id}/invoke`, {
+      const res = await fetch(`/api/mcp/${module.id}/invoke`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ tool: tool.id, input: toolInput }),
@@ -210,7 +203,7 @@ export default function ModuleRenderer({ module, onClose }) {
                       // Defer so state is clean before invocation
                       setTimeout(() => {
                         setToolLoading(true);
-                        fetch(`${API}/api/mcp/${module.id}/invoke`, {
+                        fetch(`/api/mcp/${module.id}/invoke`, {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({ tool: tool.id, input: '' }),

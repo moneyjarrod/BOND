@@ -3,7 +3,7 @@
 // Master toggle, mode selector, verb switches, card list, execution, log.
 import { useState, useEffect, useCallback } from 'react';
 
-const API = 'http://localhost:3000';
+// S139: Use relative paths — Vite proxy handles dev routing
 
 const VERB_META = {
   read:    { color: '#2ecc71', risk: 'None',   label: 'Read' },
@@ -30,9 +30,9 @@ export default function PowerShellModule({ module, onClose }) {
     setLoading(true);
     try {
       const [cfgR, cardsR, logR] = await Promise.all([
-        fetch(`${API}/api/powershell/config`).then(r => r.json()).catch(() => null),
-        fetch(`${API}/api/powershell/cards`).then(r => r.json()).catch(() => ({ cards: [] })),
-        fetch(`${API}/api/powershell/log`).then(r => r.json()).catch(() => ({ entries: [] })),
+        fetch('/api/powershell/config').then(r => r.json()).catch(() => null),
+        fetch('/api/powershell/cards').then(r => r.json()).catch(() => ({ cards: [] })),
+        fetch('/api/powershell/log').then(r => r.json()).catch(() => ({ entries: [] })),
       ]);
       if (cfgR) setConfig(cfgR);
       setCards(cardsR.cards || []);
@@ -45,7 +45,7 @@ export default function PowerShellModule({ module, onClose }) {
 
   const updateConfig = async (updates) => {
     try {
-      const res = await fetch(`${API}/api/powershell/config`, {
+      const res = await fetch('/api/powershell/config', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(updates),
@@ -57,20 +57,20 @@ export default function PowerShellModule({ module, onClose }) {
     } catch {}
   };
 
-  const executeCard = async (cardId, dryRun = false) => {
+  const executeCard = async (cardId, dryRun = false, params = {}) => {
     setExecLoading(cardId);
     setExecResult(null);
     try {
-      const res = await fetch(`${API}/api/powershell/exec`, {
+      const res = await fetch('/api/powershell/exec', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ card_id: cardId, dry_run: dryRun, initiator: 'user', confirmed: true }),
+        body: JSON.stringify({ card_id: cardId, dry_run: dryRun, initiator: 'user', confirmed: true, params }),
         signal: AbortSignal.timeout(36000),
       });
       const data = await res.json();
       setExecResult({ card: cardId, ...data });
       // Refresh log
-      const logR = await fetch(`${API}/api/powershell/log`).then(r => r.json()).catch(() => ({ entries: [] }));
+      const logR = await fetch('/api/powershell/log').then(r => r.json()).catch(() => ({ entries: [] }));
       setLog(logR.entries || []);
     } catch (err) {
       setExecResult({ card: cardId, error: err.message });
@@ -222,8 +222,8 @@ export default function PowerShellModule({ module, onClose }) {
             verbs={verbs}
             masterOn={enabled}
             executing={execLoading === card.id}
-            onExecute={() => executeCard(card.id)}
-            onDryRun={() => executeCard(card.id, true)}
+            onExecute={(params) => executeCard(card.id, false, params)}
+            onDryRun={(params) => executeCard(card.id, true, params)}
           />
         ))}
       </div>
@@ -287,64 +287,150 @@ function CardRow({ card, verbs, masterOn, executing, onExecute, onDryRun }) {
   const verbEnabled = verbs[card.verb]?.enabled || false;
   const canRun = masterOn && verbEnabled;
 
+  // Detect argument params that need user input
+  const argParams = (card.params || []).filter(p => p.source === 'argument');
+  const needsInput = argParams.length > 0;
+  const [showParams, setShowParams] = useState(false);
+  const [paramValues, setParamValues] = useState({});
+
+  const handleAction = (isDry) => {
+    if (needsInput) {
+      // Check if all params filled
+      const allFilled = argParams.every(p => paramValues[p.name]?.trim());
+      if (!allFilled) {
+        setShowParams(true);
+        return;
+      }
+      (isDry ? onDryRun : onExecute)(paramValues);
+      setShowParams(false);
+    } else {
+      (isDry ? onDryRun : onExecute)({});
+    }
+  };
+
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
       padding: '8px 10px', marginBottom: 4,
       background: 'var(--bg-elevated)', borderRadius: 'var(--radius-sm, 4px)',
       borderLeft: `3px solid ${meta.color}`,
       opacity: canRun ? 1 : 0.5,
     }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{card.name}</span>
-          <span style={{
-            fontSize: '0.6rem', fontFamily: 'var(--font-mono)',
-            padding: '1px 5px', borderRadius: 3,
-            background: meta.color + '22', color: meta.color,
-          }}>
-            {card.verb}
-          </span>
-          <span className="text-muted" style={{ fontSize: '0.6rem', fontFamily: 'var(--font-mono)' }}>
-            {card.scope}
-          </span>
-          {card.confirm && (
-            <span style={{ fontSize: '0.6rem', color: 'var(--amber)' }} title="Requires confirmation">🔒</span>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontWeight: 600, fontSize: '0.85rem' }}>{card.name}</span>
+            <span style={{
+              fontSize: '0.6rem', fontFamily: 'var(--font-mono)',
+              padding: '1px 5px', borderRadius: 3,
+              background: meta.color + '22', color: meta.color,
+            }}>
+              {card.verb}
+            </span>
+            <span className="text-muted" style={{ fontSize: '0.6rem', fontFamily: 'var(--font-mono)' }}>
+              {card.scope}
+            </span>
+            {card.confirm && (
+              <span style={{ fontSize: '0.6rem', color: 'var(--amber)' }} title="Requires confirmation">🔒</span>
+            )}
+            {needsInput && (
+              <span style={{ fontSize: '0.6rem', color: 'var(--teal)' }} title="Requires parameters">📝</span>
+            )}
+          </div>
+          {card.description && (
+            <div className="text-muted" style={{ fontSize: '0.7rem', marginTop: 2 }}>{card.description}</div>
           )}
         </div>
-        {card.description && (
-          <div className="text-muted" style={{ fontSize: '0.7rem', marginTop: 2 }}>{card.description}</div>
-        )}
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginLeft: 8 }}>
+          <button
+            onClick={() => handleAction(true)}
+            disabled={!canRun || executing}
+            title="Dry run"
+            style={{
+              fontSize: '0.65rem', fontFamily: 'var(--font-mono)',
+              padding: '3px 6px', cursor: canRun ? 'pointer' : 'not-allowed',
+              background: 'var(--bg)', border: '1px solid var(--border)',
+              color: 'var(--text-muted)', borderRadius: 'var(--radius-sm, 4px)',
+            }}
+          >
+            DRY
+          </button>
+          <button
+            onClick={() => handleAction(false)}
+            disabled={!canRun || executing}
+            title="Run"
+            style={{
+              fontSize: '0.65rem', fontFamily: 'var(--font-mono)',
+              padding: '3px 8px', cursor: canRun ? 'pointer' : 'not-allowed',
+              background: canRun ? meta.color : 'var(--bg-elevated)',
+              color: canRun ? '#fff' : 'var(--text-muted)',
+              border: 'none', borderRadius: 'var(--radius-sm, 4px)',
+            }}
+          >
+            {executing ? '⏳' : 'RUN'}
+          </button>
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 4, flexShrink: 0, marginLeft: 8 }}>
-        <button
-          onClick={onDryRun}
-          disabled={!canRun || executing}
-          title="Dry run"
-          style={{
-            fontSize: '0.65rem', fontFamily: 'var(--font-mono)',
-            padding: '3px 6px', cursor: canRun ? 'pointer' : 'not-allowed',
-            background: 'var(--bg)', border: '1px solid var(--border)',
-            color: 'var(--text-muted)', borderRadius: 'var(--radius-sm, 4px)',
-          }}
-        >
-          DRY
-        </button>
-        <button
-          onClick={onExecute}
-          disabled={!canRun || executing}
-          title="Run"
-          style={{
-            fontSize: '0.65rem', fontFamily: 'var(--font-mono)',
-            padding: '3px 8px', cursor: canRun ? 'pointer' : 'not-allowed',
-            background: canRun ? meta.color : 'var(--bg-elevated)',
-            color: canRun ? '#fff' : 'var(--text-muted)',
-            border: 'none', borderRadius: 'var(--radius-sm, 4px)',
-          }}
-        >
-          {executing ? '⏳' : 'RUN'}
-        </button>
-      </div>
+
+      {/* Parameter input panel — shown for argument-sourced params */}
+      {showParams && (
+        <div style={{
+          marginTop: 8, padding: '8px 10px',
+          background: 'var(--bg)', borderRadius: 'var(--radius-sm, 4px)',
+          border: '1px solid var(--border)',
+        }}>
+          {argParams.map(p => (
+            <div key={p.name} style={{ marginBottom: 6 }}>
+              <label className="text-muted" style={{ fontSize: '0.6rem', fontFamily: 'var(--font-mono)', display: 'block', marginBottom: 2 }}>
+                {p.name} {p.validate ? `(${p.validate})` : ''}
+              </label>
+              <input
+                type="text"
+                value={paramValues[p.name] || ''}
+                onChange={e => setParamValues({ ...paramValues, [p.name]: e.target.value })}
+                placeholder={p.name}
+                className="module-tool-input"
+                style={{ width: '100%', fontSize: '0.75rem' }}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    const allFilled = argParams.every(ap => (ap.name === p.name ? e.target.value : paramValues[ap.name])?.trim());
+                    if (allFilled) handleAction(false);
+                  }
+                }}
+              />
+            </div>
+          ))}
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => setShowParams(false)}
+              style={{
+                fontSize: '0.6rem', fontFamily: 'var(--font-mono)',
+                padding: '2px 8px', background: 'var(--bg-elevated)',
+                border: '1px solid var(--border)', borderRadius: 'var(--radius-sm, 4px)',
+                color: 'var(--text-muted)', cursor: 'pointer',
+              }}
+            >Cancel</button>
+            <button
+              onClick={() => handleAction(true)}
+              style={{
+                fontSize: '0.6rem', fontFamily: 'var(--font-mono)',
+                padding: '2px 8px', background: 'var(--bg-elevated)',
+                border: '1px solid var(--border)', borderRadius: 'var(--radius-sm, 4px)',
+                color: 'var(--text-muted)', cursor: 'pointer',
+              }}
+            >DRY</button>
+            <button
+              onClick={() => handleAction(false)}
+              disabled={!argParams.every(p => paramValues[p.name]?.trim())}
+              style={{
+                fontSize: '0.6rem', fontFamily: 'var(--font-mono)',
+                padding: '2px 8px', background: meta.color,
+                border: 'none', borderRadius: 'var(--radius-sm, 4px)',
+                color: '#fff', cursor: 'pointer', fontWeight: 600,
+              }}
+            >RUN</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -454,7 +540,7 @@ function NewCardForm({ onCreated }) {
       // Use the daemon /write or just save via server.
       // Simplest: POST the card data and let server write it
       const card = { ...form, params: [], post_verify: null };
-      const res = await fetch(`${API}/api/powershell/cards`, {
+      const res = await fetch('/api/powershell/cards', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(card),

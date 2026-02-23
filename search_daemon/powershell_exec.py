@@ -268,14 +268,23 @@ class PowerShellExecutor:
                         pass
                 elif name in request_params:
                     validate = param_def.get('validate', '')
-                    value = request_params[name]
+                    value = str(request_params[name])
                     if validate == 'doctrine_path':
-                        real_value = os.path.realpath(str(value))
+                        real_value = os.path.realpath(value)
                         doctrine_norm = os.path.realpath(
                             os.path.join(self.bond_root, 'doctrine')
                         ).replace('\\', '/').lower()
                         if real_value.replace('\\', '/').lower().startswith(doctrine_norm):
-                            resolved = resolved.replace(placeholder, str(value))
+                            resolved = resolved.replace(placeholder, value)
+                    elif validate == 'bond_root_path':
+                        real_value = os.path.realpath(value)
+                        bond_norm = self.bond_root.replace('\\', '/').lower()
+                        if real_value.replace('\\', '/').lower().startswith(bond_norm):
+                            resolved = resolved.replace(placeholder, value)
+                        else:
+                            pass  # Path escapes BOND_ROOT — param stays unresolved, caught by containment check
+                    elif validate == '' or validate is None:
+                        resolved = resolved.replace(placeholder, value)
 
         return resolved
 

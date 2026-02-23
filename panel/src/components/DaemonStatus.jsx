@@ -94,11 +94,3 @@ export default function DaemonStatus() {
   );
 }
 
-// Hook for other components to update daemon status from their own calls
-// Usage: import { useDaemonHealth } from './DaemonStatus';
-//        const reportHealth = useDaemonHealth();
-//        reportHealth(true);  // after successful daemon call
-//        reportHealth(false); // after failed daemon call
-let _healthCallback = null;
-export function registerDaemonHealth(cb) { _healthCallback = cb; }
-export function reportDaemonHealth(online) { if (_healthCallback) _healthCallback(online); }

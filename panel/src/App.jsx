@@ -4,7 +4,6 @@
 import { useState, useEffect, useCallback, useContext } from 'react';
 import Header from './components/Header';
 import CommandBar from './components/CommandBar';
-import SystemStatus from './components/SystemStatus';
 import ModuleBay from './components/ModuleBay';
 import EntityCards from './components/EntityCards';
 import DoctrineViewer from './components/DoctrineViewer';

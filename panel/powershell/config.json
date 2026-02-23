@@ -19,7 +19,7 @@
       "expires": null
     },
     "delete": {
-      "enabled": false,
+      "enabled": true,
       "expires": null
     },
     "execute": {
