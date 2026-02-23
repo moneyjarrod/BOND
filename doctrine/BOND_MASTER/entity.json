@@ -2,5 +2,6 @@
   "class": "doctrine",
   "display_name": "BOND Master",
   "public": true,
-  "links": []
+  "links": [],
+  "mandatory": ["BOND_MASTER.md"]
 }

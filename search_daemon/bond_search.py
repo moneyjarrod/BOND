@@ -48,7 +48,6 @@ Composite Payloads (Data Assembly Layer — one call replaces many):
     POST /sync-complete {"text": "...", "session": "S124"}  # steps 1-5 + vine scores + tracker writes
     # D11: sync-complete includes state/handoff.md content
     # D12: linked entities return entity.json identity only (tier 1)
-    GET  /sync-payload                         # legacy: entity, config, files, links, seeders
     GET  /enter-payload?entity=BOND_MASTER     # {Enter} in one call: entity files + linked files
     GET  /vine-data?perspective=P11-Plumber    # vine lifecycle: tracker, roots, seeds, pruned
     GET  /obligations                          # derived obligations + warnings from state
@@ -63,10 +62,6 @@ QAIS Resonance (Daemon-local vine scoring):
     GET /resonance-test?perspective=P11-Plumber&text=...  # single perspective
     GET /resonance-multi?text=...                         # all armed perspectives
 
-Repository Sync (Private→Public):
-    GET /repo-sync                             # dry-run: report what would sync (default)
-    GET /repo-sync?dry=false                   # execute: copy files to target
-    GET /repo-sync?execute=true                # same as dry=false
 """
 
 import sys, os, re, json, math, time, threading, shutil, fnmatch
@@ -1467,12 +1462,11 @@ class DaemonHeatMap:
 daemon_heatmap = None  # initialized in __main__
 
 
-# ─── RepoSync (Private→Public Sync Engine) ────────────────
-# P11: Eliminates Claude context window as file transport joint.
-# CM: Derive sync scope from entity flags + manifest, not prose.
-# BM: Daemon IS amendment — operates within BOND_ROOT and configured sync targets.
-
-class RepoSync:
+# ─── RepoSync: REMOVED (A1/F2 — S153) ────────────────
+# Dead pipe: required sync_manifest.json (never created).
+# Repo sync runs via PowerShell card through /exec endpoint.
+# Class removed, ~200 lines reclaimed.
+class _RepoSyncRemoved:
     """Binary-safe repository sync from BOND_private to BOND_github.
     
     One-way valve: reads source, writes target. Never reads target content.
@@ -1772,7 +1766,7 @@ class RepoSync:
             return {'exists': True, 'entries': 'unknown'}
 
 
-repo_sync = None  # initialized in __main__
+# repo_sync: REMOVED (A1/F2). Repo sync runs via PowerShell /exec card.
 
 
 # ─── Composite Payloads (Data Assembly Layer) ──────────────
@@ -1797,7 +1791,6 @@ class PayloadAssembler:
         'composite': ['GET /sync-complete', 'POST /sync-complete', 'GET /sync-payload', 'GET /enter-payload?entity=', 'GET /vine-data?perspective=', 'GET /obligations'],
         'heatmap': ['GET /heatmap-touch?concepts=', 'GET /heatmap-hot', 'GET /heatmap-chunk', 'GET /heatmap-clear'],
         'resonance': ['GET /resonance-test?perspective=&text=', 'GET /resonance-multi?text='],
-        'repo_sync': ['GET /repo-sync', 'GET /repo-sync?execute=true'],
     }
 
     def __init__(self, bond_root, state_path, doctrine_path):
@@ -1828,6 +1821,111 @@ class PayloadAssembler:
                 content = self._read_file(f)
                 if content is not None:
                     files[f.name] = content
+        return files
+
+    # D14: Class defaults for mandatory file sets
+    CLASS_DEFAULTS = {
+        'project': ['CORE.md', 'ACTIVE.md'],
+        'doctrine': None,  # entity_name + ".md" — resolved dynamically
+        'perspective': None,  # ROOT-*.md glob + CORE.md + ACTIVE.md — resolved dynamically
+        'library': [],  # entity.json only
+    }
+
+    def _resolve_mandatory(self, entity_path, entity_json):
+        """D14: Resolve mandatory file set for an entity.
+
+        Returns list of mandatory filenames (excluding entity.json, which is always included separately).
+        """
+        entity_path = Path(entity_path)
+
+        # If entity.json has explicit "mandatory" array, use it
+        if entity_json and 'mandatory' in entity_json:
+            mandatory = list(entity_json['mandatory'])
+            # Filter to files that actually exist
+            return [f for f in mandatory if (entity_path / f).is_file()]
+
+        # Apply class defaults
+        entity_class = entity_json.get('class', 'unknown') if entity_json else 'unknown'
+
+        if entity_class == 'project':
+            candidates = ['CORE.md', 'ACTIVE.md']
+            return [f for f in candidates if (entity_path / f).is_file()]
+
+        elif entity_class == 'doctrine':
+            # entity_name + ".md"
+            entity_name = entity_path.name
+            candidate = entity_name + '.md'
+            return [candidate] if (entity_path / candidate).is_file() else []
+
+        elif entity_class == 'perspective':
+            # ROOT-*.md glob + CORE.md + ACTIVE.md (if they exist)
+            import glob as glob_mod
+            root_files = sorted([
+                Path(p).name for p in glob_mod.glob(str(entity_path / 'ROOT-*.md'))
+            ])
+            extras = [f for f in ['CORE.md', 'ACTIVE.md'] if (entity_path / f).is_file()]
+            return root_files + extras
+
+        elif entity_class == 'library':
+            return []  # entity.json only
+
+        else:
+            # Unknown class — load ALL files (backward compatible)
+            return None  # signal to caller: load everything
+
+    def _deferred_manifest(self, entity_path, mandatory_files):
+        """D14: Build deferred manifest for non-mandatory files.
+
+        Returns sorted list of {name, size_kb} for files not in the mandatory set.
+        """
+        entity_path = Path(entity_path)
+        if not entity_path.is_dir():
+            return []
+
+        excluded = set(mandatory_files or [])
+        excluded.add('entity.json')
+
+        deferred = []
+        for f in sorted(entity_path.iterdir()):
+            if not f.is_file():
+                continue
+            if f.suffix not in ('.md', '.json'):
+                continue
+            if f.name in excluded:
+                continue
+            size_kb = round(f.stat().st_size / 1024, 1)
+            deferred.append({'name': f.name, 'size_kb': size_kb})
+
+        return deferred
+
+    def _load_files(self, entity_path, filenames):
+        """Load specific files from entity directory. Returns dict of filename→content.
+
+        Always includes entity.json. If filenames is None, loads ALL files (backward compat).
+        """
+        entity_path = Path(entity_path)
+        if not entity_path.is_dir():
+            return {}
+
+        # None means unknown class — load everything
+        if filenames is None:
+            files = {}
+            for f in sorted(entity_path.iterdir()):
+                if f.is_file():
+                    content = self._read_file(f)
+                    if content is not None:
+                        files[f.name] = content
+            return files
+
+        files = {}
+        # Always include entity.json
+        all_to_load = set(filenames) | {'entity.json'}
+        for name in sorted(all_to_load):
+            path = entity_path / name
+            if path.is_file():
+                content = self._read_file(path)
+                if content is not None:
+                    files[name] = content
         return files
 
     def _linked_entities(self, entity_name):
@@ -1880,10 +1978,16 @@ class PayloadAssembler:
         config = self._read_json(self.state_path / 'config.json') or {}
 
         entity_files = {}
+        deferred = []
         linked_identities = {}  # D12: tiered loading — identity only
         links = []
         if entity_name:
-            entity_files = self._entity_files(entity_name)
+            # D14: mandatory set + deferred manifest
+            entity_path = self.doctrine_path / entity_name
+            entity_json = self._read_json(entity_path / 'entity.json')
+            mandatory_filenames = self._resolve_mandatory(entity_path, entity_json)
+            entity_files = self._load_files(entity_path, mandatory_filenames)
+            deferred = self._deferred_manifest(entity_path, mandatory_filenames)
             links = self._linked_entities(entity_name)
             # D12: linked entities get entity.json only (tier 1: identity)
             # Full content available via /enter-payload (tier 3: full)
@@ -1932,13 +2036,14 @@ class PayloadAssembler:
             'active_class': entity_class,
             'config': config,
             'entity_files': entity_files,
+            'deferred_manifest': deferred,  # D14: non-mandatory files available via /read
             'links': links,
             'linked_identities': linked_identities,  # D12: entity.json only
             'armed_seeders': armed,
             'vine': vine,
             'handoff': handoff,
             'heatmap': daemon_heatmap.for_chunk(),
-            'capabilities': self.CAPABILITIES,
+            # A3/T1-F1: capabilities removed — dead weight (~300 tokens/sync). Available via /status.
             'daemon_version': '3.0.0',
         }
 
@@ -1984,14 +2089,20 @@ class PayloadAssembler:
 
     def enter_payload(self, entity_name):
         """One call replaces {Enter} file cascade.
-        
-        Returns: entity config, all entity files, linked entity files.
+
+        D14: Same mandatory/deferred split as sync_complete.
+        Returns: entity config, mandatory entity files, deferred manifest, linked entity files.
         """
-        config = self._read_json(self.doctrine_path / entity_name / 'entity.json')
+        entity_path = self.doctrine_path / entity_name
+        config = self._read_json(entity_path / 'entity.json')
         if not config:
             return {'error': f'Entity not found: {entity_name}'}
 
-        entity_files = self._entity_files(entity_name)
+        # D14: mandatory set + deferred manifest
+        mandatory_filenames = self._resolve_mandatory(entity_path, config)
+        entity_files = self._load_files(entity_path, mandatory_filenames)
+        deferred = self._deferred_manifest(entity_path, mandatory_filenames)
+
         links = config.get('links', [])
         linked_files = {}
         for linked_name in links:
@@ -2002,6 +2113,7 @@ class PayloadAssembler:
             'class': config.get('class', 'unknown'),
             'config': config,
             'entity_files': entity_files,
+            'deferred_manifest': deferred,  # D14
             'links': links,
             'linked_files': linked_files,
         }
@@ -2369,20 +2481,8 @@ class SearchHandler(BaseHTTPRequestHandler):
             results = perspective_reader.check_multi(perspectives, text)
             self._json(200, {'armed': perspectives, 'results': results})
 
-        # ── RepoSync (Private→Public) ──
-        elif path == '/repo-sync':
-            dry = params.get('dry', ['true'])[0].lower() != 'false'
-            execute = params.get('execute', ['false'])[0].lower() == 'true'
-            if execute:
-                dry = False
-            result = repo_sync.sync(dry_run=dry)
-            if 'error' in result:
-                self._json(400, result)
-            else:
-                self._json(200, result)
-
         else:
-            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /status, /reindex, /manifest, /read, /write, /copy, /export, /sync-complete, /sync-payload, /enter-payload, /vine-data, /obligations, /heatmap-touch, /heatmap-hot, /heatmap-chunk, /heatmap-clear, /resonance-test, /resonance-multi, /repo-sync'})
+            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /status, /reindex, /manifest, /read, /write, /copy, /export, /sync-complete, /enter-payload, /vine-data, /obligations, /heatmap-touch, /heatmap-hot, /heatmap-chunk, /heatmap-clear, /resonance-test, /resonance-multi'})
 
     def do_POST(self):
         parsed = urlparse(self.path)
@@ -2509,7 +2609,6 @@ if __name__ == '__main__':
     vine_processor = VineProcessor(DOCTRINE_PATH)
     daemon_heatmap = DaemonHeatMap(STATE_PATH)
     payloads = PayloadAssembler(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
-    repo_sync = RepoSync(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
     ps_executor = PowerShellExecutor(BOND_ROOT) if PowerShellExecutor else None
     index = SearchIndex()
     watcher = FileWatcher(index)
@@ -2570,7 +2669,6 @@ if __name__ == '__main__':
     print(f"   Composite Payloads (Data Assembly Layer):")
     print(f"     GET  http://localhost:{port}/sync-complete              (steps 1-5 no scores)")
     print(f"     POST http://localhost:{port}/sync-complete              (steps 1-5 + vine scores)")
-    print(f"     GET  http://localhost:{port}/sync-payload               (legacy)")
     print(f"     GET  http://localhost:{port}/enter-payload?entity=BOND_MASTER")
     print(f"     GET  http://localhost:{port}/vine-data?perspective=P11-Plumber")
     print(f"     GET  http://localhost:{port}/obligations")
@@ -2588,11 +2686,6 @@ if __name__ == '__main__':
     print(f"     numpy: {numpy_status}")
     print(f"     perspectives: {perspective_reader.perspectives_dir}")
     print()
-    print(f"   Repository Sync (Private\u2192Public):")
-    print(f"     GET http://localhost:{port}/repo-sync              (dry-run, default)")
-    print(f"     GET http://localhost:{port}/repo-sync?execute=true  (execute)")
-    print()
-
     class ThreadedServer(ThreadingMixIn, HTTPServer):
         daemon_threads = True
 

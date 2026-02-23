@@ -1256,11 +1256,12 @@ app.get('/api/daemon/status', async (req, res) => {
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 3000);
-    const response = await fetch(`${DAEMON_URL}/sync-payload`, { signal: controller.signal });
+    // A1/F1: Use lightweight /status instead of heavy /sync-payload for health check
+    const response = await fetch(`${DAEMON_URL}/status`, { signal: controller.signal });
     clearTimeout(timeout);
     if (response.ok) {
       const data = await response.json();
-      res.json({ online: true, active_entity: data.active_entity || null, capabilities: data.capabilities || null, timestamp: new Date().toISOString() });
+      res.json({ online: true, active_entity: data.active_entity || null, paragraphs: data.paragraphs || 0, scope_mode: data.scope_mode || null, timestamp: new Date().toISOString() });
     } else {
       res.json({ online: false, error: `Daemon returned ${response.status}`, timestamp: new Date().toISOString() });
     }
@@ -1282,7 +1283,7 @@ app.post('/api/daemon/start', async (req, res) => {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 3000);
-      const response = await fetch(`${DAEMON_URL}/sync-payload`, { signal: controller.signal });
+      const response = await fetch(`${DAEMON_URL}/status`, { signal: controller.signal });
       clearTimeout(timeout);
       if (response.ok) {
         console.log('🔍 Daemon started successfully');
@@ -1492,7 +1493,7 @@ bootstrapFrameworkEntities().then(async () => {
     try {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 2000);
-      await fetch(`${DAEMON_URL}/sync-payload`, { signal: controller.signal });
+      await fetch(`${DAEMON_URL}/status`, { signal: controller.signal });
       clearTimeout(timeout);
       console.log(`   🟢 Daemon already running`);
     } catch {

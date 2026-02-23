@@ -10,6 +10,7 @@ Authority stack (D13):
   4. D-pad modes (panel fixture — user selection)
 
 All execution flows through validate() → execute() → post_verify() → log().
+12-step pipeline (A2 audit renumbered from original 10).
 Escalation continuum: Level 0 Pass, Level 1 Flag, Level 2 Hold, Level 3 Deny.
 """
 
@@ -77,9 +78,26 @@ BLACKLIST = [
     "Stop-Computer", "Restart-Computer", "Clear-Disk",
     "Get-Credential", "ConvertTo-SecureString",
     "New-PSSession", "Enter-PSSession",
+    # A2/S5-F2: Missing dangerous cmdlets
+    "Invoke-Command", "Add-Type", "Start-Job", "Start-ThreadJob",
+    "New-Service", "Set-Service", "Enable-PSRemoting",
+    "certutil", "bitsadmin", "rundll32",
 ]
 
 BLACKLIST_PATTERNS = [re.compile(re.escape(b), re.IGNORECASE) for b in BLACKLIST]
+
+# A2/S3-F3 (L3 Critical): EncodedCommand bypasses entire inspection pipeline.
+# PowerShell accepts abbreviations: -EncodedCommand, -enc, -en, -e
+# Also block -ExecutionPolicy bypass when used inline (not via Set-ExecutionPolicy cmdlet).
+# A2/S5-F1: .NET direct type access bypasses cmdlet-layer blacklist.
+BLACKLIST_REGEX = [
+    re.compile(r'(?:^|\s)-enc\w*\b', re.IGNORECASE),         # -EncodedCommand (min abbrev: -enc)
+    re.compile(r'\[System\.Net\.', re.IGNORECASE),           # .NET network types
+    re.compile(r'\[System\.Diagnostics\.Process\]', re.IGNORECASE),  # .NET process spawning
+    re.compile(r'\\\\[^\s]+'),                              # UNC paths (A2/S3-F1)
+    re.compile(r'\$env:', re.IGNORECASE),                      # env var expansion (A2/S3-F2)
+    re.compile(r'\$HOME\b', re.IGNORECASE),                   # $HOME expansion (A2/S3-F2)
+]
 
 
 # ─── Chain Operator Splitting ─────────────────────────────
@@ -241,6 +259,10 @@ class PowerShellExecutor:
         for i, pattern in enumerate(BLACKLIST_PATTERNS):
             if pattern.search(command):
                 return False, BLACKLIST[i]
+        # A2: Regex patterns for encoded commands, .NET types, UNC paths, env vars
+        for pattern in BLACKLIST_REGEX:
+            if pattern.search(command):
+                return False, f'regex:{pattern.pattern}'
         return True, None
 
     # ─── Param Resolution ─────────────────────────────────
@@ -284,11 +306,15 @@ class PowerShellExecutor:
                         else:
                             pass  # Path escapes BOND_ROOT — param stays unresolved, caught by containment check
                     elif validate == '' or validate is None:
-                        resolved = resolved.replace(placeholder, value)
+                        # A2/S6-F1: argument-source params require explicit validation
+                        if source == 'argument':
+                            pass  # reject — unvalidated user input stays unresolved
+                        else:
+                            resolved = resolved.replace(placeholder, value)
 
         return resolved
 
-    # ─── Validation Pipeline (D13: 10 steps) ──────────────
+    # ─── Validation Pipeline (D13: 12 steps, A2 renumbered) ────
 
     def validate_and_execute(self, card_id, dry_run=False, initiator='user', params=None, confirmed=False):
         """Run the full D13 validation pipeline. Returns response dict."""
@@ -344,18 +370,18 @@ class PowerShellExecutor:
             self._log(r, initiator, params)
             return r
 
-        # Resolve command with params
+        # Step 5: Resolve command with params
         command = card.get('command', '')
         card_params = card.get('params') or []
         command = self.resolve_params(command, card_params, params)
 
-        # Step 4: Alias resolution
+        # Step 6: Alias resolution
         resolved = self.resolve_aliases(command)
 
-        # Step 5: Chain operator splitting
+        # Step 7: Chain operator splitting
         segments = self.split_chain(resolved)
 
-        # Step 6: Level 3 blacklist scan (on full resolved command)
+        # Step 8: Level 3 blacklist scan (on full resolved command)
         clean, matched = self.check_blacklist(resolved)
         if not clean:
             r = self._result('deny', 3, card_id, verb, reason=f'Level 3 blacklist: {matched}')
@@ -363,9 +389,16 @@ class PowerShellExecutor:
             self._log(r, initiator, params)
             return r
 
-        # Step 7: Verb-to-pattern mismatch — each segment must match declared verb only
+        # Step 9: Verb-to-pattern mismatch — each segment must match declared verb only
         for seg in segments:
             seg_verbs = self.classify_segment(seg)
+            # A2/S6-F3: Unrecognized commands (empty verb set) only allowed for 'execute' verb
+            if not seg_verbs and seg.strip() and verb != 'execute':
+                r = self._result('hold', 1, card_id, verb,
+                                 reason=f'Unrecognized command in segment — cannot classify verb: {seg[:80]}')
+                r['duration_ms'] = self._ms(t0)
+                self._log(r, initiator, params)
+                return r
             mismatched = seg_verbs - {verb}
             if mismatched:
                 r = self._result('hold', 2, card_id, verb,
@@ -374,7 +407,7 @@ class PowerShellExecutor:
                 self._log(r, initiator, params)
                 return r
 
-        # Step 8: Path containment
+        # Step 10: Path containment
         scope = card.get('scope', 'global')
         active_entity = None
         if scope == 'entity':
@@ -391,7 +424,7 @@ class PowerShellExecutor:
             self._log(r, initiator, params)
             return r
 
-        # Step 9: Confirm gate
+        # Step 11: Confirm gate
         needs_confirm = card.get('confirm', False)
         if verb in ('delete', 'execute'):
             needs_confirm = True  # forced regardless of card declaration
@@ -403,7 +436,7 @@ class PowerShellExecutor:
             self._log(r, initiator, params)
             return r
 
-        # Step 10: Dry-run gate
+        # Step 12: Dry-run gate
         if dry_run:
             dry_text = card.get('dry_run_text', f'Would execute: {resolved}')
             r = self._result('preview', 0, card_id, verb,
@@ -415,11 +448,11 @@ class PowerShellExecutor:
             return r
 
         # All validation passed — execute
-        return self._execute(card, resolved, verb, initiator, params, t0)
+        return self._execute(card, resolved, verb, initiator, params, t0, resolved_command=resolved)
 
     # ─── Execution ────────────────────────────────────────
 
-    def _execute(self, card, resolved_command, verb, initiator, params, t0):
+    def _execute(self, card, resolved_command, verb, initiator, params, t0, **kwargs):
         card_id = card.get('id', 'unknown')
         timeout = card.get('timeout', 30)
 
@@ -455,6 +488,7 @@ class PowerShellExecutor:
                 'level': level,
                 'card': card_id,
                 'verb': verb,
+                'command_preview': resolved_command,  # A2/S2-F1: for audit log
                 'output': output_summary,
                 'exit_code': exit_code,
                 'duration_ms': self._ms(t0),
@@ -498,6 +532,8 @@ class PowerShellExecutor:
             'initiator': initiator,
             'level': result.get('level', 0),
             'params': params,
+            # A2/S2-F1: Log resolved command for forensic reconstruction
+            'resolved_command': (result.get('command_preview', '') or '')[:500],
             'exit_code': result.get('exit_code'),
             'duration_ms': result.get('duration_ms', 0),
             'post_verify': result.get('post_verify'),
