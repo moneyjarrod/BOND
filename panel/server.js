@@ -1299,6 +1299,48 @@ app.post('/api/daemon/start', async (req, res) => {
   }
 });
 
+// ─── Daemon Proxy: GNOISE + generic GET passthrough (D17) ─
+// Routes /api/daemon/gnoise*, etc. to DAEMON_URL.
+// All daemon calls go through sidecar — panel never hits localhost:3003 directly.
+app.get('/api/daemon/gnoise', async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch(`${DAEMON_URL}/gnoise?${qs}`, { signal: controller.signal });
+    clearTimeout(timeout);
+    res.status(response.status).json(await response.json());
+  } catch (err) {
+    res.status(502).json({ error: err.name === 'AbortError' ? 'Daemon timeout (15s)' : err.message });
+  }
+});
+
+app.get('/api/daemon/gnoise-cell', async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(`${DAEMON_URL}/gnoise-cell?${qs}`, { signal: controller.signal });
+    clearTimeout(timeout);
+    res.status(response.status).json(await response.json());
+  } catch (err) {
+    res.status(502).json({ error: err.name === 'AbortError' ? 'Daemon timeout (5s)' : err.message });
+  }
+});
+
+app.get('/api/daemon/gnoise-triage', async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(`${DAEMON_URL}/gnoise-triage?${qs}`, { signal: controller.signal });
+    clearTimeout(timeout);
+    res.status(response.status).json(await response.json());
+  } catch (err) {
+    res.status(502).json({ error: err.name === 'AbortError' ? 'Daemon timeout (5s)' : err.message });
+  }
+});
+
 // ─── AHK Status API (S114) ────────────────────────────────
 const AHK_STATUS_FILE = join(STATE_PATH, 'ahk_status.json');
 
@@ -1390,6 +1432,22 @@ app.post('/api/powershell/exec', async (req, res) => {
   }
 });
 
+// D18: Async job status proxy
+app.get('/api/powershell/job/:jobId', async (req, res) => {
+  try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    const response = await fetch(`${DAEMON_URL}/exec-status?job_id=${req.params.jobId}`, {
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (err) {
+    res.status(502).json({ error: err.name === 'AbortError' ? 'Daemon timeout (5s)' : err.message });
+  }
+});
+
 app.get('/api/powershell/log', async (req, res) => {
   try {
     const limit = parseInt(req.query.limit) || 50;
@@ -1435,7 +1493,7 @@ if (existsSync(DIST_PATH)) {
   // Never cache index.html — always serve fresh to pick up new asset hashes
   app.get('/', (req, res) => { res.set('Cache-Control', 'no-store'); res.sendFile(join(DIST_PATH, 'index.html')); });
   app.use(express.static(DIST_PATH, { maxAge: 0 }));
-  app.get('/{*path}', (req, res) => { if (!req.path.startsWith('/api/')) { res.set('Cache-Control', 'no-store'); res.sendFile(join(DIST_PATH, 'index.html')); } });
+  app.get('/{*path}', (req, res) => { if (req.path.startsWith('/api/')) { res.status(404).json({ error: 'API route not found' }); } else { res.set('Cache-Control', 'no-store'); res.sendFile(join(DIST_PATH, 'index.html')); } });
   console.log('   Serving built panel from dist/');
 }
 

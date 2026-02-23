@@ -4,12 +4,14 @@
 // D13: custom_renderer support for PowerShell module
 import { useState, useEffect, useCallback } from 'react';
 import PowerShellModule from './PowerShellModule';
+import GnoiseModule from './GnoiseModule';
 
 // S139: Use relative paths — Vite proxy handles dev routing
 
 // Custom renderers — modules with custom_renderer field delegate here
 const CUSTOM_RENDERERS = {
   powershell: PowerShellModule,
+  gnoise: GnoiseModule,
 };
 
 // Tools defined as data — adding a module means adding an entry here, not editing JSX

@@ -18,6 +18,7 @@ import os
 import re
 import json
 import time
+import threading
 import subprocess
 from pathlib import Path
 from datetime import datetime, timezone
@@ -121,6 +122,8 @@ class PowerShellExecutor:
         self.cards_dir = os.path.join(self.ps_dir, 'cards')
         self.log_path = os.path.join(self.ps_dir, 'exec_log.jsonl')
         self.dry_run_completed = set()  # D16: card_ids that passed dry run this session
+        self.jobs = {}  # D18: job_id → {status, card_id, verb, started, process, stdout, stderr, exit_code, result}
+        self.job_ttl = 300  # seconds — jobs expire after 5 minutes
 
     # ─── Config ───────────────────────────────────────────
 
@@ -483,6 +486,10 @@ class PowerShellExecutor:
                 self._log(r, initiator, params)
                 return r
 
+        # Step 12.5: D18 async routing
+        if card.get('async', False) and not dry_run:
+            return self._execute_async(card, resolved, verb, initiator, params, t0)
+
         # All validation passed — execute
         return self._execute(card, resolved, verb, initiator, params, t0)
 
@@ -543,6 +550,162 @@ class PowerShellExecutor:
             r['duration_ms'] = self._ms(t0)
             self._log(r, initiator, params)
             return r
+
+    # ─── Async Execution (D18) ──────────────────────────────
+
+    def _execute_async(self, card, resolved_command, verb, initiator, params, t0):
+        """Non-blocking execution. Returns job_id immediately."""
+        import uuid
+        card_id = card.get('id', 'unknown')
+        timeout = card.get('timeout', 30)
+        job_id = str(uuid.uuid4())[:8]
+
+        try:
+            proc = subprocess.Popen(
+                ['powershell', '-NoProfile', '-NonInteractive', '-Command', resolved_command],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                cwd=self.bond_root, text=True,
+            )
+
+            self.jobs[job_id] = {
+                'status': 'running',
+                'card_id': card_id,
+                'verb': verb,
+                'command_preview': resolved_command,
+                'started': time.time(),
+                'timeout': timeout,
+                'process': proc,
+                'stdout': None,
+                'stderr': None,
+                'exit_code': None,
+                'result': None,
+            }
+
+            # Start background thread to wait for completion
+            thread = threading.Thread(target=self._wait_job, args=(job_id,), daemon=True)
+            thread.start()
+
+            r = {
+                'status': 'accepted',
+                'async': True,
+                'job_id': job_id,
+                'card': card_id,
+                'verb': verb,
+                'level': 0,
+                'duration_ms': self._ms(t0),
+            }
+            self._log(r, initiator, params)
+            return r
+
+        except Exception as e:
+            r = self._result('error', 2, card_id, verb, reason=str(e))
+            r['duration_ms'] = self._ms(t0)
+            self._log(r, initiator, params)
+            return r
+
+    def _wait_job(self, job_id):
+        """Background thread: wait for process, capture output, update job status."""
+        job = self.jobs.get(job_id)
+        if not job:
+            return
+
+        proc = job['process']
+        timeout = job['timeout']
+
+        try:
+            stdout, stderr = proc.communicate(timeout=timeout)
+            exit_code = proc.returncode
+
+            output_summary = (stdout or '')[:500]
+            if stderr:
+                output_summary += f'\n[stderr]: {(stderr or "")[:200]}'
+
+            post_verify = self._post_verify(
+                {'id': job['card_id'], 'post_verify': None},
+                job['verb'], exit_code
+            )
+
+            if exit_code != 0:
+                level = 1
+                status = 'flag'
+            elif post_verify and post_verify not in ('pass', None):
+                level = 2
+                status = 'hold'
+            else:
+                level = 0
+                status = 'success'
+
+            job['status'] = status
+            job['stdout'] = output_summary
+            job['stderr'] = (stderr or '')[:200]
+            job['exit_code'] = exit_code
+            job['result'] = {
+                'status': status,
+                'level': level,
+                'card': job['card_id'],
+                'verb': job['verb'],
+                'command_preview': job['command_preview'],
+                'output': output_summary,
+                'exit_code': exit_code,
+                'duration_ms': round((time.time() - job['started']) * 1000),
+                'post_verify': post_verify,
+                'async': True,
+            }
+
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.communicate()  # reap
+            job['status'] = 'timeout'
+            job['result'] = {
+                'status': 'error',
+                'level': 2,
+                'card': job['card_id'],
+                'verb': job['verb'],
+                'reason': f'Timeout after {timeout}s',
+                'async': True,
+            }
+        except Exception as e:
+            job['status'] = 'error'
+            job['result'] = {
+                'status': 'error',
+                'level': 2,
+                'card': job['card_id'],
+                'verb': job['verb'],
+                'reason': str(e),
+                'async': True,
+            }
+        finally:
+            # Remove process handle (not serializable)
+            job['process'] = None
+
+    def job_status(self, job_id):
+        """Check job status. Returns current state."""
+        self._cleanup_jobs()  # TTL sweep on each check
+
+        job = self.jobs.get(job_id)
+        if not job:
+            return {'error': f'Job not found: {job_id}', 'status': 'unknown'}
+
+        if job['status'] == 'running':
+            elapsed = round((time.time() - job['started']) * 1000)
+            return {
+                'status': 'running',
+                'job_id': job_id,
+                'card': job['card_id'],
+                'verb': job['verb'],
+                'elapsed_ms': elapsed,
+                'async': True,
+            }
+        else:
+            return job['result']
+
+    def _cleanup_jobs(self):
+        """Remove expired jobs."""
+        now = time.time()
+        expired = [jid for jid, job in self.jobs.items()
+                   if now - job['started'] > self.job_ttl and job['status'] != 'running']
+        for jid in expired:
+            del self.jobs[jid]
 
     # ─── Post-Execution Verification (MCSO) ───────────────
 

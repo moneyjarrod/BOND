@@ -31,6 +31,11 @@ Search Endpoints (Hot Water — SLA pipeline):
     GET /orphans?max_sim=0.3                   # higher = more results
     GET /coverage?entity=P11-Plumber           # seed-to-ROOT resonance map
     GET /similarity                            # entity vocabulary overlap
+    GET /gnoise?entity=P11-Plumber             # D17: noise scan (inverted resonance)
+    GET /gnoise?entity=P11&threshold=0.15      # custom threshold
+    GET /gnoise-cell                           # read global holding cell
+    GET /gnoise-cell?entity=P11-Plumber        # read entity-local cell (if N valve on)
+    GET /gnoise-triage?entity=P11&indices=0,1&action=fixed  # mark findings triaged
     GET /status                                # index stats, scope, health
     GET /reindex                               # force rebuild
 
@@ -1587,6 +1592,277 @@ class DaemonHeatMap:
 
 
 daemon_heatmap = None  # initialized in __main__
+gnoise_auditor = None  # initialized in __main__
+
+
+# ─── GNOISE: Inverted Resonance Auditor (D17) ────────────────
+# Finds content that no longer belongs to the entity it lives in.
+# Rides existing reindex — same SearchIndex, opposite polarity.
+# Read-only on source files. Writes only to holding cell.
+# Authority (BM or entity-local) triages findings.
+
+class GnoiseAuditor:
+    """Inverted resonance auditor. Finds noise in entities.
+
+    D17: GNOISE IS a belongingness detector on the negative threshold.
+    Same TF-IDF engine as search, opposite polarity.
+
+    Safety model:
+    1. Zero write authority over source files
+    2. Only writes to holding cell (global or entity-local)
+    3. Recency exemption — recent content scores low naturally (growth, not noise)
+    """
+
+    # Identity file patterns by class
+    IDENTITY_PATTERNS = {
+        'perspective': lambda files: [f for f in files if f.startswith('ROOT-') or f.startswith('ROOT_')],
+        'project': lambda files: [f for f in files if f in ('CORE.md',)],
+        'doctrine': None,  # resolved dynamically: entity_name + '.md'
+        'library': lambda files: [],  # no identity files — skip
+    }
+
+    def __init__(self, bond_root, state_path, doctrine_path):
+        self.bond_root = Path(bond_root)
+        self.state_path = Path(state_path)
+        self.doctrine_path = Path(doctrine_path)
+        self.global_cell = self.state_path / 'gnoise_findings.json'
+
+    def _holding_cell_path(self, entity_name):
+        """Route findings: entity-local if N valve on, else global."""
+        entity_dir = self.doctrine_path / entity_name
+        try:
+            config = json.loads((entity_dir / 'entity.json').read_text(encoding='utf-8'))
+            gnoise_cfg = config.get('gnoise', {})
+            if gnoise_cfg.get('enabled', False) and gnoise_cfg.get('authority') == 'self':
+                local_dir = entity_dir / 'state' / 'gnoise'
+                os.makedirs(local_dir, exist_ok=True)
+                return local_dir / 'findings.json'
+        except Exception:
+            pass
+        return self.global_cell
+
+    def _load_cell(self, cell_path):
+        """Load existing findings. Returns list."""
+        try:
+            return json.loads(Path(cell_path).read_text(encoding='utf-8'))
+        except Exception:
+            return []
+
+    def _save_cell(self, cell_path, findings):
+        """Write findings to holding cell. Append-and-mark, never delete."""
+        os.makedirs(Path(cell_path).parent, exist_ok=True)
+        Path(cell_path).write_text(
+            json.dumps(findings, indent=2, ensure_ascii=False),
+            encoding='utf-8'
+        )
+
+    def _identity_files(self, entity_name, entity_class):
+        """Resolve which files define this entity's identity."""
+        entity_dir = self.doctrine_path / entity_name
+        all_files = [f.name for f in entity_dir.iterdir() if f.is_file() and f.suffix == '.md']
+
+        if entity_class == 'doctrine':
+            # Primary .md = entity_name + '.md'
+            candidate = entity_name + '.md'
+            return [candidate] if candidate in all_files else []
+
+        pattern_fn = self.IDENTITY_PATTERNS.get(entity_class)
+        if pattern_fn is None:
+            return []
+        return pattern_fn(all_files)
+
+    def _recency_exempt(self, filepath, exempt_days=14):
+        """Check if file was modified recently enough to be exempt.
+
+        D17 safety: new content scores low naturally — that's growth, not noise.
+        Default 14 days (~5 sessions at typical pace).
+        """
+        try:
+            mtime = Path(filepath).stat().st_mtime
+            age_days = (time.time() - mtime) / 86400
+            return age_days < exempt_days
+        except Exception:
+            return False
+
+    def scan(self, entity_name, search_index, threshold=0.10, exempt_days=14):
+        """Scan entity for noise. Returns structured report.
+
+        Args:
+            entity_name: entity to audit
+            search_index: the daemon's SearchIndex (already built)
+            threshold: paragraphs with identity cosine BELOW this are findings
+            exempt_days: files modified within this window are skipped
+
+        Returns: {entity, findings, identity_files, scanned, skipped_recent, threshold}
+        """
+        entity_dir = self.doctrine_path / entity_name
+
+        # Read entity config
+        try:
+            config = json.loads((entity_dir / 'entity.json').read_text(encoding='utf-8'))
+        except Exception:
+            return {'error': f'Cannot read entity.json for {entity_name}'}
+
+        entity_class = config.get('class', 'unknown')
+        if entity_class == 'library':
+            return {'entity': entity_name, 'skipped': True, 'reason': 'Library class — no identity to audit against'}
+
+        # Resolve identity files
+        id_files = self._identity_files(entity_name, entity_class)
+        if not id_files:
+            return {'error': f'No identity files found for {entity_name} ({entity_class}-class)'}
+
+        # Build identity tokens (centroid) from identity files
+        identity_tokens = []
+        for fname in id_files:
+            fpath = entity_dir / fname
+            if fpath.is_file():
+                paragraphs = extract_paragraphs(str(fpath))
+                for p in paragraphs:
+                    identity_tokens.extend(content_stems(p['text']))
+
+        if not identity_tokens:
+            return {'error': f'Identity files are empty for {entity_name}'}
+
+        # Score every paragraph in this entity against identity
+        # Use the SearchIndex's lock and data
+        findings = []
+        scanned = 0
+        skipped_recent = 0
+
+        with search_index._lock:
+            for i, p in enumerate(search_index.paragraphs):
+                if p['entity'] != entity_name:
+                    continue
+
+                # Skip identity files themselves
+                if p['file'] in id_files:
+                    continue
+
+                # Skip entity.json, seed_tracker.json
+                if p['file'] in ('entity.json', 'seed_tracker.json'):
+                    continue
+
+                # Recency exemption
+                fpath = entity_dir / p['file']
+                if self._recency_exempt(str(fpath), exempt_days):
+                    skipped_recent += 1
+                    continue
+
+                scanned += 1
+
+                # Cosine against identity centroid
+                p_tokens = search_index.tokens[i]
+                if not p_tokens:
+                    continue
+
+                score = search_index._cosine(p_tokens, identity_tokens, search_index.idf)
+
+                if score < threshold:
+                    # Priority: lower score = higher priority (more noise)
+                    if score < threshold * 0.25:
+                        priority = 'high'
+                    elif score < threshold * 0.5:
+                        priority = 'medium'
+                    else:
+                        priority = 'low'
+
+                    findings.append({
+                        'source_file': p['file'],
+                        'heading': p['heading'],
+                        'text_preview': p['text'][:200],
+                        'score': round(score, 4),
+                        'entity': entity_name,
+                        'priority': priority,
+                        'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
+                        'triaged': False,
+                    })
+
+        # Sort by score ascending (lowest resonance = most noise)
+        findings.sort(key=lambda x: x['score'])
+
+        # Append to holding cell (skip duplicates by source_file + heading + text_preview)
+        cell_path = self._holding_cell_path(entity_name)
+        existing = self._load_cell(cell_path)
+
+        # Dedup: skip findings that match an existing untriaged entry
+        existing_keys = set()
+        for e in existing:
+            if not e.get('triaged', False):
+                existing_keys.add((e.get('source_file', ''), e.get('heading', ''), e.get('text_preview', '')[:100]))
+
+        new_findings = []
+        for f in findings:
+            key = (f['source_file'], f['heading'], f['text_preview'][:100])
+            if key not in existing_keys:
+                new_findings.append(f)
+
+        if new_findings:
+            existing.extend(new_findings)
+            self._save_cell(cell_path, existing)
+
+        return {
+            'entity': entity_name,
+            'entity_class': entity_class,
+            'identity_files': id_files,
+            'threshold': threshold,
+            'exempt_days': exempt_days,
+            'scanned': scanned,
+            'skipped_recent': skipped_recent,
+            'findings_total': len(findings),
+            'findings_new': len(new_findings),
+            'findings_duplicate': len(findings) - len(new_findings),
+            'holding_cell': str(cell_path.relative_to(self.bond_root)),
+            'findings': findings,
+        }
+
+    def read_cell(self, entity_name=None):
+        """Read holding cell contents. For audit pre-flight briefing.
+
+        If entity_name provided and N valve active, reads entity-local cell.
+        Otherwise reads global cell.
+        """
+        if entity_name:
+            cell_path = self._holding_cell_path(entity_name)
+        else:
+            cell_path = self.global_cell
+
+        findings = self._load_cell(cell_path)
+        untriaged = [f for f in findings if not f.get('triaged', False)]
+        triaged = [f for f in findings if f.get('triaged', False)]
+
+        return {
+            'total': len(findings),
+            'untriaged': len(untriaged),
+            'triaged': len(triaged),
+            'findings': findings,
+            'cell_path': str(cell_path),
+        }
+
+    def triage(self, entity_name, indices, action='dismiss'):
+        """Mark findings as triaged. Append-and-mark, never delete.
+
+        Args:
+            entity_name: entity for cell routing
+            indices: list of finding indices to mark
+            action: 'dismiss', 'fixed', 'deferred'
+        """
+        if entity_name:
+            cell_path = self._holding_cell_path(entity_name)
+        else:
+            cell_path = self.global_cell
+
+        findings = self._load_cell(cell_path)
+        marked = 0
+        for idx in indices:
+            if 0 <= idx < len(findings):
+                findings[idx]['triaged'] = True
+                findings[idx]['triage_action'] = action
+                findings[idx]['triage_timestamp'] = time.strftime('%Y-%m-%dT%H:%M:%S')
+                marked += 1
+
+        self._save_cell(cell_path, findings)
+        return {'marked': marked, 'action': action, 'total_findings': len(findings)}
 
 
 # ─── RepoSync: REMOVED (A1/F2 — S153) ────────────────
@@ -2171,7 +2447,7 @@ class PayloadAssembler:
             'handoff': handoff,
             'heatmap': daemon_heatmap.for_chunk(),
             # A3/T1-F1: capabilities removed — dead weight (~300 tokens/sync). Available via /status.
-            'daemon_version': '3.1.0',
+            'daemon_version': '3.2.0',
         }
 
     def sync_payload(self):
@@ -2468,6 +2744,58 @@ class SearchHandler(BaseHTTPRequestHandler):
             result = index.entity_similarity()
             self._json(200, result)
 
+        # ── GNOISE: Inverted Resonance Auditor (D17) ──
+        elif path == '/gnoise':
+            entity = params.get('entity', [None])[0]
+            if not entity:
+                self._json(400, {'error': 'Missing ?entity= parameter. Usage: /gnoise?entity=NAME'})
+                return
+            threshold = float(params.get('threshold', ['0.10'])[0])
+            exempt_days = int(params.get('exempt_days', ['14'])[0])
+            result = gnoise_auditor.scan(entity, index, threshold=threshold, exempt_days=exempt_days)
+            if 'error' in result:
+                self._json(400, result)
+            else:
+                self._json(200, result)
+
+        elif path == '/gnoise-cell':
+            entity = params.get('entity', [None])[0]
+            result = gnoise_auditor.read_cell(entity_name=entity)
+            self._json(200, result)
+
+        elif path == '/gnoise-triage':
+            entity = params.get('entity', [None])[0]
+            indices_raw = params.get('indices', [''])[0]
+            action = params.get('action', ['dismiss'])[0]
+            if not indices_raw:
+                self._json(400, {'error': 'Missing ?indices=0,1,2 parameter'})
+                return
+            try:
+                indices = [int(i.strip()) for i in indices_raw.split(',')]
+            except ValueError:
+                self._json(400, {'error': 'indices must be comma-separated integers'})
+                return
+            if action not in ('dismiss', 'fixed', 'deferred'):
+                self._json(400, {'error': 'action must be: dismiss, fixed, or deferred'})
+                return
+            result = gnoise_auditor.triage(entity, indices, action=action)
+            self._json(200, result)
+
+        # ── D18: Async Job Status ──
+        elif path == '/exec-status':
+            if not ps_executor:
+                self._json(500, {'error': 'PowerShell execution module not available'})
+                return
+            job_id = params.get('job_id', [''])[0]
+            if not job_id:
+                self._json(400, {'error': 'Missing ?job_id= parameter'})
+                return
+            result = ps_executor.job_status(job_id)
+            if 'error' in result:
+                self._json(404, result)
+            else:
+                self._json(200, result)
+
         # ── File Operations (Cold Water) ──
         elif path == '/manifest':
             entity = params.get('entity', [None])[0]
@@ -2609,7 +2937,7 @@ class SearchHandler(BaseHTTPRequestHandler):
             self._json(200, {'armed': perspectives, 'results': results})
 
         else:
-            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /status, /reindex, /manifest, /read, /write, /copy, /export, /sync-complete, /enter-payload, /vine-data, /obligations, /heatmap-touch, /heatmap-hot, /heatmap-chunk, /heatmap-clear, /resonance-test, /resonance-multi'})
+            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /gnoise, /gnoise-cell, /gnoise-triage, /exec-status, /status, /reindex, /manifest, /read, /write, /copy, /export, /sync-complete, /enter-payload, /vine-data, /obligations, /heatmap-touch, /heatmap-hot, /heatmap-chunk, /heatmap-clear, /resonance-test, /resonance-multi'})
 
     def do_POST(self):
         parsed = urlparse(self.path)
@@ -2780,6 +3108,7 @@ if __name__ == '__main__':
     perspective_reader = PerspectiveReader(BOND_ROOT)
     vine_processor = VineProcessor(DOCTRINE_PATH)
     daemon_heatmap = DaemonHeatMap(STATE_PATH)
+    gnoise_auditor = GnoiseAuditor(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
     payloads = PayloadAssembler(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
     ps_executor = PowerShellExecutor(BOND_ROOT) if PowerShellExecutor else None
     index = SearchIndex()
@@ -2826,6 +3155,9 @@ if __name__ == '__main__':
     print(f"     GET http://localhost:{port}/orphans")
     print(f"     GET http://localhost:{port}/coverage?entity=P11-Plumber")
     print(f"     GET http://localhost:{port}/similarity")
+    print(f"     GET http://localhost:{port}/gnoise?entity=P11-Plumber")
+    print(f"     GET http://localhost:{port}/gnoise-cell")
+    print(f"     GET http://localhost:{port}/gnoise-triage?entity=P11&indices=0,1&action=fixed")
     print(f"     GET http://localhost:{port}/status")
     print(f"     GET http://localhost:{port}/reindex")
     print()

@@ -1,0 +1,12 @@
+{
+  "id": "gnoise",
+  "name": "GNOISE",
+  "icon": "\uD83D\uDD0D",
+  "description": "Noise Gnome \u2014 Inverted Resonance Auditor (D17)",
+  "status_endpoint": "/api/daemon/status",
+  "custom_renderer": "gnoise",
+  "display_fields": [
+    { "key": "paragraphs", "label": "Indexed", "icon": "\uD83D\uDCC4" }
+  ],
+  "refresh_interval": 30
+}

@@ -3,5 +3,7 @@
   "display_name": "BOND Master",
   "public": true,
   "links": [],
-  "mandatory": ["BOND_MASTER.md"]
+  "mandatory": [
+    "BOND_MASTER.md"
+  ]
 }

@@ -4,6 +4,17 @@ echo.
 
 cd /d "%~dp0panel"
 
+REM Kill zombie sidecar on port 3000 (prevents EADDRINUSE crash)
+netstat -ano | findstr ":3000 " | findstr "LISTENING" >nul 2>&1
+if %ERRORLEVEL%==0 (
+    echo [!] Port 3000 in use — killing zombie process...
+    for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":3000 " ^| findstr "LISTENING"') do (
+        taskkill /PID %%a /F >nul 2>&1
+    )
+    timeout /t 1 /nobreak >nul
+    echo [OK] Cleared port 3000
+)
+
 :: Force rebuild with --rebuild flag
 if "%1"=="--rebuild" (
   echo [!] Forcing clean rebuild...

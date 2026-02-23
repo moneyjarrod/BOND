@@ -1,0 +1,11 @@
+{
+  "id": "async-test",
+  "name": "Async Test (D18)",
+  "description": "Tests async execution — sleeps 5 seconds then reports success",
+  "command": "Start-Sleep -Seconds 5",
+  "dry_run_command": "Write-Host '[DRY] Would sleep 5 seconds'",
+  "verb": "execute",
+  "scope": "global",
+  "async": true,
+  "timeout": 15
+}

@@ -57,6 +57,35 @@ export default function PowerShellModule({ module, onClose }) {
     } catch {}
   };
 
+  const pollJob = async (jobId, cardId) => {
+    const maxAttempts = 60;  // 30 seconds at 500ms intervals
+    for (let i = 0; i < maxAttempts; i++) {
+      await new Promise(r => setTimeout(r, 500));
+      try {
+        const res = await fetch(`/api/powershell/job/${jobId}`);
+        const data = await res.json();
+        if (data.status === 'running') {
+          setExecResult({ card: cardId, status: 'running', async: true, elapsed_ms: data.elapsed_ms });
+          continue;
+        }
+        // Job complete
+        setExecResult({ card: cardId, ...data });
+        setExecLoading(null);
+        // Refresh log
+        const logR = await fetch('/api/powershell/log').then(r => r.json()).catch(() => ({ entries: [] }));
+        setLog(logR.entries || []);
+        return;
+      } catch (err) {
+        setExecResult({ card: cardId, error: `Poll error: ${err.message}` });
+        setExecLoading(null);
+        return;
+      }
+    }
+    // Timeout
+    setExecResult({ card: cardId, error: 'Job timed out waiting for result' });
+    setExecLoading(null);
+  };
+
   const executeCard = async (cardId, dryRun = false, params = {}) => {
     setExecLoading(cardId);
     setExecResult(null);
@@ -68,14 +97,21 @@ export default function PowerShellModule({ module, onClose }) {
         signal: AbortSignal.timeout(36000),
       });
       const data = await res.json();
-      setExecResult({ card: cardId, dryRun, ...data });
-      // Refresh log
-      const logR = await fetch('/api/powershell/log').then(r => r.json()).catch(() => ({ entries: [] }));
-      setLog(logR.entries || []);
+      if (data.async && data.job_id) {
+        // D18: Enter polling mode — don't clear execLoading
+        setExecResult({ card: cardId, status: 'accepted', async: true, job_id: data.job_id });
+        pollJob(data.job_id, cardId);
+      } else {
+        setExecResult({ card: cardId, dryRun, ...data });
+        // Refresh log
+        const logR = await fetch('/api/powershell/log').then(r => r.json()).catch(() => ({ entries: [] }));
+        setLog(logR.entries || []);
+        setExecLoading(null);
+      }
     } catch (err) {
       setExecResult({ card: cardId, error: err.message });
+      setExecLoading(null);
     }
-    setExecLoading(null);
   };
 
   if (loading) {
@@ -314,8 +350,10 @@ function CardRow({ card, verbs, masterOn, executing, execResult, onExecute, onDr
         return;
       }
       (isDry ? onDryRun : onExecute)(paramValues);
-      setParamValues({});
-      setShowParams(false);
+      if (!isDry) {
+        setParamValues({});
+        setShowParams(false);
+      }
     } else {
       (isDry ? onDryRun : onExecute)({});
     }
@@ -454,8 +492,9 @@ function CardRow({ card, verbs, masterOn, executing, execResult, onExecute, onDr
 function ExecResultPanel({ result, onDismiss }) {
   const levelColors = { 0: '#2ecc71', 1: '#f39c12', 2: '#e74c3c', 3: '#8e44ad' };
   const levelNames = { 0: 'Pass', 1: 'Flag', 2: 'Hold', 3: 'Deny' };
-  const level = result.level ?? -1;
-  const color = levelColors[level] || 'var(--text-muted)';
+  const isAsyncRunning = result.async && (result.status === 'running' || result.status === 'accepted');
+  const level = isAsyncRunning ? -1 : (result.level ?? -1);
+  const color = isAsyncRunning ? 'var(--amber)' : (levelColors[level] || 'var(--text-muted)');
 
   return (
     <div style={{
@@ -491,6 +530,12 @@ function ExecResultPanel({ result, onDismiss }) {
           </span>
         )}
       </div>
+
+      {isAsyncRunning && (
+        <div style={{ fontSize: '0.75rem', marginBottom: 6, color: 'var(--amber)', fontFamily: 'var(--font-mono)' }}>
+          {'\u23F3'} Running...{result.elapsed_ms ? ` (${Math.round(result.elapsed_ms / 1000)}s)` : ''}
+        </div>
+      )}
 
       {result.reason && (
         <div style={{ fontSize: '0.75rem', marginBottom: 6, color }}>

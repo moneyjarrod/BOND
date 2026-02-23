@@ -605,9 +605,10 @@ body {
 .module-renderer {
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-md);
   padding: 16px;
   margin-top: 4px;
+  overflow: visible;
 }
 
 .module-renderer-header {
