@@ -29,6 +29,10 @@ VERB_CMDLET_MAP = {
     "read": [
         "Get-Content", "Get-Item", "Get-ChildItem", "Test-Path",
         "Select-String", "Measure-Object",
+        # D16: pipeline/formatting cmdlets — read-only, no side effects
+        "Sort-Object", "Select-Object", "Format-Table", "Format-List",
+        "Where-Object", "ForEach-Object", "Group-Object",
+        "Write-Host", "Write-Output", "Join-Path", "Get-Date",
     ],
     "copy": ["Copy-Item"],
     "move": ["Move-Item", "Rename-Item"],
@@ -116,6 +120,7 @@ class PowerShellExecutor:
         self.config_path = os.path.join(self.ps_dir, 'config.json')
         self.cards_dir = os.path.join(self.ps_dir, 'cards')
         self.log_path = os.path.join(self.ps_dir, 'exec_log.jsonl')
+        self.dry_run_completed = set()  # D16: card_ids that passed dry run this session
 
     # ─── Config ───────────────────────────────────────────
 
@@ -316,8 +321,8 @@ class PowerShellExecutor:
 
     # ─── Validation Pipeline (D13: 12 steps, A2 renumbered) ────
 
-    def validate_and_execute(self, card_id, dry_run=False, initiator='user', params=None, confirmed=False):
-        """Run the full D13 validation pipeline. Returns response dict."""
+    def validate_and_execute(self, card_id, dry_run=False, initiator='user', params=None):
+        """Run the full D13/D16 validation pipeline. Returns response dict."""
         params = params or {}
         t0 = time.time()
 
@@ -424,31 +429,62 @@ class PowerShellExecutor:
             self._log(r, initiator, params)
             return r
 
-        # Step 11: Confirm gate
-        needs_confirm = card.get('confirm', False)
+        # Step 11: D16 dry-run enforcement gate
+        requires_dry = card.get('requires_dry_run', False)
         if verb in ('delete', 'execute'):
-            needs_confirm = True  # forced regardless of card declaration
-        if needs_confirm and not confirmed:
-            r = self._result('hold', 0, card_id, verb,
-                             reason='Confirmation required',
-                             command_preview=resolved)
+            requires_dry = True  # forced regardless of card declaration
+
+        if requires_dry and not dry_run and card_id not in self.dry_run_completed:
+            r = self._result('hold', 2, card_id, verb,
+                             reason='Dry run required before execution. Run DRY first.')
             r['duration_ms'] = self._ms(t0)
             self._log(r, initiator, params)
             return r
 
-        # Step 12: Dry-run gate
+        # Step 12: D16 dry-run execution
         if dry_run:
-            dry_text = card.get('dry_run_text', f'Would execute: {resolved}')
-            r = self._result('preview', 0, card_id, verb,
-                             reason='Dry run',
-                             command_preview=resolved,
-                             dry_run_text=dry_text)
-            r['duration_ms'] = self._ms(t0)
-            self._log(r, initiator, params)
-            return r
+            dry_cmd = card.get('dry_run_command')
+            if dry_cmd:
+                # Resolve params in dry_run_command too
+                dry_cmd = self.resolve_params(dry_cmd, card_params, params)
+                dry_resolved = self.resolve_aliases(dry_cmd)
+                # Validate as read-only
+                for seg in self.split_chain(dry_resolved):
+                    seg_verbs = self.classify_segment(seg)
+                    non_read = seg_verbs - {'read'}
+                    if non_read:
+                        r = self._result('deny', 3, card_id, verb,
+                                         reason=f'dry_run_command contains non-read verbs: {non_read}')
+                        r['duration_ms'] = self._ms(t0)
+                        self._log(r, initiator, params)
+                        return r
+                # Execute the dry run command
+                exec_cmd = dry_resolved
+            else:
+                # null dry_run_command = DRY ≡ RUN
+                exec_cmd = resolved
+
+            try:
+                proc = subprocess.run(
+                    ['powershell', '-NoProfile', '-NonInteractive', '-Command', exec_cmd],
+                    capture_output=True, text=True, timeout=15, shell=False, cwd=self.bond_root
+                )
+                self.dry_run_completed.add(card_id)
+                r = self._result('preview', 0, card_id, verb,
+                                 reason='Dry run complete',
+                                 command_preview=exec_cmd,
+                                 output=proc.stdout[:2000] if proc.stdout else '(no output)')
+                r['duration_ms'] = self._ms(t0)
+                self._log(r, initiator, params)
+                return r
+            except subprocess.TimeoutExpired:
+                r = self._result('error', 2, card_id, verb, reason='Dry run timeout')
+                r['duration_ms'] = self._ms(t0)
+                self._log(r, initiator, params)
+                return r
 
         # All validation passed — execute
-        return self._execute(card, resolved, verb, initiator, params, t0, resolved_command=resolved)
+        return self._execute(card, resolved, verb, initiator, params, t0)
 
     # ─── Execution ────────────────────────────────────────
 

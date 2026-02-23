@@ -4,9 +4,9 @@
   "description": "Snapshot entire doctrine/ folder to a timestamped backup",
   "verb": "copy",
   "scope": "global",
-  "confirm": true,
+  "requires_dry_run": true,
+  "dry_run_command": "$docPath = Join-Path '{BOND_ROOT}' 'doctrine'; $files = Get-ChildItem $docPath -Recurse -File; $totalSize = ($files | Measure-Object -Property Length -Sum).Sum; $sizeMB = [math]::Round($totalSize / 1MB, 2); Write-Host \"Doctrine backup preview:\"; Write-Host \"  Files: $($files.Count)\"; Write-Host \"  Total size: $sizeMB MB\"; Write-Host \"  Destination: backups/doctrine_{timestamp}\"; $files | Group-Object { $_.Directory.Name } | Sort-Object Name | ForEach-Object { Write-Host \"  $($_.Name)/: $($_.Count) files\" }",
   "command": "$ts = Get-Date -Format 'yyyy-MM-dd_HHmmss'; $dst = Join-Path '{BOND_ROOT}' \"backups\\doctrine_$ts\"; Copy-Item (Join-Path '{BOND_ROOT}' 'doctrine') $dst -Recurse -Force; Write-Host \"Backed up to $dst\"",
-  "dry_run_text": "Would copy doctrine/ to backups/doctrine_{timestamp}",
   "params": [],
   "post_verify": null
 }

@@ -4,9 +4,9 @@
   "description": "Show recently modified doctrine files with timestamps",
   "verb": "read",
   "scope": "global",
-  "confirm": false,
+  "requires_dry_run": false,
+  "dry_run_command": null,
   "command": "Get-ChildItem \"{BOND_ROOT}\\doctrine\" -Recurse -File -Include *.md,*.json | Sort-Object LastWriteTime -Descending | Select-Object -First 25 @{N='File';E={$_.FullName.Replace(\"{BOND_ROOT}\\\",'')}}, @{N='Size';E={$_.Length}}, LastWriteTime | Format-Table -AutoSize",
-  "dry_run_text": "Would list the 25 most recently modified doctrine files with timestamps",
   "params": [],
   "post_verify": null
 }

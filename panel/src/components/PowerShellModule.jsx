@@ -64,11 +64,11 @@ export default function PowerShellModule({ module, onClose }) {
       const res = await fetch('/api/powershell/exec', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ card_id: cardId, dry_run: dryRun, initiator: 'user', confirmed: true, params }),
+        body: JSON.stringify({ card_id: cardId, dry_run: dryRun, initiator: 'user', params }),
         signal: AbortSignal.timeout(36000),
       });
       const data = await res.json();
-      setExecResult({ card: cardId, ...data });
+      setExecResult({ card: cardId, dryRun, ...data });
       // Refresh log
       const logR = await fetch('/api/powershell/log').then(r => r.json()).catch(() => ({ entries: [] }));
       setLog(logR.entries || []);
@@ -222,6 +222,7 @@ export default function PowerShellModule({ module, onClose }) {
             verbs={verbs}
             masterOn={enabled}
             executing={execLoading === card.id}
+            execResult={execResult?.card === card.id ? execResult : null}
             onExecute={(params) => executeCard(card.id, false, params)}
             onDryRun={(params) => executeCard(card.id, true, params)}
           />
@@ -282,10 +283,21 @@ function ToggleSwitch({ on, onToggle, color, small }) {
   );
 }
 
-function CardRow({ card, verbs, masterOn, executing, onExecute, onDryRun }) {
+function CardRow({ card, verbs, masterOn, executing, execResult, onExecute, onDryRun }) {
   const meta = VERB_META[card.verb] || { color: 'var(--text-muted)', label: card.verb };
   const verbEnabled = verbs[card.verb]?.enabled || false;
   const canRun = masterOn && verbEnabled;
+
+  // D16: dry-run tracking
+  const requiresDry = card.requires_dry_run || card.verb === 'delete' || card.verb === 'execute';
+  const [dryRunDone, setDryRunDone] = useState(false);
+
+  // Track successful dry runs from exec results
+  if (execResult?.dryRun && execResult?.status === 'preview' && !dryRunDone) {
+    setDryRunDone(true);
+  }
+
+  const canExecute = canRun && (!requiresDry || dryRunDone);
 
   // Detect argument params that need user input
   const argParams = (card.params || []).filter(p => p.source === 'argument');
@@ -330,11 +342,14 @@ function CardRow({ card, verbs, masterOn, executing, onExecute, onDryRun }) {
             <span className="text-muted" style={{ fontSize: '0.6rem', fontFamily: 'var(--font-mono)' }}>
               {card.scope}
             </span>
-            {card.confirm && (
-              <span style={{ fontSize: '0.6rem', color: 'var(--amber)' }} title="Requires confirmation">🔒</span>
+            {requiresDry && (
+              <span style={{ fontSize: '0.6rem', color: dryRunDone ? '#2ecc71' : 'var(--amber)' }}
+                    title={dryRunDone ? 'Dry run complete' : 'Requires dry run'}>
+                {dryRunDone ? '\u2705' : '\uD83D\uDD12'}
+              </span>
             )}
             {needsInput && (
-              <span style={{ fontSize: '0.6rem', color: 'var(--teal)' }} title="Requires parameters">📝</span>
+              <span style={{ fontSize: '0.6rem', color: 'var(--teal)' }} title="Requires parameters">{'\uD83D\uDCDD'}</span>
             )}
           </div>
           {card.description && (
@@ -357,17 +372,17 @@ function CardRow({ card, verbs, masterOn, executing, onExecute, onDryRun }) {
           </button>
           <button
             onClick={() => handleAction(false)}
-            disabled={!canRun || executing}
-            title="Run"
+            disabled={!canExecute || executing}
+            title={requiresDry && !dryRunDone ? 'Run DRY first' : 'Run'}
             style={{
               fontSize: '0.65rem', fontFamily: 'var(--font-mono)',
-              padding: '3px 8px', cursor: canRun ? 'pointer' : 'not-allowed',
-              background: canRun ? meta.color : 'var(--bg-elevated)',
-              color: canRun ? '#fff' : 'var(--text-muted)',
+              padding: '3px 8px', cursor: canExecute ? 'pointer' : 'not-allowed',
+              background: canExecute ? meta.color : 'var(--bg-elevated)',
+              color: canExecute ? '#fff' : 'var(--text-muted)',
               border: 'none', borderRadius: 'var(--radius-sm, 4px)',
             }}
           >
-            {executing ? '⏳' : 'RUN'}
+            {executing ? '\u23F3' : 'RUN'}
           </button>
         </div>
       </div>
@@ -494,12 +509,6 @@ function ExecResultPanel({ result, onDismiss }) {
         </pre>
       )}
 
-      {result.dry_run_text && (
-        <div style={{ fontSize: '0.75rem', color: 'var(--teal)', marginTop: 4 }}>
-          {result.dry_run_text}
-        </div>
-      )}
-
       {result.output && (
         <pre style={{
           fontSize: '0.7rem', fontFamily: 'var(--font-mono)',
@@ -523,7 +532,7 @@ function ExecResultPanel({ result, onDismiss }) {
 function NewCardForm({ onCreated }) {
   const [form, setForm] = useState({
     id: '', name: '', description: '', verb: 'read', scope: 'global',
-    confirm: false, command: '', dry_run_text: '',
+    requires_dry_run: false, command: '', dry_run_command: '',
   });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -587,12 +596,12 @@ function NewCardForm({ onCreated }) {
           </select>
         </div>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, paddingBottom: 2 }}>
-          <ToggleSwitch on={form.confirm} onToggle={() => setForm({ ...form, confirm: !form.confirm })} small />
-          <span className="text-muted" style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)' }}>Confirm</span>
+          <ToggleSwitch on={form.requires_dry_run} onToggle={() => setForm({ ...form, requires_dry_run: !form.requires_dry_run })} small />
+          <span className="text-muted" style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)' }}>Dry Run Gate</span>
         </div>
       </div>
       <FormField label="Command" value={form.command} onChange={v => setForm({ ...form, command: v })} placeholder="Get-ChildItem ..." />
-      <FormField label="Dry Run Text" value={form.dry_run_text} onChange={v => setForm({ ...form, dry_run_text: v })} placeholder="Would do X..." />
+      <FormField label="Dry Run Command" value={form.dry_run_command} onChange={v => setForm({ ...form, dry_run_command: v })} placeholder="Get-ChildItem ... (read-only preview command)" />
 
       {error && <div style={{ color: '#e74c3c', fontSize: '0.7rem', marginTop: 4 }}>{error}</div>}
 

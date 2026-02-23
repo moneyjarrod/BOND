@@ -38,7 +38,10 @@ File Ops Endpoints (Cold Water — verbatim, no processing):
     GET  /manifest                             # all files with entity, class, size
     GET  /manifest?entity=P11-Plumber          # single entity manifest
     GET  /read?path=doctrine/P11/ROOT-x.md     # read file verbatim
-    POST /write  {"path": "...", "content": "..."}  # write file verbatim
+    POST /append  {"path": "...", "content": "..."}        # append to file (D15)
+    POST /append  {"path": "...", "content": "...", "position": "after", "marker": "## Section"}  # insert after marker
+    POST /replace {"path": "...", "old_text": "...", "new_text": "..."}  # targeted edit (D15)
+    POST /write   {"path": "...", "content": "..."}         # full overwrite (gated, D15)
     GET  /copy?from=...&to=...                 # copy file verbatim
     GET  /export                               # full doctrine export to state/export.md
     GET  /export?entity=P11-Plumber            # single entity export
@@ -922,25 +925,149 @@ class FileOps:
         except Exception as e:
             return {'error': f'Read failed: {e}'}
 
-    def write(self, rel_path, content):
-        """Write content verbatim to file."""
+    def write(self, rel_path, content, confirmed=False):
+        """Write content to file with safety gates.
+
+        Safety features (D15/P9):
+        1. Shadow .bak — always created before overwriting existing file
+        2. Size gate — if new content < 50% of existing size, returns hold
+        3. Confirmed flag — caller must re-send with confirmed=True to proceed past gate
+        """
         resolved, err = self._safe_path(rel_path)
         if err:
             return {'error': err}
         try:
             os.makedirs(resolved.parent, exist_ok=True)
             existed = resolved.is_file()
+            existing_size = 0
+
+            if existed:
+                existing_size = resolved.stat().st_size
+
+                # Shadow .bak — always, before any overwrite
+                # P11: one-deep backup is sufficient for current flow pattern.
+                # If rotation needed later (.bak.1, .bak.2), add then — don't over-engineer the fitting.
+                bak_path = resolved.with_suffix(resolved.suffix + '.bak')
+                try:
+                    shutil.copy2(str(resolved), str(bak_path))
+                except Exception:
+                    pass  # Best effort — don't block write on backup failure
+
+                # Size gate — destructive overwrite detection
+                # P11: both values are byte counts (stat().st_size vs encoded length). Apples to apples.
+                new_size = len(content.encode('utf-8'))
+                # TODO: read threshold from state/config.json (P11: don't leave magic numbers unmarked)
+                size_gate_threshold = 0.5
+                if existing_size > 0 and new_size < (existing_size * size_gate_threshold) and not confirmed:
+                    self._log('HOLD', rel_path, f"Destructive overwrite blocked: {existing_size}\u2192{new_size} bytes")
+                    return {
+                        'status': 'hold',
+                        'reason': 'Destructive overwrite detected',
+                        'path': rel_path,
+                        'existing_size': existing_size,
+                        'new_size': new_size,
+                        'ratio': round(new_size / existing_size, 2),
+                        'backup': str(bak_path.name),
+                        'instruction': 'Re-send with "confirmed": true to proceed',
+                    }
+
             resolved.write_text(content, encoding='utf-8')
             op = 'OVERWRITE' if existed else 'CREATE'
-            self._log(op, rel_path, f"{len(content)} bytes")
+            detail = f"{len(content)} bytes"
+            if existed:
+                detail += f" (was {existing_size} bytes, .bak created)"
+            self._log(op, rel_path, detail)
             return {
                 'path': rel_path,
                 'operation': op.lower(),
                 'size': len(content),
                 'lines': content.count('\n') + 1,
+                'previous_size': existing_size if existed else None,
+                'backup': existed,
             }
         except Exception as e:
             return {'error': f'Write failed: {e}'}
+
+    def append(self, rel_path, content, position='end', marker=None):
+        """Append content to existing file. Never overwrites.
+
+        position: 'end' (default) or 'after'
+        marker: required when position='after' — line/heading to insert after
+        """
+        resolved, err = self._safe_path(rel_path)
+        if err:
+            return {'error': err}
+        if not resolved.is_file():
+            return {'error': f'File not found (append requires existing file): {rel_path}'}
+        try:
+            existing = resolved.read_text(encoding='utf-8')
+            if position == 'after' and marker:
+                # Find marker line and insert after it
+                # P11: first match is intentional for append (additive, not destructive).
+                # Unlike replace(), ambiguous markers are acceptable — we're adding, not replacing.
+                lines = existing.split('\n')
+                found = -1
+                for i, line in enumerate(lines):
+                    if marker in line:
+                        found = i
+                        break
+                if found == -1:
+                    return {'error': f'Marker not found: {marker}'}
+                # Insert content after the marker line
+                before = '\n'.join(lines[:found + 1])
+                after = '\n'.join(lines[found + 1:])
+                new_content = before + '\n' + content + ('\n' + after if after.strip() else '\n')
+            else:
+                # Default: append to end
+                if existing and not existing.endswith('\n'):
+                    new_content = existing + '\n' + content
+                else:
+                    new_content = existing + content
+
+            resolved.write_text(new_content, encoding='utf-8')
+            lines_added = content.count('\n') + (0 if content.endswith('\n') else 1)
+            self._log('APPEND', rel_path, f"+{len(content)} bytes, position={position}")
+            return {
+                'path': rel_path,
+                'operation': 'append',
+                'position': position,
+                'new_size': len(new_content),
+                'added_bytes': len(content),
+                'lines_added': lines_added,
+            }
+        except Exception as e:
+            return {'error': f'Append failed: {e}'}
+
+    def replace(self, rel_path, old_text, new_text):
+        """Replace exact text in file. Fails if not found or ambiguous.
+
+        Same safety model as str_replace: exactly one match required.
+        """
+        resolved, err = self._safe_path(rel_path)
+        if err:
+            return {'error': err}
+        if not resolved.is_file():
+            return {'error': f'File not found: {rel_path}'}
+        try:
+            existing = resolved.read_text(encoding='utf-8')
+            count = existing.count(old_text)
+            if count == 0:
+                return {'error': 'old_text not found in file', 'path': rel_path}
+            if count > 1:
+                return {'error': f'old_text matches {count} locations (must be unique)', 'path': rel_path}
+
+            new_content = existing.replace(old_text, new_text, 1)
+            resolved.write_text(new_content, encoding='utf-8')
+            self._log('REPLACE', rel_path, f"{len(old_text)}\u2192{len(new_text)} bytes")
+            return {
+                'path': rel_path,
+                'operation': 'replace',
+                'old_size': len(existing),
+                'new_size': len(new_content),
+                'replacements': 1,
+            }
+        except Exception as e:
+            return {'error': f'Replace failed: {e}'}
 
     def copy(self, from_rel, to_rel):
         """Copy file verbatim from one path to another."""
@@ -2044,7 +2171,7 @@ class PayloadAssembler:
             'handoff': handoff,
             'heatmap': daemon_heatmap.for_chunk(),
             # A3/T1-F1: capabilities removed — dead weight (~300 tokens/sync). Available via /status.
-            'daemon_version': '3.0.0',
+            'daemon_version': '3.1.0',
         }
 
     def sync_payload(self):
@@ -2503,7 +2630,7 @@ class SearchHandler(BaseHTTPRequestHandler):
             result = payloads.sync_complete(conversation_text=text, session_label=session_label)
             self._json(200, result)
 
-        elif path == '/write':
+        elif path == '/append':
             try:
                 length = int(self.headers.get('Content-Length', 0))
                 body = json.loads(self.rfile.read(length).decode('utf-8'))
@@ -2515,10 +2642,56 @@ class SearchHandler(BaseHTTPRequestHandler):
             if not file_path:
                 self._json(400, {'error': 'Missing "path" in body'})
                 return
+            if not content:
+                self._json(400, {'error': 'Missing "content" in body'})
+                return
+            position = body.get('position', 'end')
+            marker = body.get('marker')
+            result = file_ops.append(file_path, content, position=position, marker=marker)
+            if 'error' in result:
+                self._json(400, result)
+            else:
+                self._json(200, result)
+
+        elif path == '/replace':
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(length).decode('utf-8'))
+            except Exception as e:
+                self._json(400, {'error': f'Invalid JSON body: {e}'})
+                return
+            file_path = body.get('path', '')
+            old_text = body.get('old_text', '')
+            new_text = body.get('new_text', '')
+            if not file_path:
+                self._json(400, {'error': 'Missing "path" in body'})
+                return
+            if not old_text:
+                self._json(400, {'error': 'Missing "old_text" in body'})
+                return
+            result = file_ops.replace(file_path, old_text, new_text)
+            if 'error' in result:
+                self._json(400, result)
+            else:
+                self._json(200, result)
+
+        elif path == '/write':
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(length).decode('utf-8'))
+            except Exception as e:
+                self._json(400, {'error': f'Invalid JSON body: {e}'})
+                return
+            file_path = body.get('path', '')
+            content = body.get('content', '')
+            confirmed = body.get('confirmed', False)
+            if not file_path:
+                self._json(400, {'error': 'Missing "path" in body'})
+                return
             if content is None:
                 self._json(400, {'error': 'Missing "content" in body'})
                 return
-            result = file_ops.write(file_path, content)
+            result = file_ops.write(file_path, content, confirmed=confirmed)
             if 'error' in result:
                 self._json(400, result)
             else:
@@ -2544,14 +2717,13 @@ class SearchHandler(BaseHTTPRequestHandler):
                 dry_run=body.get('dry_run', False),
                 initiator=body.get('initiator', 'user'),
                 params=body.get('params', {}),
-                confirmed=body.get('confirmed', False),
             )
             level = result.get('level', 0)
             status_code = 200 if level < 3 else 403
             self._json(status_code, result)
 
         else:
-            self._json(404, {'error': 'POST endpoints: /sync-complete, /write, /exec'})
+            self._json(404, {'error': 'POST endpoints: /sync-complete, /write, /append, /replace, /exec'})
 
     def _json(self, code, data):
         body = json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8')
@@ -2661,7 +2833,9 @@ if __name__ == '__main__':
     print(f"     GET  http://localhost:{port}/manifest")
     print(f"     GET  http://localhost:{port}/manifest?entity=P11-Plumber")
     print(f"     GET  http://localhost:{port}/read?path=doctrine/P11-Plumber/ROOT-build-for-access.md")
-    print(f"     POST http://localhost:{port}/write  body: {{\"path\": \"...\", \"content\": \"...\"}}") 
+    print(f"     POST http://localhost:{port}/append   body: {{\"path\": \"...\", \"content\": \"...\"}}")
+    print(f"     POST http://localhost:{port}/replace  body: {{\"path\": \"...\", \"old_text\": \"...\", \"new_text\": \"...\"}}")
+    print(f"     POST http://localhost:{port}/write    body: {{\"path\": \"...\", \"content\": \"...\"}}")
     print(f"     GET  http://localhost:{port}/copy?from=...&to=...")
     print(f"     GET  http://localhost:{port}/export")
     print(f"     GET  http://localhost:{port}/export?entity=P11-Plumber")
