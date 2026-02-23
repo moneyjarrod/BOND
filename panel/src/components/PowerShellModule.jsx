@@ -302,6 +302,7 @@ function CardRow({ card, verbs, masterOn, executing, onExecute, onDryRun }) {
         return;
       }
       (isDry ? onDryRun : onExecute)(paramValues);
+      setParamValues({});
       setShowParams(false);
     } else {
       (isDry ? onDryRun : onExecute)({});
