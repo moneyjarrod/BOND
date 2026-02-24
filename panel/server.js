@@ -1341,6 +1341,20 @@ app.get('/api/daemon/gnoise-triage', async (req, res) => {
   }
 });
 
+// D25: GNOISE full system sweep proxy
+app.get('/api/daemon/gnoise-all', async (req, res) => {
+  try {
+    const qs = new URLSearchParams(req.query).toString();
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000);
+    const response = await fetch(`${DAEMON_URL}/gnoise-all?${qs}`, { signal: controller.signal });
+    clearTimeout(timeout);
+    res.status(response.status).json(await response.json());
+  } catch (err) {
+    res.status(502).json({ error: err.name === 'AbortError' ? 'Daemon timeout (30s)' : err.message });
+  }
+});
+
 // ─── AHK Status API (S114) ────────────────────────────────
 const AHK_STATUS_FILE = join(STATE_PATH, 'ahk_status.json');
 

@@ -188,7 +188,7 @@ if (-not $hasPython) {
         $vr = Invoke-WebRequest -Uri 'http://localhost:3003/sync-complete' -TimeoutSec 3 -UseBasicParsing -ErrorAction Stop
         $vrJson = $vr.Content | ConvertFrom-Json
         $daemonVersion = $vrJson.daemon_version
-        $expectedVersion = '3.2.0'
+        $expectedVersion = '3.4.0'
         if ($daemonVersion -eq $expectedVersion) {
             Write-Pass "Daemon version $daemonVersion"
         } else {

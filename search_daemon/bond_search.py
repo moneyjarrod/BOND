@@ -36,6 +36,8 @@ Search Endpoints (Hot Water — SLA pipeline):
     GET /gnoise-cell                           # read global holding cell
     GET /gnoise-cell?entity=P11-Plumber        # read entity-local cell (if N valve on)
     GET /gnoise-triage?entity=P11&indices=0,1&action=fixed  # mark findings triaged
+    GET /gnoise-all                            # D25: sweep all entities
+    GET /gnoise-all?threshold=0.15             # custom threshold
     GET /status                                # index stats, scope, health
     GET /reindex                               # force rebuild
 
@@ -1657,8 +1659,12 @@ class GnoiseAuditor:
             encoding='utf-8'
         )
 
-    def _identity_files(self, entity_name, entity_class):
+    def _identity_files(self, entity_name, entity_class, config=None):
         """Resolve which files define this entity's identity."""
+        # entity.json override — explicit identity files take priority
+        if config and 'identity_files' in config:
+            return config['identity_files']
+
         entity_dir = self.doctrine_path / entity_name
         all_files = [f.name for f in entity_dir.iterdir() if f.is_file() and f.suffix == '.md']
 
@@ -1709,7 +1715,7 @@ class GnoiseAuditor:
             return {'entity': entity_name, 'skipped': True, 'reason': 'Library class — no identity to audit against'}
 
         # Resolve identity files
-        id_files = self._identity_files(entity_name, entity_class)
+        id_files = self._identity_files(entity_name, entity_class, config=config)
         if not id_files:
             return {'error': f'No identity files found for {entity_name} ({entity_class}-class)'}
 
@@ -1864,6 +1870,63 @@ class GnoiseAuditor:
 
         self._save_cell(cell_path, findings)
         return {'marked': marked, 'action': action, 'total_findings': len(findings)}
+
+    def scan_all(self, search_index, threshold=0.10, exempt_days=14):
+        """Sweep all entities in doctrine directory. Returns consolidated report.
+
+        Iterates every subdirectory in doctrine/, reads entity.json,
+        runs scan() on each. Skips entities that error or are library class.
+
+        Returns: {entities: [...results], summary: {total, scanned, findings, skipped}}
+        """
+        results = []
+        summary = {
+            'total_entities': 0,
+            'scanned': 0,
+            'skipped_library': 0,
+            'skipped_error': 0,
+            'total_findings': 0,
+            'total_new': 0,
+            'entities_with_findings': 0,
+        }
+
+        if not self.doctrine_path.is_dir():
+            return {'error': 'Doctrine path not found', 'results': []}
+
+        for entry in sorted(self.doctrine_path.iterdir()):
+            if not entry.is_dir():
+                continue
+            if entry.name.startswith('_'):
+                continue
+
+            entity_name = entry.name
+            summary['total_entities'] += 1
+
+            result = self.scan(entity_name, search_index,
+                              threshold=threshold, exempt_days=exempt_days)
+
+            if result.get('skipped'):
+                summary['skipped_library'] += 1
+                results.append({'entity': entity_name, 'status': 'skipped',
+                              'reason': result.get('reason', 'library class')})
+            elif 'error' in result:
+                summary['skipped_error'] += 1
+                results.append({'entity': entity_name, 'status': 'error',
+                              'error': result['error']})
+            else:
+                summary['scanned'] += 1
+                summary['total_findings'] += result.get('findings_total', 0)
+                summary['total_new'] += result.get('findings_new', 0)
+                if result.get('findings_total', 0) > 0:
+                    summary['entities_with_findings'] += 1
+                results.append(result)
+
+        return {
+            'summary': summary,
+            'threshold': threshold,
+            'exempt_days': exempt_days,
+            'entities': results,
+        }
 
 
 # ─── RepoSync: REMOVED (A1/F2 — S153) ────────────────
@@ -2448,7 +2511,7 @@ class PayloadAssembler:
             'handoff': handoff,
             'heatmap': daemon_heatmap.for_chunk(),
             # A3/T1-F1: capabilities removed — dead weight (~300 tokens/sync). Available via /status.
-            'daemon_version': '3.2.0',
+            'daemon_version': '3.4.0',
         }
 
     def sync_payload(self):
@@ -2782,6 +2845,13 @@ class SearchHandler(BaseHTTPRequestHandler):
             result = gnoise_auditor.triage(entity, indices, action=action)
             self._json(200, result)
 
+        # ── D25: GNOISE sweep all entities ──
+        elif path == '/gnoise-all':
+            threshold = float(params.get('threshold', ['0.10'])[0])
+            exempt_days = int(params.get('exempt_days', ['14'])[0])
+            result = gnoise_auditor.scan_all(index, threshold=threshold, exempt_days=exempt_days)
+            self._json(200, result)
+
         # ── D18: Async Job Status ──
         elif path == '/exec-status':
             if not ps_executor:
@@ -2938,7 +3008,7 @@ class SearchHandler(BaseHTTPRequestHandler):
             self._json(200, {'armed': perspectives, 'results': results})
 
         else:
-            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /gnoise, /gnoise-cell, /gnoise-triage, /exec-status, /status, /reindex, /manifest, /read, /write, /copy, /export, /sync-complete, /enter-payload, /vine-data, /obligations, /heatmap-touch, /heatmap-hot, /heatmap-chunk, /heatmap-clear, /resonance-test, /resonance-multi'})
+            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /gnoise, /gnoise-cell, /gnoise-triage, /gnoise-all, /exec-status, /status, /reindex, /manifest, /read, /write, /copy, /export, /sync-complete, /enter-payload, /vine-data, /obligations, /heatmap-touch, /heatmap-hot, /heatmap-chunk, /heatmap-clear, /resonance-test, /resonance-multi'})
 
     def do_POST(self):
         parsed = urlparse(self.path)
@@ -3331,6 +3401,7 @@ if __name__ == '__main__':
     print(f"     GET http://localhost:{port}/gnoise?entity=P11-Plumber")
     print(f"     GET http://localhost:{port}/gnoise-cell")
     print(f"     GET http://localhost:{port}/gnoise-triage?entity=P11&indices=0,1&action=fixed")
+    print(f"     GET http://localhost:{port}/gnoise-all")
     print(f"     GET http://localhost:{port}/status")
     print(f"     GET http://localhost:{port}/reindex")
     print()

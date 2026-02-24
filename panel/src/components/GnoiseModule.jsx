@@ -14,6 +14,7 @@ export default function GnoiseModule({ module, onClose }) {
   const [entity, setEntity] = useState('');
   const [threshold, setThreshold] = useState('0.10');
   const [scanResult, setScanResult] = useState(null);
+  const [allResult, setAllResult] = useState(null);    // D25: /gnoise-all response
   const [cellResult, setCellResult] = useState(null);
   const [scanLoading, setScanLoading] = useState(false);
   const [cellLoading, setCellLoading] = useState(false);
@@ -22,6 +23,8 @@ export default function GnoiseModule({ module, onClose }) {
   const [selected, setSelected] = useState(new Set());
   const [exemptDays, setExemptDays] = useState('14');
   const [showSettings, setShowSettings] = useState(false);
+  const [scanMode, setScanMode] = useState('entity');   // 'entity' | 'all'
+  const [hasActiveEntity, setHasActiveEntity] = useState(false);
 
   // Load entities + active entity on mount
   useEffect(() => {
@@ -32,34 +35,54 @@ export default function GnoiseModule({ module, onClose }) {
       const list = Array.isArray(ents) ? ents : (ents?.entities || []);
       setEntities(list);
       const active = state.entity || state.active_entity?.name || state.active_entity || '';
-      if (active) setEntity(active);
-      else if (list.length > 0) setEntity(list[0].name || list[0]);
+      if (active) {
+        setEntity(active);
+        setHasActiveEntity(true);
+      } else if (list.length > 0) {
+        setEntity(list[0].name || list[0]);
+      }
     });
   }, []);
 
   const runScan = useCallback(async () => {
-    if (!entity) return;
     setScanLoading(true);
     setError(null);
     setScanResult(null);
+    setAllResult(null);
     setSelected(new Set());
     try {
       const t = parseFloat(threshold) || 0.10;
       const ed = parseInt(exemptDays) || 14;
-      const res = await fetch(`/api/daemon/gnoise?entity=${encodeURIComponent(entity)}&threshold=${t}&exempt_days=${ed}`, {
-        signal: AbortSignal.timeout(15000),
-      });
-      const data = await res.json();
-      if (data.error) {
-        setError(data.error);
+
+      if (scanMode === 'all') {
+        // D25: Full system sweep
+        const res = await fetch(`/api/daemon/gnoise-all?threshold=${t}&exempt_days=${ed}`, {
+          signal: AbortSignal.timeout(30000),
+        });
+        const data = await res.json();
+        if (data.error) {
+          setError(data.error);
+        } else {
+          setAllResult(data);
+        }
       } else {
-        setScanResult(data);
+        // Single entity scan
+        if (!entity) { setScanLoading(false); return; }
+        const res = await fetch(`/api/daemon/gnoise?entity=${encodeURIComponent(entity)}&threshold=${t}&exempt_days=${ed}`, {
+          signal: AbortSignal.timeout(15000),
+        });
+        const data = await res.json();
+        if (data.error) {
+          setError(data.error);
+        } else {
+          setScanResult(data);
+        }
       }
     } catch (err) {
-      setError(err.name === 'TimeoutError' ? 'Scan timed out (15s)' : err.message);
+      setError(err.name === 'TimeoutError' ? 'Scan timed out' : err.message);
     }
     setScanLoading(false);
-  }, [entity, threshold, exemptDays]);
+  }, [entity, threshold, exemptDays, scanMode]);
 
   const readCell = useCallback(async () => {
     setCellLoading(true);
@@ -151,24 +174,44 @@ export default function GnoiseModule({ module, onClose }) {
 
       {/* Entity Selector + Scan Controls */}
       <div style={{ padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <EntityDropdown
-            entities={entities}
-            value={entity}
-            onChange={setEntity}
+        {/* D25: Mode toggle — Active Entity vs Full System */}
+        <div style={{ display: 'flex', gap: 0, marginBottom: 10 }}>
+          <ModeTab
+            label="Active Entity"
+            active={scanMode === 'entity'}
+            disabled={!hasActiveEntity}
+            tooltip={!hasActiveEntity ? 'No entity active' : undefined}
+            onClick={() => hasActiveEntity && setScanMode('entity')}
+            side="left"
           />
+          <ModeTab
+            label="Full System"
+            active={scanMode === 'all'}
+            onClick={() => setScanMode('all')}
+            side="right"
+          />
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {scanMode === 'entity' && (
+            <EntityDropdown
+              entities={entities}
+              value={entity}
+              onChange={setEntity}
+            />
+          )}
           <button
             onClick={runScan}
-            disabled={!entity || scanLoading}
+            disabled={(scanMode === 'entity' && !entity) || scanLoading}
             style={{
               padding: '5px 14px', fontSize: '0.78rem', fontFamily: 'var(--font-mono)',
               fontWeight: 600, background: 'var(--amber)', color: '#000',
               border: 'none', borderRadius: 'var(--radius-sm, 4px)',
-              cursor: entity && !scanLoading ? 'pointer' : 'not-allowed',
-              opacity: entity && !scanLoading ? 1 : 0.5,
+              cursor: ((scanMode === 'entity' && !entity) || scanLoading) ? 'not-allowed' : 'pointer',
+              opacity: ((scanMode === 'entity' && !entity) || scanLoading) ? 0.5 : 1,
             }}
           >
-            {scanLoading ? '\u23F3 Scanning...' : 'SCAN'}
+            {scanLoading ? '\u23F3 Scanning...' : scanMode === 'all' ? 'SCAN ALL' : 'SCAN'}
           </button>
           <button
             onClick={readCell}
@@ -333,6 +376,31 @@ export default function GnoiseModule({ module, onClose }) {
               }
             </div>
           )}
+        </div>
+      )}
+
+      {/* D25: Full System Sweep Results */}
+      {allResult && (
+        <div style={{ padding: '8px 0' }}>
+          {/* Summary stats */}
+          <div style={{
+            display: 'flex', gap: 16, padding: '8px 0', flexWrap: 'wrap',
+            borderBottom: '1px solid var(--border)', marginBottom: 8,
+          }}>
+            <StatCell label="Entities" value={allResult.summary.total_entities} />
+            <StatCell label="Scanned" value={allResult.summary.scanned} />
+            <StatCell label="Libraries" value={allResult.summary.skipped_library} color="var(--text-muted)" />
+            <StatCell label="Errors" value={allResult.summary.skipped_error} color={allResult.summary.skipped_error > 0 ? '#e74c3c' : 'var(--text-muted)'} />
+            <StatCell label="Findings" value={allResult.summary.total_findings} color={allResult.summary.total_findings > 0 ? '#e74c3c' : 'var(--amber)'} />
+            <StatCell label="With Issues" value={allResult.summary.entities_with_findings} />
+          </div>
+
+          {/* Per-entity results */}
+          <div style={{ maxHeight: 400, overflowY: 'auto' }}>
+            {allResult.entities.map((ent, i) => (
+              <AllEntityRow key={ent.entity || i} result={ent} />
+            ))}
+          </div>
         </div>
       )}
 
@@ -610,6 +678,95 @@ function EntityDropdown({ entities, value, onChange }) {
             );
           })}
         </div>
+      )}
+    </div>
+  );
+}
+
+function ModeTab({ label, active, disabled, tooltip, onClick, side }) {
+  const radius = side === 'left' ? '4px 0 0 4px' : '0 4px 4px 0';
+  return (
+    <button
+      onClick={disabled ? undefined : onClick}
+      title={tooltip}
+      style={{
+        padding: '4px 14px', fontSize: '0.7rem', fontFamily: 'var(--font-mono)',
+        fontWeight: active ? 700 : 400,
+        background: active ? 'var(--amber)' : 'var(--bg-elevated)',
+        color: active ? '#000' : disabled ? 'var(--text-muted)' : 'var(--text-primary)',
+        border: `1px solid ${active ? 'var(--amber)' : 'var(--border)'}`,
+        borderRadius: radius,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.4 : 1,
+        transition: 'all 0.15s ease',
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+function AllEntityRow({ result }) {
+  const isSkipped = result.status === 'skipped';
+  const isError = result.status === 'error';
+  const hasFindings = !isSkipped && !isError && result.findings_total > 0;
+  const isClean = !isSkipped && !isError && result.findings_total === 0;
+
+  return (
+    <div style={{
+      padding: '5px 0',
+      borderBottom: '1px solid var(--border)',
+      display: 'flex', alignItems: 'center', gap: 8,
+    }}>
+      {/* Status indicator */}
+      <span style={{
+        fontSize: '0.7rem', width: 14, textAlign: 'center',
+        color: isError ? '#e74c3c' : isSkipped ? 'var(--text-muted)' : hasFindings ? '#f39c12' : '#2ecc71',
+      }}>
+        {isError ? '\u2717' : isSkipped ? '\u2014' : hasFindings ? '\u26A0' : '\u2713'}
+      </span>
+
+      {/* Entity name */}
+      <span style={{
+        fontSize: '0.75rem', fontFamily: 'var(--font-mono)', fontWeight: 600,
+        flex: 1, minWidth: 0,
+        color: isSkipped ? 'var(--text-muted)' : 'var(--text-primary)',
+        opacity: isSkipped ? 0.5 : 1,
+      }}>
+        {result.entity}
+      </span>
+
+      {/* Right-side info */}
+      {isSkipped && (
+        <span className="text-muted" style={{ fontSize: '0.6rem', fontFamily: 'var(--font-mono)' }}>
+          library
+        </span>
+      )}
+      {isError && (
+        <span style={{ fontSize: '0.6rem', fontFamily: 'var(--font-mono)', color: '#e74c3c' }}>
+          {result.error}
+        </span>
+      )}
+      {isClean && (
+        <span style={{ fontSize: '0.6rem', fontFamily: 'var(--font-mono)', color: '#2ecc71' }}>
+          clean
+        </span>
+      )}
+      {hasFindings && (
+        <span style={{
+          fontSize: '0.6rem', fontFamily: 'var(--font-mono)',
+          padding: '1px 6px', borderRadius: 3,
+          background: 'rgba(243,156,18,0.15)', color: '#f39c12',
+        }}>
+          {result.findings_total} finding{result.findings_total !== 1 ? 's' : ''}
+        </span>
+      )}
+
+      {/* Scanned count */}
+      {!isSkipped && !isError && (
+        <span className="text-muted" style={{ fontSize: '0.6rem', fontFamily: 'var(--font-mono)', width: 30, textAlign: 'right' }}>
+          {result.scanned || 0}p
+        </span>
       )}
     </div>
   );
