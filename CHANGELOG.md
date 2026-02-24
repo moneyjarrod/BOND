@@ -5,6 +5,11 @@ All notable changes to BOND will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.6.0] - 2026-02-24
+
+### Added
+- **D22 verify_bond** — Post-install verification script. 14 checks across 4 tiers (prerequisites, services, round-trips, info). Cascade skips prevent wall-of-red when one service is down. Unicode /file-op round-trip test catches D21-class encoding regressions. Panel build integrity check catches stale dist bundles. Fresh-install safe (null active_entity accepted). QA-Boundary reviewed (Consult #4, 4 findings applied). `verify_bond.bat` + `installer/verify.ps1`.
+
 ## [2.5.0] - 2026-02-24
 
 ### Added
