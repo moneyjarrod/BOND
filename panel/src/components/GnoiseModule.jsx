@@ -20,7 +20,8 @@ export default function GnoiseModule({ module, onClose }) {
   const [triageLoading, setTriageLoading] = useState(false);
   const [error, setError] = useState(null);
   const [selected, setSelected] = useState(new Set());
-  const [showThreshold, setShowThreshold] = useState(false);
+  const [exemptDays, setExemptDays] = useState('14');
+  const [showSettings, setShowSettings] = useState(false);
 
   // Load entities + active entity on mount
   useEffect(() => {
@@ -44,7 +45,8 @@ export default function GnoiseModule({ module, onClose }) {
     setSelected(new Set());
     try {
       const t = parseFloat(threshold) || 0.10;
-      const res = await fetch(`/api/daemon/gnoise?entity=${encodeURIComponent(entity)}&threshold=${t}`, {
+      const ed = parseInt(exemptDays) || 14;
+      const res = await fetch(`/api/daemon/gnoise?entity=${encodeURIComponent(entity)}&threshold=${t}&exempt_days=${ed}`, {
         signal: AbortSignal.timeout(15000),
       });
       const data = await res.json();
@@ -57,7 +59,7 @@ export default function GnoiseModule({ module, onClose }) {
       setError(err.name === 'TimeoutError' ? 'Scan timed out (15s)' : err.message);
     }
     setScanLoading(false);
-  }, [entity, threshold]);
+  }, [entity, threshold, exemptDays]);
 
   const readCell = useCallback(async () => {
     setCellLoading(true);
@@ -181,38 +183,58 @@ export default function GnoiseModule({ module, onClose }) {
             {cellLoading ? '\u23F3' : 'Read Cell'}
           </button>
           <button
-            onClick={() => setShowThreshold(!showThreshold)}
+            onClick={() => setShowSettings(!showSettings)}
             style={{
               padding: '5px 8px', fontSize: '0.7rem', fontFamily: 'var(--font-mono)',
               background: 'var(--bg-elevated)', color: 'var(--text-muted)',
               border: '1px solid var(--border)', borderRadius: 'var(--radius-sm, 4px)',
               cursor: 'pointer',
             }}
-            title="Threshold settings"
+            title="Scan settings"
           >
-            {'\u2699'}
+            {'\u2699'} Settings
           </button>
         </div>
 
-        {/* Threshold input (collapsible) */}
-        {showThreshold && (
-          <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-            <span className="text-muted" style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)' }}>
-              Threshold:
-            </span>
-            <input
-              type="number"
-              step="0.01"
-              min="0.01"
-              max="1.0"
-              value={threshold}
-              onChange={(e) => setThreshold(e.target.value)}
-              className="module-tool-input"
-              style={{ width: 70, fontSize: '0.75rem' }}
-            />
-            <span className="text-muted" style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)' }}>
-              (lower = stricter, default 0.10)
-            </span>
+        {/* Settings panel (collapsible) */}
+        {showSettings && (
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="text-muted" style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', width: 75 }}>
+                Threshold:
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                min="0.01"
+                max="1.0"
+                value={threshold}
+                onChange={(e) => setThreshold(e.target.value)}
+                className="module-tool-input"
+                style={{ width: 70, fontSize: '0.75rem' }}
+              />
+              <span className="text-muted" style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)' }}>
+                lower = stricter, default 0.10
+              </span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span className="text-muted" style={{ fontSize: '0.7rem', fontFamily: 'var(--font-mono)', width: 75 }}>
+                Exempt:
+              </span>
+              <input
+                type="number"
+                step="1"
+                min="0"
+                max="90"
+                value={exemptDays}
+                onChange={(e) => setExemptDays(e.target.value)}
+                className="module-tool-input"
+                style={{ width: 70, fontSize: '0.75rem' }}
+              />
+              <span className="text-muted" style={{ fontSize: '0.65rem', fontFamily: 'var(--font-mono)' }}>
+                days — new content needs time to settle
+              </span>
+            </div>
           </div>
         )}
       </div>
@@ -286,11 +308,29 @@ export default function GnoiseModule({ module, onClose }) {
             />
           )}
 
+          {/* Recency explanation when files were skipped */}
+          {scanResult.skipped_recent > 0 && (
+            <div style={{
+              padding: '6px 10px', margin: '4px 0',
+              background: 'rgba(86,212,221,0.06)', border: '1px solid rgba(86,212,221,0.15)',
+              borderRadius: 'var(--radius-sm, 4px)',
+              fontSize: '0.7rem', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)',
+            }}>
+              {scanResult.skipped_recent} file{scanResult.skipped_recent !== 1 ? 's' : ''} skipped
+              {' \u2014 modified in the last '}{scanResult.exempt_days}{' days.'}
+              {' New content scores low naturally; that\u2019s growth, not noise.'}
+              {' Adjust in '}<span onClick={() => setShowSettings(true)} style={{ color: 'var(--teal)', cursor: 'pointer' }}>{'\u2699 settings'}</span>{' to include newer files.'}
+            </div>
+          )}
+
           {scanResult.findings_total === 0 && (
             <div className="text-muted" style={{
               fontSize: '0.75rem', fontFamily: 'var(--font-mono)', padding: '12px 0', textAlign: 'center',
             }}>
-              No noise detected at threshold {scanResult.threshold}
+              {scanResult.skipped_recent > 0
+                ? `All auditable content passed at ${scanResult.threshold}. Try reducing the exemption window to scan newer files.`
+                : `No noise detected at threshold ${scanResult.threshold}`
+              }
             </div>
           )}
         </div>

@@ -50,7 +50,7 @@ When you type `{Sync}`, Claude re-reads the entire grounding stack:
 4. **Linked entity files** — Files from any entities linked to the active one.
 5. **Config** — Settings like save confirmation toggle.
 6. **Vine lifecycle** — For any armed perspectives, runs the full seed check cycle.
-7. **Counter reset** — Back to `t1/10`.
+7. **Counter reset** — AHK bridge resets to `t1/10` automatically when it detects {Sync}.
 
 This puts doctrine back at the *front* of Claude's attention. It's not restarting the conversation — it's refreshing the foundation that everything else is built on.
 

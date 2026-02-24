@@ -2,15 +2,14 @@
 
 ## Counter
 
-The counter tracks conversation depth. It IS the sync timer.
+The counter tracks conversation depth. AHK bridge owns it entirely.
 
 ### Rules
-- User provides the counter tag: `«tN/L emoji»`
-- Claude echoes the user's tag exactly as first line of every response.
-- Counter state is authoritative. Claude echoes it, does not compute it.
-- Resets on: {Sync}, {Full Restore}, {Warm Restore}, new conversation.
-- Does NOT reset on: {Save}, {Chunk}, {Handoff}, bonfire, task completion, compaction.
-- Lost count → recommend {Sync}.
+- First line of every response: echo the user's `«tN/L emoji»` tag character-for-character.
+- Do not track, compute, override, or maintain internal count.
+- What the user sent is what Claude returns. Claude is a mirror, never a counter.
+- AHK bridge owns the count, the emoji, all resets, and all escalation thresholds.
+- Claude never outputs a counter value that differs from the user's tag.
 
 ### Urgency Thresholds
 The counter has escalating urgency levels. Normal → sync recommended → sync urged → sync critical. Threshold boundaries and display implementation are fixture-level — the protocol requires only that escalation exists and that Claude recognizes urgency signals from the counter tag.
@@ -79,21 +78,21 @@ Hooks are subordinate to BOND_MASTER doctrine. They augment, never override.
 
 ## Commands
 
-| Command | Action | Resets Counter |
-|---------|--------|---------------|
-| {Sync} | Read hierarchy by task, write state | Yes |
-| {Full Restore} | Complete reload + full depth read | Yes |
-| {Warm Restore} | Selective session pickup via SLA | Yes |
-| {Handoff} | Draft session handoff sections | No |
-| {Save} | Write proven work (both agree) | No |
-| {Crystal} | QAIS crystallization | No |
-| {Chunk} | Session snapshot → appends to entity-local state/session_chunks.md | No |
-| {Tick} | Quick status | No |
-| {Enter ENTITY} | Load entity files, apply class boundaries | No |
-| {Exit} | Clear active entity, drop boundaries | No |
-| {Relational} | Architecture re-anchor | No |
-| {Drift?} | Self-check | No |
-| {Consult ENTITY} | Read-only lens — load entity docs, speak through lens, no entity switch | No |
+| Command | Action |
+|---------|--------|
+| {Sync} | Read hierarchy by task, write state |
+| {Full Restore} | Complete reload + full depth read |
+| {Warm Restore} | Selective session pickup via SLA |
+| {Handoff} | Draft session handoff sections |
+| {Save} | Write proven work (both agree) |
+| {Crystal} | QAIS crystallization |
+| {Chunk} | Session snapshot → appends to entity-local state/session_chunks.md |
+| {Tick} | Quick status |
+| {Enter ENTITY} | Load entity files, apply class boundaries |
+| {Exit} | Clear active entity, drop boundaries |
+| {Relational} | Architecture re-anchor |
+| {Drift?} | Self-check |
+| {Consult ENTITY} | Read-only lens — load entity docs, speak through lens, no entity switch |
 
 ## Command Recognition
 
@@ -115,7 +114,6 @@ Commands are parsed by **core keyword**, not exact string match. When Claude enc
 2. OPS/MASTER state file
 3. state/active_entity.json — if entity set, read all files at path; if null, skip
 4. Vine lifecycle — **Gate: if armed_seeders = 0, skip entirely.** Armed seeders trigger the vine pass (see VINE_GROWTH_MODEL). Disarmed perspectives are invisible to {Sync}.
-5. Reset counter
 
 {Full Restore} = {Sync} + full depth read of all referenced files + bond_gate(trigger="restore").
 

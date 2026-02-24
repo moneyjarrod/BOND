@@ -5,6 +5,73 @@ All notable changes to BOND will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.5.0] - 2026-02-24
+
+### Added
+- **D19 Unified /file-op endpoint** — Single `POST /file-op` with `op` field replaces three separate write endpoints. Daemon write friction now matches filesystem tool friction.
+- **D17 GNOISE (Noise Gnome)** — Inverted resonance auditor. Scores entity paragraphs against identity centroid to find content that no longer belongs. Full stack: panel tile → daemon → TF-IDF cosine → holding cell → triage controls. Recency exemption (14-day default) prevents false positives on new content.
+- **GNOISE panel UX** — Settings panel with adjustable threshold and exempt days. Contextual explanation when files are skipped. Smart zero-state messaging.
+- **D18 Async PowerShell execution** — Card-declared `async:true` routes to daemon job tank. Bypass valve pattern for long-running operations.
+- **D21 UTF-8 encoding fix** — cp1252 double-encoding on Windows stdin in QAIS MCP server. Two fixes: `sys.stdin.reconfigure(encoding='utf-8')` + `ensure_ascii=False` with byte-counted Content-Length.
+- **Platform_Reference entity** — Library class, 11 documented traps across 6 categories (Encoding, HTTP, Process, Path, MCP, SPA). Seeded from web research and BOND incidents.
+- **QA-Boundary entity** — Perspective class, 8 ROOTs defining diagnostic methodology for system boundary inspection. Linked to Platform_Reference.
+- **D16 Computed dry runs** — Replaces static dry_run_text + honor-system confirm with computed dry runs and mandatory gate. 9/9 validation passing.
+- **Zombie guard** — start_bond.bat checks for orphaned processes before launching daemon.
+
+### Changed
+- **Daemon v3.2.0** — All write, async, GNOISE, and encoding improvements consolidated.
+- **SKILL.md counter rule** — Pure mirror. AHK bridge owns the count, emoji, and all resets. Claude echoes, never computes.
+
+### Fixed
+- **D21 Unicode pipeline** — em dash, checkmark, arrow, ellipsis all survive /file-op round trip on Windows.
+- **D20 IS Collapse verified** — Fresh sessions use /file-op naturally for governed writes. SKILL.md instructions survive context boundary.
+
+## [2.4.0] - 2026-02-22
+
+### Added
+- **D17 GNOISE daemon** — GnoiseAuditor class + GET routes (/gnoise, /gnoise-cell, /gnoise-triage). Panel Module Bay tile with entity selector, scan trigger, findings list, priority breakdown, and triage controls.
+- **D18 Async execution** — daemon job tank for long-running PowerShell cards.
+- **D-pad Auto mode** — daemon gate checks config mode; Manual denies Claude-initiated execution, Auto passes.
+
+## [2.3.0] - 2026-02-20
+
+### Added
+- **D15 Write path safety** — /append, /replace endpoints. /write gets shadow .bak + 50% destructive overwrite gate. P9 principle (write path mirrors read path) added to CORE.
+- **D16 Computed dry runs** — Mandatory gate replaces honor-system confirmation.
+- **D14 Deferred entity loading** — {Sync} loads mandatory set only (CORE.md + ACTIVE.md + entity.json). Deferred manifest lists remaining files with size. 85% token reduction per sync for large projects.
+
+### Changed
+- **Daemon v3.1.0** — Write safety, deferred loading, dry run gate.
+
+### Fixed
+- **Pipeline Audit A1-A4** — 45 findings, 17 fixed. Security hardening (EncodedCommand L3 block, BLACKLIST_REGEX), token savings, audience hygiene.
+
+## [2.1.0] - 2026-02-17
+
+### Added
+- **D13 PowerShell execution** — Full architecture: master toggle → verb whitelist → card registration → verb-pattern match → chain splitting → path containment → escalation continuum (L0-L3) → spawn → post-exec verify → audit log. Panel UI with cards, dry run, confirmation flow.
+- **Gift Pack import** — GET /api/starters + POST /api/starters/import. Panel component for importing starter ROOT packs into perspectives.
+- **Layer 0 Warm Restore** — Entity-local state replaces global handoff as primary restore source.
+- **Handoff sweep protocol** — Mandatory ACTIVE.md open thread sweep during {Handoff}.
+- **Starter cards** — doctrine-backup, doctrine-backup-check, entity-export, repo-sync, panel-build, system-diagnostic.
+
+### Changed
+- **Panel audit** — 16 violations fixed across 2 rounds. Dead code removed, hardcoded paths → relative, tool toggle endpoint removed.
+
+## [2.0.0] - 2026-02-16
+
+### Added
+- **BOND Overhaul architecture** — Complete redesign of BOND's runtime. SKILL.md + daemon-derived state replaces 14 piecemeal doctrine file loads. Three-audience sort (runtime/constitutional/rationale) governs all content placement.
+- **Search daemon v3.0.0** — Standalone Python daemon on port 3003. TF-IDF paragraph-level search, composite payloads (/sync-complete, /enter-payload), entity-scoped indexing, SLA v2 retrieval.
+- **Composite sync** — Single POST /sync-complete returns: active entity + config + mandatory files + deferred manifest + linked identities + armed seeders + vine resonance + tracker updates + obligations.
+- **SKILL.md v1.0** — Three-zone architecture (Key Signature, Instrument, Accidentals). 52% token reduction from previous version. Runtime-only audience.
+- **D12 Tiered entity loading** — Linked entities return identity only (entity.json) on sync/restore. Full content on {Consult} or {Enter}.
+- **Entity-local state routing** — All session state ({Chunk}, {Handoff}, {Tick}) writes to active entity's local state/ subdirectory.
+- **Four entity classes** — Doctrine (static), Project (bounded), Perspective (unbounded growth + vine), Library (read-only reference).
+
+### Changed
+- **Phase 6 Switchover** — BOND_parallel is the live system. All tools, installer, and repo sync ship from the new architecture.
+
 ## [1.5.0] - 2026-02-14
 
 ### Added
