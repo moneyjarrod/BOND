@@ -25,6 +25,9 @@ node_modules/
 /installer/transfer_report.md
 /installer/output/
 
+# Personal audit log
+panel/powershell/exec_log.jsonl
+
 # Session handoffs (personal)
 /handoffs/
 
