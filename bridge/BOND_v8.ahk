@@ -250,8 +250,8 @@ ClipboardBridge(dataType) {
     
     lastClipboard := clip
     
-    ; If this is a reset command, flag the counter
-    if (command == "{Sync}" || command == "{Full Restore}") {
+    ; If this command contains a reset keyword, flag the counter
+    if (InStr(command, "Sync") || InStr(command, "Restore")) {
         FlagReset()
     }
     
@@ -366,7 +366,8 @@ ShowStatus(*) {
     }
 }
 
-; Hotstrings: detect {Sync} and {Full Restore} typed by user
+; Hotstrings: detect reset triggers typed by user
+; Any command containing Sync or Restore flags a counter reset.
 :*:{Sync}::{
     FlagReset()
     SendText("{Sync}")
@@ -375,6 +376,16 @@ ShowStatus(*) {
 :*:{Full Restore}::{
     FlagReset()
     SendText("{Full Restore}")
+}
+
+:*:{Warm Restore}::{
+    FlagReset()
+    SendText("{Warm Restore}")
+}
+
+:*:{Project Sync}::{
+    FlagReset()
+    SendText("{Project Sync}")
 }
 
 ; ═══════════════════════════════════════════════════════
