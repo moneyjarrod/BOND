@@ -3062,14 +3062,66 @@ class SearchHandler(BaseHTTPRequestHandler):
             op = body.get('op', '')
             file_path = body.get('path', '')
             initiator = body.get('initiator', 'user')
+            source = body.get('source')
+            source_cleaned = False
 
             if not op:
-                self._json(400, {'error': 'Missing "op" field. Options: replace, append, write'})
+                self._json(400, {'error': 'Missing "op" field. Options: replace, append, write, create'})
                 return
             if not file_path:
                 self._json(400, {'error': 'Missing "path" field'})
                 return
 
+            # ── D23: Staged file source ──────────────────────────
+            # When source is present, read content from that staged file
+            # inside state/ instead of from the request body.
+            if source:
+                # Mutual exclusion: source and content cannot both be present
+                if body.get('content'):
+                    self._json(400, {'error': 'Cannot specify both source and content'})
+                    return
+
+                # Security: resolve and validate source is inside state/
+                try:
+                    source_resolved = Path(os.path.join(BOND_ROOT, source)).resolve()
+                    state_resolved = Path(STATE_PATH).resolve()
+                    if not str(source_resolved).startswith(str(state_resolved) + os.sep) and source_resolved != state_resolved:
+                        self._json(400, {'error': 'Source path must be inside state/ directory'})
+                        return
+                except Exception:
+                    self._json(400, {'error': 'Source path must be inside state/ directory'})
+                    return
+
+                # Read staged content
+                if not source_resolved.is_file():
+                    self._json(400, {'error': f'Staged file not found: {source}'})
+                    return
+                try:
+                    staged_content = source_resolved.read_text(encoding='utf-8')
+                except Exception as e:
+                    self._json(400, {'error': f'Failed to read staged file: {e}'})
+                    return
+
+                if not staged_content:
+                    # Clean up empty staged file before returning error
+                    try:
+                        source_resolved.unlink()
+                    except Exception:
+                        pass
+                    self._json(400, {'error': 'Staged file is empty'})
+                    return
+
+                # Delete staged file BEFORE the target write (cleanup even on failure)
+                try:
+                    source_resolved.unlink()
+                    source_cleaned = True
+                except Exception:
+                    pass
+
+                # Inject staged content into body for downstream ops
+                body['content'] = staged_content
+
+            # ── Op dispatch (existing + create alias) ─────────────
             if op == 'replace':
                 old_text = body.get('old', '')
                 new_text = body.get('new', '')
@@ -3087,16 +3139,74 @@ class SearchHandler(BaseHTTPRequestHandler):
                 marker = body.get('marker')
                 result = file_ops.append(file_path, content, position=position, marker=marker)
 
-            elif op == 'write':
+            elif op in ('write', 'create'):
                 content = body.get('content', '')
                 confirmed = body.get('confirmed', False)
                 if content is None:
-                    self._json(400, {'error': 'write op requires "content" field'})
+                    self._json(400, {'error': f'{op} op requires "content" field'})
                     return
                 result = file_ops.write(file_path, content, confirmed=confirmed)
 
+            # ── D24: Delete operation ─────────────────────────────
+            elif op == 'delete':
+                confirmed = body.get('confirmed', False)
+
+                # Resolve path via existing containment check
+                resolved, err = file_ops._safe_path(file_path)
+                if err:
+                    self._json(400, {'error': err})
+                    return
+
+                # File must exist
+                if not resolved.is_file():
+                    self._json(400, {'error': f'File not found: {file_path}'})
+                    return
+
+                # Protected paths: entity.json and BOND_MASTER/*
+                if resolved.name == 'entity.json':
+                    self._json(400, {'error': 'Protected file \u2014 cannot delete entity.json'})
+                    return
+                master_dir = Path(os.path.join(BOND_ROOT, 'doctrine', 'BOND_MASTER')).resolve()
+                if str(resolved).startswith(str(master_dir) + os.sep) or resolved == master_dir:
+                    self._json(400, {'error': 'Protected file \u2014 cannot delete BOND_MASTER constitutional files'})
+                    return
+
+                # Gate: confirmed must be true — no exceptions
+                file_size = resolved.stat().st_size
+                if not confirmed:
+                    self._json(200, {
+                        'status': 'hold',
+                        'reason': 'Delete requires explicit confirmation',
+                        'path': file_path,
+                        'file_size': file_size,
+                        'instruction': 'Re-send with "confirmed": true to proceed',
+                    })
+                    return
+
+                # Shadow .bak BEFORE delete (D15 safety pattern)
+                bak_path = resolved.with_suffix(resolved.suffix + '.bak')
+                try:
+                    shutil.copy2(str(resolved), str(bak_path))
+                except Exception:
+                    pass  # best effort — don't block delete on backup failure
+
+                # Delete the file
+                try:
+                    resolved.unlink()
+                except Exception as e:
+                    self._json(500, {'error': f'Delete failed: {e}'})
+                    return
+
+                file_ops._log('DELETE', file_path, f"{file_size} bytes, backup={bak_path.name}")
+                result = {
+                    'path': file_path,
+                    'operation': 'delete',
+                    'deleted_size': file_size,
+                    'backup': bak_path.name,
+                }
+
             else:
-                self._json(400, {'error': f'Unknown op: {op}. Options: replace, append, write'})
+                self._json(400, {'error': f'Unknown op: {op}. Options: replace, append, write, create, delete'})
                 return
 
             # Inject initiator into log (the existing methods log internally,
@@ -3108,6 +3218,9 @@ class SearchHandler(BaseHTTPRequestHandler):
                 self._json(400, result)
             else:
                 result['initiator'] = initiator
+                if source:
+                    result['source'] = source
+                    result['source_cleaned'] = source_cleaned
                 self._json(200, result)
 
         else:

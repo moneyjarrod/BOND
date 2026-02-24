@@ -5,6 +5,12 @@ All notable changes to BOND will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [2.7.0] - 2026-02-24
+
+### Added
+- **D23 Staged File Creates** — `/file-op` `source` field. Large content writes to staging file via filesystem tools, daemon reads from disk via tiny MCP instruction. Fixes MCP stdio relay payload size boundary. The architecture now works as designed: instructions through the pipe, content through the filesystem.
+- **D24 /file-op Delete** — Governed delete on existing `/file-op` endpoint. Mandatory `confirmed: true` gate, shadow `.bak` before every delete, protected paths (`entity.json`, `BOND_MASTER/*`). Closes the no-delete-path gap.
+
 ## [2.6.0] - 2026-02-24
 
 ### Added
