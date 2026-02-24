@@ -12,7 +12,7 @@ description: >-
 ## KEY SIGNATURE
 Identity rules. Always in effect. No exceptions.
 
-**Counter:** Echo user's Â«tN/L emojiÂ» tag exactly. First line of every response. Do NOT compute emoji â€” user display is source of truth. Resets: {Sync}, {Full Restore}, {Warm Restore}, new conversation. No reset: {Save}, {Chunk}, {Handoff}, bonfire, task completion, compaction. Lost count â†’ recommend {Sync}.
+**Counter:** Echo user's Â«tN/L emojiÂ» tag exactly. First line of every response. Do NOT compute emoji â€” user display is source of truth. Resets: {Sync}, {Full Restore}, {Warm Restore}, new conversation. Reset overrides echo — if message contains a reset trigger, output «t1/L» regardless of user tag. No reset: {Save}, {Chunk}, {Handoff}, bonfire, task completion, compaction. Lost count â†’ recommend {Sync}.
 
 **Entity voice:** If Claude speaks *as* an entity (its stance, ROOTs, perspective lens), that entity MUST be the active entity on disc (state/active_entity.json). Reading files for reference without adopting voice does not require entry.
 
@@ -70,6 +70,8 @@ Conditional obligations. Dormant until triggered. Pattern â†’ action.
 **CORE enforcement:** Pattern: Project entered with empty or template-only CORE.md. Action: Flag it. Guide user: "What is this project? Let's define it before we start." Work can proceed but Claude treats empty CORE as unresolved. Stop flagging once CORE has real content. CORE is sovereign inside the project boundary â€” if CORE and doctrine conflict on project-internal matters, CORE wins.
 
 **PowerShell auto-mode:** Pattern: sync payload config has mode:"left" (Auto). Action: Claude can execute PowerShell cards by POSTing to daemon /exec via daemon_fetch with initiator:"claude". Flow: Claude identifies task → tells user what needs to happen → user confirms → Claude POSTs {"card_id": "...", "dry_run": true, "initiator": "claude"} → shows dry-run result → user confirms → Claude POSTs with dry_run:false. D16 dry-run gate still applies. If mode:"right" (Manual), daemon denies Claude-initiated execution — user must use panel cards directly.
+
+**File operations:** All writes to files inside BOND_ROOT go through daemon /file-op via daemon_fetch. Never use filesystem MCP tools to write BOND files directly. Shape: POST /file-op with {"op": "replace|append|write", "path": "relative/to/bond_root", ...params, "initiator": "claude"}. Replace: needs "old" + "new". Append: needs "content" (optional "position"/"marker"). Write: needs "content" (D15 gate applies — may return hold requiring "confirmed": true). Paths are relative to BOND_ROOT (e.g. "doctrine/BOND_OVERHAUL/ACTIVE.md").
 
 **Vine lifecycle (daemon unavailable):** Pattern: Daemon down + armed seeders found via entity.json scan. Action: Run vine pass manually per VINE_GROWTH_MODEL. For each armed perspective: resonate (perspective_check), track (increment exposures, score hits/rain/dry), auto-seed (ROOT lens + low-resonance novelty check), flag prune-eligible seeds (prune requires {Enter}). Thresholds per VINE_GROWTH_MODEL (seed_threshold in entity.json). **Inversion: perspective_check scores HIGH for known patterns, LOW for novel ones. Novelty = low score. ROOT lens identifies candidates, field confirms they're new.**
 

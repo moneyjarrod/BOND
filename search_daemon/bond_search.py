@@ -47,6 +47,7 @@ File Ops Endpoints (Cold Water — verbatim, no processing):
     POST /append  {"path": "...", "content": "...", "position": "after", "marker": "## Section"}  # insert after marker
     POST /replace {"path": "...", "old_text": "...", "new_text": "..."}  # targeted edit (D15)
     POST /write   {"path": "...", "content": "..."}         # full overwrite (gated, D15)
+    POST /file-op {"op": "replace|append|write", "path": "...", ...}  # D19 unified write
     GET  /copy?from=...&to=...                 # copy file verbatim
     GET  /export                               # full doctrine export to state/export.md
     GET  /export?entity=P11-Plumber            # single entity export
@@ -3050,8 +3051,67 @@ class SearchHandler(BaseHTTPRequestHandler):
             status_code = 200 if level < 3 else 403
             self._json(status_code, result)
 
+        elif path == '/file-op':
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(length).decode('utf-8'))
+            except Exception as e:
+                self._json(400, {'error': f'Invalid JSON body: {e}'})
+                return
+
+            op = body.get('op', '')
+            file_path = body.get('path', '')
+            initiator = body.get('initiator', 'user')
+
+            if not op:
+                self._json(400, {'error': 'Missing "op" field. Options: replace, append, write'})
+                return
+            if not file_path:
+                self._json(400, {'error': 'Missing "path" field'})
+                return
+
+            if op == 'replace':
+                old_text = body.get('old', '')
+                new_text = body.get('new', '')
+                if not old_text:
+                    self._json(400, {'error': 'replace op requires "old" field'})
+                    return
+                result = file_ops.replace(file_path, old_text, new_text)
+
+            elif op == 'append':
+                content = body.get('content', '')
+                if not content:
+                    self._json(400, {'error': 'append op requires "content" field'})
+                    return
+                position = body.get('position', 'end')
+                marker = body.get('marker')
+                result = file_ops.append(file_path, content, position=position, marker=marker)
+
+            elif op == 'write':
+                content = body.get('content', '')
+                confirmed = body.get('confirmed', False)
+                if content is None:
+                    self._json(400, {'error': 'write op requires "content" field'})
+                    return
+                result = file_ops.write(file_path, content, confirmed=confirmed)
+
+            else:
+                self._json(400, {'error': f'Unknown op: {op}. Options: replace, append, write'})
+                return
+
+            # Inject initiator into log (the existing methods log internally,
+            # but we add a wrapper log entry for the unified endpoint)
+            if 'error' not in result:
+                file_ops._log('FILE-OP', file_path, f"op={op} initiator={initiator}")
+
+            if 'error' in result:
+                self._json(400, result)
+            else:
+                result['initiator'] = initiator
+                self._json(200, result)
+
         else:
-            self._json(404, {'error': 'POST endpoints: /sync-complete, /write, /append, /replace, /exec'})
+            self._json(404, {'error': 'POST endpoints: /sync-complete, /write, /append, /replace, /exec, /file-op'})
 
     def _json(self, code, data):
         body = json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8')

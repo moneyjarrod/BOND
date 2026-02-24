@@ -716,9 +716,15 @@ def handle_request(request):
                 url = f"http://localhost:3003{endpoint}"
                 body_data = args.get("body")
                 if body_data:
+                    # D21 fix: ensure_ascii=False preserves Unicode chars,
+                    # Content-Length from byte count (not char count) for multi-byte safety
+                    body_bytes = json.dumps(body_data, ensure_ascii=False).encode('utf-8')
                     req = urllib.request.Request(url,
-                        data=json.dumps(body_data).encode('utf-8'),
-                        headers={'Content-Type': 'application/json'},
+                        data=body_bytes,
+                        headers={
+                            'Content-Type': 'application/json; charset=utf-8',
+                            'Content-Length': str(len(body_bytes)),
+                        },
                         method='POST')
                 else:
                     req = urllib.request.Request(url)
@@ -736,6 +742,10 @@ def handle_request(request):
     return {"jsonrpc": "2.0", "id": req_id, "error": {"code": -32601, "message": f"Unknown method: {method}"}}
 
 def main():
+    # D21 fix: Force UTF-8 on stdin/stdout — Windows defaults to cp1252,
+    # which garbles multi-byte UTF-8 from MCP client (em dash → â€" etc.)
+    sys.stdin.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding='utf-8')
     get_field()
     for line in sys.stdin:
         line = line.strip()
