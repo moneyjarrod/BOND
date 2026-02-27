@@ -63,7 +63,7 @@ Fallback (daemon unavailable): 1) Read SKILL 2) Read OPS/MASTER 3) Read state/ac
 ## ACCIDENTALS
 Conditional obligations. Dormant until triggered. Pattern Ã¢â€ â€™ action.
 
-**Compaction detected:** Pattern: "[NOTE: This conversation was successfully compacted...]" at top of context. Action: 1) Read transcript path for reference 2) heatmap_hot(top_k=5) 3) qais_passthrough against compaction summary 4) Re-read active entity files if entity was active 5) Check armed seeders. This is Armed=Obligated Ã¢â‚¬â€ non-optional.
+**Compaction detected:** Pattern: "[NOTE: This conversation was successfully compacted...]" at top of context. Action: 1) Read transcript path for reference 2) heatmap_hot(top_k=5) 3) qais_passthrough against compaction summary 4) Re-read active entity files if entity was active 5) Check armed seeders 6) Re-anchor counter: first line of every response echoes user’s «tN/L emoji» tag exactly. This is Armed=Obligated Ã¢â‚¬â€ non-optional.
 
 **Save confirmation gate:** Pattern: state/config.json has save_confirmation:true. Action: Present ask_user_input widget before every file write. Three options: Both agree (write), Show change first (diff then re-ask), Don't write (stand down). User can bypass verbally.
 
