@@ -1346,7 +1346,7 @@ class PerspectiveReader:
 
     def check_multi(self, perspectives, text):
         """Score text against multiple perspectives in one call.
-        
+
         Returns dict of perspective_name → check result.
         Used by /sync-complete for all armed seeders at once.
         """
@@ -1354,6 +1354,62 @@ class PerspectiveReader:
         for p in perspectives:
             results[p] = self.check(p, text)
         return results
+
+    def store(self, perspective, seed_title, seed_content):
+        """Store a seed into a perspective's .npz field.
+
+        Replicates QAISField.store() from qais_core.py:
+          identity=seed_title, role='seed', fact=seed_content
+        Creates the field file if it doesn't exist.
+        Returns {stored: bool, field_count: int, status: str}.
+        """
+        if not HAS_NUMPY:
+            return {'error': 'numpy not available'}
+
+        os.makedirs(self.perspectives_dir, exist_ok=True)
+        field_path = os.path.join(self.perspectives_dir, f"{perspective}.npz")
+
+        # Load existing field or create empty
+        identity_field = np.zeros(QAIS_N, dtype=np.float32)
+        role_fields = {}
+        stored = set()
+        count = 0
+
+        if os.path.exists(field_path):
+            try:
+                data = np.load(field_path, allow_pickle=True)
+                stored = set(data['stored'].tolist()) if 'stored' in data else set()
+                count = int(data['count']) if 'count' in data else 0
+                identity_field = data['identity_field'] if 'identity_field' in data else np.zeros(QAIS_N, dtype=np.float32)
+                role_fields = dict(data['role_fields'].item()) if 'role_fields' in data else {}
+            except Exception:
+                pass  # start fresh on corrupt file
+
+        key = f"{seed_title}|seed|{seed_content}"
+        if key in stored:
+            return {'stored': True, 'field_count': count, 'status': 'exists'}
+
+        # Compute vectors — same math as QAISField.store()
+        id_vec = qais_seed_to_vector(seed_title)
+        fact_vec = qais_seed_to_vector(seed_content)
+        identity_field = identity_field + id_vec
+        if 'seed' not in role_fields:
+            role_fields['seed'] = np.zeros(QAIS_N, dtype=np.float32)
+        role_fields['seed'] = role_fields['seed'] + (id_vec * fact_vec)  # bind = element-wise multiply
+        stored.add(key)
+        count += 1
+
+        # Save — same format as QAISField.save()
+        try:
+            np.savez(field_path,
+                     identity_field=identity_field,
+                     role_fields=role_fields,
+                     stored=np.array(list(stored), dtype=object),
+                     count=np.array(count))
+        except Exception as e:
+            return {'error': f'Failed to save field: {e}'}
+
+        return {'stored': True, 'field_count': count, 'status': 'stored'}
 
 
 perspective_reader = None  # initialized in __main__
@@ -3293,8 +3349,110 @@ class SearchHandler(BaseHTTPRequestHandler):
                     result['source_cleaned'] = source_cleaned
                 self._json(200, result)
 
+        # ── Perspective Store (bootstrap) ──
+        elif path == '/perspective-store':
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(length).decode('utf-8'))
+            except Exception as e:
+                self._json(400, {'error': f'Invalid JSON body: {e}'})
+                return
+            perspective = body.get('perspective', '')
+            seed_title = body.get('seed_title', '')
+            seed_content = body.get('seed_content', '')
+            if not perspective:
+                self._json(400, {'error': 'Missing "perspective" in body'})
+                return
+            if not seed_title:
+                self._json(400, {'error': 'Missing "seed_title" in body'})
+                return
+            if not seed_content:
+                self._json(400, {'error': 'Missing "seed_content" in body'})
+                return
+            if not perspective_reader or not perspective_reader.available():
+                self._json(500, {'error': 'numpy not available or perspectives dir not ready'})
+                return
+            result = perspective_reader.store(perspective, seed_title, seed_content)
+            if 'error' in result:
+                self._json(500, result)
+            else:
+                self._json(200, result)
+
+        # ── Vine Pass All (batch resonance) ──
+        elif path == '/vine-pass-all':
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                body = json.loads(self.rfile.read(length).decode('utf-8'))
+            except Exception as e:
+                self._json(400, {'error': f'Invalid JSON body: {e}'})
+                return
+            text = body.get('text', '')
+            entity_name = body.get('entity', '')
+            session_label = body.get('session', '')
+            if not text:
+                self._json(400, {'error': 'Missing "text" in body'})
+                return
+            if not entity_name:
+                self._json(400, {'error': 'Missing "entity" in body'})
+                return
+            if not perspective_reader or not perspective_reader.available():
+                self._json(500, {'error': 'numpy not available or perspectives dir not ready'})
+                return
+
+            # Read entity config → links array
+            entity_config = payloads._read_json(payloads.doctrine_path / entity_name / 'entity.json')
+            if not entity_config:
+                self._json(400, {'error': f'Entity not found: {entity_name}'})
+                return
+            links = entity_config.get('links', [])
+
+            # For each linked perspective, check if seeding: true
+            perspectives = {}
+            armed_count = 0
+            total_matches = 0
+            for linked_name in links:
+                linked_config = payloads._read_json(payloads.doctrine_path / linked_name / 'entity.json')
+                if not linked_config:
+                    continue
+                if linked_config.get('class') != 'perspective':
+                    continue
+                if not linked_config.get('seeding'):
+                    continue
+                # Armed seeder — run resonance check
+                armed_count += 1
+                check_result = perspective_reader.check(linked_name, text)
+                match_count = len(check_result.get('matches', []))
+                perspectives[linked_name] = {
+                    'matches': check_result.get('matches', []),
+                    'field_count': check_result.get('field_count', 0),
+                }
+                total_matches += match_count
+                # VineProcessor tracker update (same pattern as sync_complete)
+                tracker = payloads._read_json(
+                    payloads.doctrine_path / linked_name / 'seed_tracker.json') or {}
+                vine_result = vine_processor.process(
+                    linked_name, check_result, tracker, linked_config, session_label)
+                perspectives[linked_name]['vine_processing'] = {
+                    'changes': vine_result['changes'],
+                    'thresholds': vine_result['thresholds'],
+                    'written': vine_result['written'],
+                }
+                perspectives[linked_name]['tracker'] = vine_result['tracker']
+
+            total_changes = sum(
+                len(p.get('vine_processing', {}).get('changes', []))
+                for p in perspectives.values())
+            self._json(200, {
+                'entity': entity_name,
+                'perspectives': perspectives,
+                'armed_count': armed_count,
+                'total_matches': total_matches,
+                'total_changes': total_changes,
+                'timestamp': time.strftime('%Y-%m-%dT%H:%M:%S'),
+            })
+
         else:
-            self._json(404, {'error': 'POST endpoints: /sync-complete, /write, /append, /replace, /exec, /file-op'})
+            self._json(404, {'error': 'POST endpoints: /sync-complete, /write, /append, /replace, /exec, /file-op, /perspective-store, /vine-pass-all'})
 
     def _json(self, code, data):
         body = json.dumps(data, indent=2, ensure_ascii=False).encode('utf-8')
