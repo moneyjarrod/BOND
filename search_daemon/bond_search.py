@@ -1524,6 +1524,53 @@ class VineProcessor:
                     'exposures': entry['exposures'],
                 })
 
+        # === AUTO-SEED: Plant new seeds from high-scoring resonance matches ===
+        seeding_armed = config.get('seeding', False)
+        max_new_seeds = 3
+
+        if seeding_armed and resonance_result and 'matches' in resonance_result:
+            new_seed_count = 0
+            planted_date = time.strftime('%Y-%m-%d')
+
+            for match in resonance_result.get('matches', []):
+                if new_seed_count >= max_new_seeds:
+                    break
+
+                seed_name = match['seed']
+                score = match['score']
+
+                if score < threshold:
+                    continue
+
+                bare_name = seed_name[5:] if seed_name.startswith('root:') else seed_name
+                if bare_name in tracker or seed_name in tracker:
+                    continue
+
+                if seed_name.upper().startswith('ROOT'):
+                    continue
+                if 'CORE' in seed_name.upper():
+                    continue
+                if seed_name in ('entity.json', 'seed_tracker.json'):
+                    continue
+
+                tracker[bare_name] = {
+                    'planted': planted_date,
+                    'exposures': 1,
+                    'hits': 1,
+                    'rain': 0,
+                    'last_hit': f"{session_label} — {score:.4f}" if session_label else f"{score:.4f}",
+                    'last_rain': None,
+                    'collapsed_from': [],
+                }
+
+                new_seed_count += 1
+                changes.append({
+                    'seed': bare_name,
+                    'event': 'PLANTED',
+                    'score': round(score, 4),
+                    'source': seed_name,
+                })
+
         # Write updated tracker to disk
         tracker_path = self.doctrine_path / perspective / 'seed_tracker.json'
         written = False
