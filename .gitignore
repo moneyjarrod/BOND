@@ -4,6 +4,10 @@
 __pycache__/
 *.pyc
 
+# Build artifacts (daemon patches, backups)
+*.bak
+d27_d28_patch.py
+
 # Node
 node_modules/
 

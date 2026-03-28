@@ -9,7 +9,7 @@ Write-Host "  ====================================" -ForegroundColor Cyan
 
 # --- Root files ---
 Write-Host "`n  [1/9] Root files..."
-$rootFiles = @("README.md", "GETTING_STARTED.md", "SKILL.md", "CHANGELOG.md", "start_bond.bat", "stop_bond.bat", "start_daemon.bat", "start_daemon.sh", "stop_daemon.bat", "warm_restore.py", "install_bond.bat", "verify_bond.bat")
+$rootFiles = @("README.md", "GETTING_STARTED.md", "SKILL.md", "CHANGELOG.md", "start_bond.bat", "stop_bond.bat", "start_daemon.bat", "start_daemon.sh", "stop_daemon.bat", "stop_daemon.sh", "warm_restore.py", "install_bond.bat", "verify_bond.bat")
 foreach ($f in $rootFiles) {
     $s = Join-Path $src $f
     if (Test-Path $s) {
