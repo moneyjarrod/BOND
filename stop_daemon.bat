@@ -1,19 +1,54 @@
 @echo off
-REM BOND Search Daemon — Force Stop (PowerShell method)
-REM Tries multiple methods to kill port 3003
+REM BOND Search Daemon — Clean Stop (v3.5.0)
+REM Uses PID file first, port scan as fallback.
+REM Never kills all Python — surgical only.
 
-echo === Method 1: PowerShell ===
-powershell -Command "Get-NetTCPConnection -LocalPort 3003 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force; Write-Host ('Killed PID: ' + $_.OwningProcess) }"
+cd /d "%~dp0"
+setlocal EnableDelayedExpansion
 
-echo === Method 2: Kill all python ===
-taskkill /IM python.exe /F 2>nul
-taskkill /IM python3.exe /F 2>nul
-taskkill /IM pythonw.exe /F 2>nul
+set KILLED=0
 
-echo === Checking port 3003 ===
-netstat -ano | findstr ":3003"
+REM ─── Method 1: PID file ─────────────────────────────────
+if exist "state\daemon.pid" (
+    set /p SAVED_PID=<state\daemon.pid
+    echo   PID file found: !SAVED_PID!
+    taskkill /PID !SAVED_PID! /F >nul 2>&1
+    if !ERRORLEVEL!==0 (
+        echo   Killed daemon PID !SAVED_PID!
+        set /a KILLED+=1
+    ) else (
+        echo   PID !SAVED_PID! not running ^(stale PID file^)
+    )
+    del "state\daemon.pid" >nul 2>&1
+)
 
-echo.
-echo If lines appeared above, the port is still held.
-echo If nothing appeared, daemon is dead.
-pause
+REM ─── Method 2: Port scan (catches orphans) ──────────────
+:kill_loop
+set FOUND_PID=
+for /f "tokens=5" %%a in ('netstat -ano 2^>nul ^| findstr ":3003 " ^| findstr "LISTENING"') do (
+    if not "%%a"=="0" (
+        set FOUND_PID=%%a
+        taskkill /PID %%a /F >nul 2>&1
+        echo   Killed port 3003 occupant PID: %%a
+        set /a KILLED+=1
+    )
+)
+if defined FOUND_PID (
+    timeout /t 1 /nobreak >nul
+    goto kill_loop
+)
+
+REM ─── Verify ─────────────────────────────────────────────
+netstat -ano 2>nul | findstr ":3003 " | findstr "LISTENING" >nul 2>&1
+if %ERRORLEVEL%==0 (
+    echo   WARNING: Port 3003 still occupied.
+    echo   Run manually: netstat -ano ^| findstr ":3003"
+) else (
+    if %KILLED% gtr 0 (
+        echo   Port 3003 clear. %KILLED% process^(es^) stopped.
+    ) else (
+        echo   Port 3003 was already clear. No daemon running.
+    )
+)
+
+endlocal

@@ -1524,53 +1524,6 @@ class VineProcessor:
                     'exposures': entry['exposures'],
                 })
 
-        # === AUTO-SEED: Plant new seeds from high-scoring resonance matches ===
-        seeding_armed = config.get('seeding', False)
-        max_new_seeds = 3
-
-        if seeding_armed and resonance_result and 'matches' in resonance_result:
-            new_seed_count = 0
-            planted_date = time.strftime('%Y-%m-%d')
-
-            for match in resonance_result.get('matches', []):
-                if new_seed_count >= max_new_seeds:
-                    break
-
-                seed_name = match['seed']
-                score = match['score']
-
-                if score < threshold:
-                    continue
-
-                bare_name = seed_name[5:] if seed_name.startswith('root:') else seed_name
-                if bare_name in tracker or seed_name in tracker:
-                    continue
-
-                if seed_name.upper().startswith('ROOT'):
-                    continue
-                if 'CORE' in seed_name.upper():
-                    continue
-                if seed_name in ('entity.json', 'seed_tracker.json'):
-                    continue
-
-                tracker[bare_name] = {
-                    'planted': planted_date,
-                    'exposures': 1,
-                    'hits': 1,
-                    'rain': 0,
-                    'last_hit': f"{session_label} — {score:.4f}" if session_label else f"{score:.4f}",
-                    'last_rain': None,
-                    'collapsed_from': [],
-                }
-
-                new_seed_count += 1
-                changes.append({
-                    'seed': bare_name,
-                    'event': 'PLANTED',
-                    'score': round(score, 4),
-                    'source': seed_name,
-                })
-
         # Write updated tracker to disk
         tracker_path = self.doctrine_path / perspective / 'seed_tracker.json'
         written = False
@@ -1699,6 +1652,7 @@ class DaemonHeatMap:
 
 daemon_heatmap = None  # initialized in __main__
 gnoise_auditor = None  # initialized in __main__
+sla_index = None  # D28: secondary index for SLA code navigation
 
 
 # ─── GNOISE: Inverted Resonance Auditor (D17) ────────────────
@@ -2522,7 +2476,7 @@ class PayloadAssembler:
                 })
         return armed
 
-    def sync_complete(self, conversation_text=None, session_label=''):
+    def sync_complete(self, conversation_text=None, session_label='', compact=True):
         """One call replaces {Sync} steps 1-5.
         
         Returns everything Claude needs:
@@ -2601,7 +2555,62 @@ class PayloadAssembler:
         if handoff is None:
             handoff = self._read_file(self.state_path / 'handoff.md')
 
-        return {
+        # -- D27: Compact mode transformations ----------------------
+        if compact:
+            import re as _re
+            # 1. CORE.md -> summary only (body available via GET /read)
+            if 'CORE.md' in entity_files:
+                _core = entity_files['CORE.md']
+                _sections = _re.findall(r'^#{1,3}\s+(.+)$', _core, _re.MULTILINE)
+                entity_files.pop('CORE.md')
+                entity_files['_core_summary'] = {
+                    'size_kb': round(len(_core.encode('utf-8')) / 1024, 1),
+                    'sections': _sections[:30],
+                    'phase_count': _core.count('| '),
+                    'mantra_count': _core.count('"'),
+                }
+
+            # 2. ACTIVE.md -> summary if > 15KB
+            if 'ACTIVE.md' in entity_files and entity_files['ACTIVE.md']:
+                _active = entity_files['ACTIVE.md']
+                if len(_active.encode('utf-8')) > 15360:
+                    _asections = _re.findall(r'^#{1,3}\s+(.+)$', _active, _re.MULTILINE)
+                    entity_files['ACTIVE.md'] = None
+                    entity_files['_active_summary'] = {
+                        'size_kb': round(len(_active.encode('utf-8')) / 1024, 1),
+                        'open_threads': [s for s in _asections if 'thread' in s.lower() or 'open' in s.lower()][:10],
+                        'section_count': len(_asections),
+                    }
+
+            # 3. Vine resonance -> top 5 per seeder, changes filtered
+            for _pn, _v in vine.items():
+                if _v.get('resonance') and 'matches' in _v['resonance']:
+                    _v['resonance']['matches'] = _v['resonance']['matches'][:5]
+                    _v['resonance']['_trimmed'] = True
+                if _v.get('vine_processing') and 'changes' in _v['vine_processing']:
+                    _pw = _v.get('config', {}).get('prune_window', 10)
+                    _v['vine_processing']['changes'] = [
+                        c for c in _v['vine_processing']['changes']
+                        if c.get('event') in ('PLANTED', 'hit', 'rain')
+                        or (c.get('event') == 'dry' and c.get('exposures', 0) >= _pw)
+                    ]
+
+            # 4. Handoff -> warning if > 10KB
+            if handoff and len(handoff.encode('utf-8')) > 10240:
+                _first = handoff.split('\n', 1)[0]
+                _hsize = round(len(handoff.encode('utf-8')) / 1024, 1)
+                handoff = None  # clear from payload
+                _handoff_warning = {
+                    'size_kb': _hsize,
+                    'message': 'Handoff exceeds 10KB. Run {Handoff} to compact.',
+                    'first_line': _first,
+                }
+            else:
+                _handoff_warning = None
+        else:
+            _handoff_warning = None
+
+        _result = {
             'active_entity': entity_name,
             'active_class': entity_class,
             'config': config,
@@ -2614,8 +2623,12 @@ class PayloadAssembler:
             'handoff': handoff,
             'heatmap': daemon_heatmap.for_chunk(),
             # A3/T1-F1: capabilities removed — dead weight (~300 tokens/sync). Available via /status.
-            'daemon_version': '3.4.0',
+            'daemon_version': '3.5.0',
+            'compact': compact,  # D27: signal which mode was used
         }
+        if _handoff_warning:
+            _result['handoff_warning'] = _handoff_warning
+        return _result
 
     def sync_payload(self):
         """One call replaces {Sync} steps 1-4 + armed seeder scan.
@@ -3017,7 +3030,7 @@ class SearchHandler(BaseHTTPRequestHandler):
         elif path == '/sync-complete':
             # GET: entity state + armed seeders + trackers (no vine scores)
             # POST with {"text": "..."}: adds vine resonance scores
-            result = payloads.sync_complete(conversation_text=None)
+            result = payloads.sync_complete(conversation_text=None, compact=True)  # D27
             self._json(200, result)
 
         elif path == '/sync-payload':
@@ -3110,8 +3123,52 @@ class SearchHandler(BaseHTTPRequestHandler):
             results = perspective_reader.check_multi(perspectives, text)
             self._json(200, {'armed': perspectives, 'results': results})
 
+        # -- D28: SLA Code Navigation (dual index) --
+        elif path == '/sla-load':
+            file_path = params.get('path', [''])[0]
+            if not file_path:
+                self._json(400, {'error': 'Missing ?path= parameter'})
+                return
+            file_path = unquote(file_path)
+            corpus_name = params.get('name', [None])[0]
+            global sla_index
+            if sla_index is None:
+                sla_index = SearchIndex()
+            stats = sla_index.build_external(file_path, corpus_name)
+            if 'error' in stats:
+                self._json(400, stats)
+            else:
+                ts = time.strftime('%H:%M:%S')
+                print(f"  [{ts}] SLA loaded: {stats['paragraphs']} paragraphs from {stats.get('files', '?')} files ({stats['build_time_ms']}ms)")
+                self._json(200, {'loaded': True, 'watcher': 'unchanged', **stats})
+
+        elif path == '/sla-search':
+            if sla_index is None or sla_index.n == 0:
+                self._json(400, {'error': 'No SLA corpus loaded. Use /sla-load?path= first.'})
+                return
+            query = params.get('q', [''])[0]
+            if not query:
+                self._json(400, {'error': 'Missing ?q= parameter'})
+                return
+            top_n = int(params.get('top', ['10'])[0])
+            mode = params.get('mode', ['retrieve'])[0]
+            if mode not in ('auto', 'explore', 'retrieve'):
+                mode = 'retrieve'
+            result = sla_index.search(query, top_n=top_n, mode=mode)
+            self._json(200, result)
+
+        elif path == '/sla-unload':
+            sla_index = SearchIndex()  # reset to empty
+            self._json(200, {'unloaded': True, 'status': 'SLA index cleared'})
+
+        elif path == '/sla-status':
+            if sla_index is None or sla_index.n == 0:
+                self._json(200, {'loaded': False, 'paragraphs': 0})
+            else:
+                self._json(200, {'loaded': True, **sla_index.status()})
+
         else:
-            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /gnoise, /gnoise-cell, /gnoise-triage, /gnoise-all, /exec-status, /status, /reindex, /manifest, /read, /write, /copy, /export, /sync-complete, /enter-payload, /vine-data, /obligations, /heatmap-touch, /heatmap-hot, /heatmap-chunk, /heatmap-clear, /resonance-test, /resonance-multi'})
+            self._json(404, {'error': 'Endpoints: /search, /load, /unload, /duplicates, /orphans, /coverage, /similarity, /gnoise, /gnoise-cell, /gnoise-triage, /gnoise-all, /exec-status, /status, /reindex, /manifest, /read, /write, /copy, /export, /sync-complete, /enter-payload, /vine-data, /obligations, /heatmap-touch, /heatmap-hot, /heatmap-chunk, /heatmap-clear, /resonance-test, /resonance-multi, /sla-load, /sla-search, /sla-unload, /sla-status'})
 
     def do_POST(self):
         parsed = urlparse(self.path)
@@ -3129,7 +3186,8 @@ class SearchHandler(BaseHTTPRequestHandler):
             if not text:
                 self._json(400, {'error': 'Missing "text" in body (conversation context for vine scoring)'})
                 return
-            result = payloads.sync_complete(conversation_text=text, session_label=session_label)
+            compact = body.get('compact', True)  # D27: default compact
+            result = payloads.sync_complete(conversation_text=text, session_label=session_label, compact=compact)
             self._json(200, result)
 
         elif path == '/append':
@@ -3560,6 +3618,7 @@ if __name__ == '__main__':
     payloads = PayloadAssembler(BOND_ROOT, STATE_PATH, DOCTRINE_PATH)
     ps_executor = PowerShellExecutor(BOND_ROOT) if PowerShellExecutor else None
     index = SearchIndex()
+    sla_index = SearchIndex()  # D28: secondary index for code navigation
     watcher = FileWatcher(index)
 
     port = DEFAULT_PORT
@@ -3633,6 +3692,12 @@ if __name__ == '__main__':
     print(f"     GET http://localhost:{port}/heatmap-hot")
     print(f"     GET http://localhost:{port}/heatmap-chunk")
     print(f"     GET http://localhost:{port}/heatmap-clear")
+    print()
+    print(f"   SLA Code Navigation (D28):")
+    print(f"     GET http://localhost:{port}/sla-load?path=C:/file.py")
+    print(f"     GET http://localhost:{port}/sla-search?q=function_name")
+    print(f"     GET http://localhost:{port}/sla-unload")
+    print(f"     GET http://localhost:{port}/sla-status")
     print()
     print(f"   QAIS Resonance (Vine Scoring):")
     print(f"     GET http://localhost:{port}/resonance-test?perspective=P11-Plumber&text=...")

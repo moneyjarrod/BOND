@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "mode": "right",
+  "mode": "left",
   "verbs": {
     "read": {
       "enabled": true,
